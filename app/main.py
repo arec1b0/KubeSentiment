@@ -9,10 +9,12 @@ import logging
 import time
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
+import uuid
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .config import get_settings
 from .api import router
@@ -66,6 +68,35 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Application shutdown complete")
 
 
+class CorrelationIDMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware to add a correlation ID to each request/response cycle.
+
+    This helps in tracing requests across services and logging systems.
+
+    Attributes:
+        correlation_id_header (str): The name of the header used for the correlation ID
+    """
+
+    correlation_id_header: str = "X-Correlation-ID"
+
+    async def dispatch(self, request: Request, call_next):
+        """
+        Process the request and add the correlation ID to the response.
+
+        Args:
+            request (Request): The incoming request
+            call_next: The next middleware or endpoint to process the request
+
+        Returns:
+            Response: The response with the correlation ID header added
+        """
+        correlation_id = str(uuid.uuid4())
+        response = await call_next(request)
+        response.headers[self.correlation_id_header] = correlation_id
+        return response
+
+
 def create_app() -> FastAPI:
     """
     Application factory function.
@@ -92,41 +123,21 @@ def create_app() -> FastAPI:
     # Add CORS middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=settings.allowed_origins,
         allow_credentials=True,
-        allow_methods=["GET", "POST"],
+        allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    # Add request timing middleware
-    @app.middleware("http")
-    async def add_process_time_header(request: Request, call_next) -> Response:
-        """
-        Middleware to measure and add request processing time to response headers.
-
-        Args:
-            request: The incoming request
-            call_next: The next middleware or endpoint
-
-        Returns:
-            Response: The response with timing headers
-        """
-        start_time = time.time()
-        response = await call_next(request)
-        process_time = (time.time() - start_time) * 1000
-        response.headers["X-Process-Time-MS"] = f"{process_time:.2f}"
-        return response
-
-    # Add global exception handler
+    # Global exception handler for unhandled errors
     @app.exception_handler(Exception)
-    async def global_exception_handler(
-        request: Request, exc: Exception
-    ) -> JSONResponse:
+    async def global_exception_handler(exc: Exception) -> JSONResponse:
         """
         Global exception handler for unhandled errors.
 
+        Logs the error and returns a generic error response.
+
         Args:
-            request: The request that caused the exception
             exc: The exception that was raised
 
         Returns:
@@ -142,11 +153,7 @@ def create_app() -> FastAPI:
         )
 
     # Include API router
-    app.include_router(
-        router,
-        prefix="/api/v1" if not settings.debug else "",
-        tags=["sentiment-analysis"],
-    )
+    app.include_router(router, prefix="/api/v1" if not settings.debug else "")
 
     # Add root endpoint
     @app.get("/", tags=["root"])
@@ -165,6 +172,9 @@ def create_app() -> FastAPI:
             "health_url": "/health" if settings.debug else "/api/v1/health",
         }
 
+    # Add correlation ID middleware
+    app.add_middleware(CorrelationIDMiddleware)
+
     return app
 
 
@@ -175,7 +185,7 @@ app = create_app()
 if __name__ == "__main__":
     """
     Development server entry point.
-    
+
     This should only be used for local development.
     For production, use a proper ASGI server like uvicorn or gunicorn.
     """
@@ -188,6 +198,6 @@ if __name__ == "__main__":
         host=settings.host,
         port=settings.port,
         reload=settings.debug,
-        log_level=settings.log_level.lower(),
-        workers=1 if settings.debug else settings.workers,
-    )
+    log_level=settings.log_level.lower(),
+    workers=1 if settings.debug else settings.workers,
+)

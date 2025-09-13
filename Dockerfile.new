@@ -1,0 +1,46 @@
+# ---- Base Stage ----
+# Use an official Python runtime as a parent image.
+# Using a specific version is recommended for reproducibility.
+FROM python:3.9-slim as base
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# Set the working directory in the container
+WORKDIR /app
+
+
+# ---- Builder Stage ----
+# This stage installs dependencies.
+FROM base as builder
+
+# Install build dependencies
+RUN pip install --upgrade pip
+
+# Copy only the requirements file to leverage Docker cache
+COPY requirements.txt .
+
+# Install Python dependencies
+# --no-cache-dir reduces image size
+RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
+
+
+# ---- Final Stage ----
+# This is the final, production-ready image.
+FROM base as final
+
+# Copy installed dependencies from the builder stage
+COPY --from=builder /app/wheels /wheels
+COPY --from=builder /app/requirements.txt .
+RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt
+
+# Copy the application code into the container
+COPY ./app /app/app
+
+# Expose the port the app runs on
+EXPOSE 8000
+
+# Define the command to run the application
+# Use --host 0.0.0.0 to make it accessible from outside the container
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

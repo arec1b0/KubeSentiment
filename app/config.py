@@ -55,6 +55,15 @@ class Settings(BaseSettings):
         default=None, description="API key for authentication"
     )
 
+    # Explicit CORS origins configuration
+    allowed_origins: list[str] = Field(
+        default_factory=lambda: [
+            "https://example.com",
+            "https://another-example.com",
+        ],
+        description="List of allowed origins for CORS",
+    )
+
     class Config:
         env_prefix = "MLOPS_"
         env_file = ".env"
