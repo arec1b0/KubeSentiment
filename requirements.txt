@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+transformers
+torch --index-url https://download.pytorch.org/whl/cpu
+pydantic
+pydantic-settings
+python-dotenv
+requests
