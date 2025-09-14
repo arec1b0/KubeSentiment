@@ -40,7 +40,17 @@ def client(app):
 
 
 @pytest.fixture
-def client_with_mock_model(app, mock_sentiment_analyzer):
+def client_with_mock_model(app):
     """Create a test client with mocked sentiment analyzer."""
-    with patch("app.api.get_sentiment_analyzer", return_value=mock_sentiment_analyzer):
-        return TestClient(app)
+    with patch("app.api.get_sentiment_analyzer") as mock_get_analyzer:
+        mock_analyzer = MagicMock()
+        mock_analyzer.is_ready.return_value = True
+        mock_analyzer.predict.return_value = {
+            "label": "POSITIVE",
+            "score": 0.999,
+            "inference_time_ms": 10.0,
+            "model_name": "mock-model",
+            "text_length": 19
+        }
+        mock_get_analyzer.return_value = mock_analyzer
+        yield TestClient(app)
