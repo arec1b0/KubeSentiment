@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlops-sentiment-service
+  labels:
+    app: mlops-sentiment-service
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mlops-sentiment-service
+  template:
+    metadata:
+      labels:
+        app: mlops-sentiment-service
+        version: v1
+    spec:
+      containers:
+      - name: sentiment-service
+        image: mlops-sentiment:latest
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: MLOPS_DEBUG
+          value: "false"
+        - name: MLOPS_LOG_LEVEL
+          value: "INFO"
+        - name: MLOPS_WORKERS
+          value: "1"
+        - name: MLOPS_ENABLE_METRICS
+          value: "true"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: models-cache
+          mountPath: /app/models
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: models-cache
+        emptyDir: {}
+      securityContext:
+        fsGroup: 1000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlops-sentiment-service
+  labels:
+    app: mlops-sentiment-service
+spec:
+  selector:
+    app: mlops-sentiment-service
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mlops-sentiment-service
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  tls:
+  - hosts:
+    - sentiment-api.example.com
+    secretName: sentiment-api-tls
+  rules:
+  - host: sentiment-api.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mlops-sentiment-service
+            port:
+              number: 80

@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mlops-sentiment-config
+  labels:
+    app: mlops-sentiment-service
+data:
+  MLOPS_DEBUG: "false"
+  MLOPS_LOG_LEVEL: "INFO"
+  MLOPS_HOST: "0.0.0.0"
+  MLOPS_PORT: "8000"
+  MLOPS_WORKERS: "1"
+  MLOPS_MODEL_NAME: "distilbert-base-uncased-finetuned-sst-2-english"
+  MLOPS_MODEL_CACHE_DIR: "/app/models"
+  MLOPS_ENABLE_METRICS: "true"
+  MLOPS_ALLOWED_ORIGINS: "*"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mlops-sentiment-secrets
+  labels:
+    app: mlops-sentiment-service
+type: Opaque
+data:
+  # Add any sensitive configuration here (base64 encoded)
+  # HUGGINGFACE_TOKEN: <base64-encoded-token>
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mlops-sentiment-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: mlops-sentiment-service
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mlops-sentiment-pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: mlops-sentiment-service
