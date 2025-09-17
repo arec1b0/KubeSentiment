@@ -1,9 +1,12 @@
-fastapi
-uvicorn[standard]
-transformers
-torch --index-url https://download.pytorch.org/whl/cpu
-pydantic
-pydantic-settings
-python-dotenv
-requests
-prometheus-client
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+transformers==4.35.2
+torch==2.1.1 --index-url https://download.pytorch.org/whl/cpu
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+requests==2.31.0
+prometheus-client==0.19.0
+pytest==7.4.3
+pytest-asyncio==0.21.1
+structlog==23.2.0

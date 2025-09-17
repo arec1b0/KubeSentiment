@@ -5,8 +5,8 @@ This module handles model loading, caching, and prediction logic
 for sentiment analysis using Hugging Face transformers.
 """
 
-import logging
 import time
+import hashlib
 from typing import Dict, Optional, Any
 from functools import lru_cache
 
@@ -14,8 +14,9 @@ import torch
 from transformers import pipeline, Pipeline
 
 from ..config import get_settings
+from ..logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SentimentAnalyzer:
@@ -31,7 +32,76 @@ class SentimentAnalyzer:
         self.settings = get_settings()
         self._pipeline: Optional[Pipeline] = None
         self._is_loaded = False
+        self._prediction_cache: Dict[str, Dict[str, Any]] = {}
+        self._cache_max_size = 1000  # Maximum number of cached predictions
         self._load_model()
+
+    def _get_cache_key(self, text: str) -> str:
+        """
+        Generate a cache key for the given text.
+
+        Args:
+            text: The input text
+
+        Returns:
+            str: A hash-based cache key
+        """
+        # Create a hash of the text for cache key
+        return hashlib.md5(text.encode("utf-8")).hexdigest()
+
+    def _get_cached_prediction(self, cache_key: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve a cached prediction if it exists.
+
+        Args:
+            cache_key: The cache key to look up
+
+        Returns:
+            Optional[Dict[str, Any]]: Cached prediction result or None
+        """
+        if cache_key in self._prediction_cache:
+            cached_result = self._prediction_cache[cache_key]
+            logger.debug(f"Cache hit for text hash: {cache_key[:8]}...")
+            return cached_result
+        return None
+
+    def _cache_prediction(self, cache_key: str, result: Dict[str, Any]) -> None:
+        """
+        Cache a prediction result.
+
+        Args:
+            cache_key: The cache key
+            result: The prediction result to cache
+        """
+        if len(self._prediction_cache) >= self._cache_max_size:
+            # Remove oldest entry (simple FIFO eviction)
+            oldest_key = next(iter(self._prediction_cache))
+            del self._prediction_cache[oldest_key]
+            logger.debug("Cache eviction: removed oldest entry")
+
+        self._prediction_cache[cache_key] = result
+        logger.debug(f"Cached prediction for text hash: {cache_key[:8]}...")
+
+    def clear_cache(self) -> None:
+        """
+        Clear all cached predictions.
+        """
+        cache_size = len(self._prediction_cache)
+        self._prediction_cache.clear()
+        logger.info(f"Cleared prediction cache ({cache_size} entries)")
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """
+        Get cache statistics.
+
+        Returns:
+            Dict[str, Any]: Cache statistics
+        """
+        return {
+            "cache_size": len(self._prediction_cache),
+            "cache_max_size": self._cache_max_size,
+            "cache_hit_ratio": 0.0,  # Could be implemented with hit/miss counters
+        }
 
     def _load_model(self) -> None:
         """
@@ -110,7 +180,19 @@ class SentimentAnalyzer:
         if not text or not text.strip():
             raise ValueError("Input text cannot be empty")
 
+        # Generate cache key
+        cache_key = self._get_cache_key(text.strip())
+
+        # Check cache first
+        cached_result = self._get_cached_prediction(cache_key)
+        if cached_result:
+            # Return cached result with cache indicator
+            cached_result_copy = cached_result.copy()
+            cached_result_copy["cached"] = True
+            return cached_result_copy
+
         # Truncate text if too long
+        original_text = text
         if len(text) > self.settings.max_text_length:
             text = text[: self.settings.max_text_length]
             logger.warning(
@@ -124,6 +206,18 @@ class SentimentAnalyzer:
             result = self._pipeline(text)[0]
             inference_time = (time.time() - start_time) * 1000
 
+            prediction_result = {
+                "label": result["label"],
+                "score": float(result["score"]),
+                "inference_time_ms": round(inference_time, 2),
+                "model_name": self.settings.model_name,
+                "text_length": len(original_text),
+                "cached": False,
+            }
+
+            # Cache the result
+            self._cache_prediction(cache_key, prediction_result)
+
             # Record metrics (import here to avoid circular imports)
             try:
                 from ..monitoring import get_metrics
@@ -132,18 +226,14 @@ class SentimentAnalyzer:
                 metrics.record_inference_duration(
                     inference_time / 1000
                 )  # Convert to seconds
-                metrics.record_prediction_metrics(float(result["score"]), len(text))
+                metrics.record_prediction_metrics(
+                    float(result["score"]), len(original_text)
+                )
             except ImportError:
                 # Metrics not available, continue without them
                 pass
 
-            return {
-                "label": result["label"],
-                "score": float(result["score"]),
-                "inference_time_ms": round(inference_time, 2),
-                "model_name": self.settings.model_name,
-                "text_length": len(text),
-            }
+            return prediction_result
 
         except Exception as e:
             logger.error(f"Prediction failed: {e}")
@@ -156,6 +246,7 @@ class SentimentAnalyzer:
         Returns:
             Dict[str, Any]: Model information and status
         """
+        cache_stats = self.get_cache_stats()
         return {
             "model_name": self.settings.model_name,
             "is_loaded": self._is_loaded,
@@ -166,6 +257,7 @@ class SentimentAnalyzer:
             "device_count": torch.cuda.device_count()
             if torch.cuda.is_available()
             else 0,
+            "cache_stats": cache_stats,
         }
 
     def get_performance_metrics(self) -> Dict[str, Any]:

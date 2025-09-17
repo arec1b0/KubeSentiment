@@ -10,8 +10,9 @@ import time
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 import uuid
+import threading
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -19,12 +20,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from .config import get_settings
 from .api import router
 from .ml.sentiment import get_sentiment_analyzer
+from .logging_config import setup_structured_logging, get_logger
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+# Setup structured logging
+setup_structured_logging()
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -92,6 +92,10 @@ class CorrelationIDMiddleware(BaseHTTPMiddleware):
             Response: The response with the correlation ID header added
         """
         correlation_id = str(uuid.uuid4())
+
+        # Set correlation ID in thread-local storage for logging
+        setattr(threading.current_thread(), "correlation_id", correlation_id)
+
         response = await call_next(request)
         response.headers[self.correlation_id_header] = correlation_id
         return response

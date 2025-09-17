@@ -5,7 +5,6 @@ This module contains all API endpoints organized using FastAPI routers
 for better modularity and maintainability.
 """
 
-import logging
 import time
 from typing import Dict, Any
 
@@ -14,8 +13,9 @@ from pydantic import BaseModel, Field, validator
 
 from .config import get_settings, Settings
 from .ml.sentiment import get_sentiment_analyzer, SentimentAnalyzer
+from .logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Create API router
 router = APIRouter()
@@ -123,14 +123,10 @@ async def predict_sentiment(
 
         return PredictionResponse(**result)
 
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=f"Invalid input: {str(e)}")
-    except RuntimeError as e:
-        logger.error(f"Prediction error: {e}")
-        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
     except Exception as e:
-        logger.error(f"Unexpected error during prediction: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        from .utils.error_handlers import handle_prediction_error
+
+        handle_prediction_error(e, "prediction")
 
 
 @router.get(
@@ -193,8 +189,9 @@ async def get_prometheus_metrics(
         return Response(content=content, media_type=content_type)
 
     except Exception as e:
-        logger.error(f"Error retrieving metrics: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve metrics")
+        from .utils.error_handlers import handle_prometheus_metrics_error
+
+        handle_prometheus_metrics_error(e)
 
 
 @router.get(
@@ -225,8 +222,9 @@ async def get_metrics_json(
         return MetricsResponse(**metrics)
 
     except Exception as e:
-        logger.error(f"Error retrieving metrics: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve metrics")
+        from .utils.error_handlers import handle_metrics_error
+
+        handle_metrics_error(e)
 
 
 @router.get(
@@ -249,7 +247,6 @@ async def get_model_info(
     try:
         return analyzer.get_model_info()
     except Exception as e:
-        logger.error(f"Error retrieving model info: {e}")
-        raise HTTPException(
-            status_code=500, detail="Failed to retrieve model information"
-        )
+        from .utils.error_handlers import handle_model_info_error
+
+        handle_model_info_error(e)

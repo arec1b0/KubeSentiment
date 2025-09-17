@@ -50,7 +50,6 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", description="Logging level")
 
     # Security settings
-    cors_origins: list = Field(default=["*"], description="CORS allowed origins")
     api_key: Optional[str] = Field(
         default=None, description="API key for authentication"
     )
@@ -68,6 +67,7 @@ class Settings(BaseSettings):
         env_prefix = "MLOPS_"
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"  # Ignore extra environment variables
 
 
 # Global settings instance
