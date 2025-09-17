@@ -43,19 +43,43 @@ class SentimentAnalyzer:
         try:
             logger.info(f"Loading sentiment analysis model: {self.settings.model_name}")
 
-            self._pipeline = pipeline(
-                "sentiment-analysis",
-                model=self.settings.model_name,
-                cache_dir=self.settings.model_cache_dir,
-            )
+            if self.settings.model_cache_dir:
+                self._pipeline = pipeline(
+                    "sentiment-analysis",
+                    model=self.settings.model_name,
+                    model_kwargs={"cache_dir": self.settings.model_cache_dir},
+                )
+            else:
+                self._pipeline = pipeline(
+                    "sentiment-analysis",
+                    model=self.settings.model_name,
+                )
 
             self._is_loaded = True
             logger.info("Sentiment analysis model loaded successfully")
+
+            # Update metrics
+            try:
+                from ..monitoring import get_metrics
+
+                metrics = get_metrics()
+                metrics.set_model_status(True)
+            except ImportError:
+                pass
 
         except Exception as e:
             logger.error(f"Failed to load sentiment analysis model: {e}")
             self._pipeline = None
             self._is_loaded = False
+
+            # Update metrics
+            try:
+                from ..monitoring import get_metrics
+
+                metrics = get_metrics()
+                metrics.set_model_status(False)
+            except ImportError:
+                pass
 
     def is_ready(self) -> bool:
         """
@@ -99,6 +123,19 @@ class SentimentAnalyzer:
             # Perform prediction
             result = self._pipeline(text)[0]
             inference_time = (time.time() - start_time) * 1000
+
+            # Record metrics (import here to avoid circular imports)
+            try:
+                from ..monitoring import get_metrics
+
+                metrics = get_metrics()
+                metrics.record_inference_duration(
+                    inference_time / 1000
+                )  # Convert to seconds
+                metrics.record_prediction_metrics(float(result["score"]), len(text))
+            except ImportError:
+                # Metrics not available, continue without them
+                pass
 
             return {
                 "label": result["label"],

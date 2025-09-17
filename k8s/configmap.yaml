@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sentiment-config
+  namespace: mlops-sentiment
+  labels:
+    app: sentiment-service
+    component: config
+data:
+  MLOPS_DEBUG: "false"
+  MLOPS_LOG_LEVEL: "INFO"
+  MLOPS_HOST: "0.0.0.0"
+  MLOPS_PORT: "8000"
+  MLOPS_ENABLE_METRICS: "true"
+  MLOPS_MODEL_NAME: "distilbert-base-uncased-finetuned-sst-2-english"
+  MLOPS_MAX_TEXT_LENGTH: "512"
+  MLOPS_MAX_REQUEST_TIMEOUT: "30"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sentiment-config-dev
+  namespace: mlops-sentiment
+  labels:
+    app: sentiment-service
+    component: config
+    environment: development
+data:
+  MLOPS_DEBUG: "true"
+  MLOPS_LOG_LEVEL: "DEBUG"
+  MLOPS_HOST: "0.0.0.0"
+  MLOPS_PORT: "8000"
+  MLOPS_ENABLE_METRICS: "true"
+  MLOPS_MODEL_NAME: "distilbert-base-uncased-finetuned-sst-2-english"
+  MLOPS_MAX_TEXT_LENGTH: "512"
+  MLOPS_MAX_REQUEST_TIMEOUT: "30"

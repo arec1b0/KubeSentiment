@@ -5,6 +5,7 @@ A production-ready sentiment analysis microservice built with FastAPI and contai
 ## Architecture Overview
 
 This microservice implements a sentiment analysis solution using:
+
 - **FastAPI** for high-performance API development
 - **DistilBERT** for efficient sentiment classification
 - **Docker** for containerization and deployment
@@ -59,6 +60,7 @@ curl -X GET http://localhost:8000/health
 ```
 
 **Response:**
+
 ```json
 {"status":"ok","model_status":"ok"}
 ```
@@ -86,6 +88,7 @@ curl -X POST http://localhost:8000/predict \
 ```
 
 **Response (Positive):**
+
 ```json
 {"label":"POSITIVE","score":0.99}
 ```
@@ -99,6 +102,7 @@ curl -X POST http://localhost:8000/predict \
 ```
 
 **Response (Negative):**
+
 ```json
 {"label":"NEGATIVE","score":0.99}
 ```
@@ -107,23 +111,26 @@ curl -X POST http://localhost:8000/predict \
 
 FastAPI automatically generates interactive API documentation:
 
-- **Swagger UI:** http://localhost:8000/docs
-- **ReDoc:** http://localhost:8000/redoc
+- **Swagger UI:** <http://localhost:8000/docs>
+- **ReDoc:** <http://localhost:8000/redoc>
 
 ## Technical Specifications
 
 ### Model Details
+
 - **Model**: DistilBERT base uncased fine-tuned on SST-2
 - **Input**: Text strings (any length)
 - **Output**: Binary sentiment classification (POSITIVE/NEGATIVE) with confidence scores
 - **Performance**: Optimized for CPU inference
 
 ### System Requirements
+
 - **Memory**: Minimum 2GB RAM
 - **CPU**: Multi-core recommended for concurrent requests
 - **Storage**: ~500MB for model weights and dependencies
 
 ### Response Time
+
 - **Target**: < 100ms per request
 - **Monitoring**: Response times tracked via X-Process-Time-MS header
 
@@ -150,42 +157,118 @@ The service implements robust error handling:
 ### Local Development
 
 1. Install dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
 
 2. Run the application:
+
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+python run.py
+```
+
+### Docker Deployment
+
+```bash
+# Build and run with Docker
+docker build -t sentiment-service:latest .
+docker run -d -p 8000:8000 --name sentiment-app sentiment-service:latest
+```
+
+### Kubernetes Deployment
+
+#### Quick Start with Minikube
+
+```bash
+# 1. Setup Minikube
+bash scripts/setup-minikube.sh
+
+# 2. Deploy the service
+bash scripts/deploy.sh
+
+# 3. Access the service
+curl http://$(minikube ip):30800/health
+```
+
+#### Quick Start with Kind
+
+```bash
+# 1. Setup Kind cluster
+bash scripts/setup-kind.sh
+
+# 2. Deploy the service  
+bash scripts/deploy.sh
+
+# 3. Access the service
+curl http://localhost:30800/health
+```
+
+#### Manual Kubernetes Deployment
+
+```bash
+# Apply all manifests
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+
+# Optional: Apply Ingress and HPA
+kubectl apply -f k8s/ingress.yaml  # Requires NGINX Ingress Controller
+kubectl apply -f k8s/hpa.yaml      # Requires metrics server
+
+# Check deployment
+kubectl get pods -n mlops-sentiment
+kubectl get services -n mlops-sentiment
 ```
 
 ### Production Deployment
 
-Use the provided Dockerfile for containerized deployment in production environments.
+Use the provided Kubernetes manifests for production deployment with proper resource limits, health checks, and autoscaling capabilities.
 
 ## Cleanup
 
-To stop and remove the container:
+### Docker Cleanup
 
 ```bash
-docker stop my-sentiment-app
-docker rm my-sentiment-app
+# Stop and remove Docker container
+docker stop sentiment-app
+docker rm sentiment-app
+docker rmi sentiment-service:latest
+```
+
+### Kubernetes Cleanup
+
+```bash
+# Remove all Kubernetes resources
+bash scripts/cleanup.sh
+
+# Or manually delete namespace
+kubectl delete namespace mlops-sentiment
+
+# Stop local clusters
+minikube stop    # For Minikube
+kind delete cluster --name mlops-sentiment  # For Kind
 ```
 
 ## Development Roadmap
 
 Future enhancements planned:
-- Kubernetes deployment configurations
-- Advanced monitoring and alerting
+
+- ✅ Kubernetes deployment configurations
+- Advanced monitoring and alerting (Prometheus/Grafana)
 - Model versioning and A/B testing
-- CI/CD pipeline integration
-- Distributed tracing and logging
+- CI/CD pipeline integration (GitHub Actions/GitLab CI)
+- Distributed tracing and logging (Jaeger/OpenTelemetry)
 - Multi-model support
 - Batch processing capabilities
+- Helm charts for easier Kubernetes deployment
+- GitOps integration (ArgoCD/Flux)
 
 ## Contributing
 
 This project follows MLOps best practices and welcomes contributions for:
+
 - Performance optimizations
 - Additional model integrations
 - Enhanced monitoring capabilities

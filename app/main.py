@@ -175,6 +175,15 @@ def create_app() -> FastAPI:
     # Add correlation ID middleware
     app.add_middleware(CorrelationIDMiddleware)
 
+    # Add metrics middleware
+    try:
+        from .monitoring import MetricsMiddleware
+
+        app.add_middleware(MetricsMiddleware)
+        logger.info("Prometheus metrics middleware enabled")
+    except ImportError as e:
+        logger.warning(f"Prometheus metrics not available: {e}")
+
     return app
 
 
@@ -198,6 +207,6 @@ if __name__ == "__main__":
         host=settings.host,
         port=settings.port,
         reload=settings.debug,
-    log_level=settings.log_level.lower(),
-    workers=1 if settings.debug else settings.workers,
-)
+        log_level=settings.log_level.lower(),
+        workers=1 if settings.debug else settings.workers,
+    )

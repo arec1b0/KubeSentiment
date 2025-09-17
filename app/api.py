@@ -165,16 +165,50 @@ async def health_check(
 
 @router.get(
     "/metrics",
-    response_model=MetricsResponse,
-    summary="Service metrics",
-    description="Get performance metrics and system information.",
+    summary="Prometheus metrics",
+    description="Get metrics in Prometheus format for monitoring and alerting.",
 )
-async def get_metrics(
+async def get_prometheus_metrics(
+    settings: Settings = Depends(get_settings),
+):
+    """
+    Get metrics in Prometheus format.
+
+    Args:
+        settings: Application settings
+
+    Returns:
+        str: Metrics in Prometheus text format
+    """
+    if not settings.enable_metrics:
+        raise HTTPException(status_code=404, detail="Metrics endpoint is disabled")
+
+    try:
+        from .monitoring import get_metrics
+
+        metrics = get_metrics()
+        content = metrics.get_metrics()
+        content_type = metrics.get_metrics_content_type()
+
+        return Response(content=content, media_type=content_type)
+
+    except Exception as e:
+        logger.error(f"Error retrieving metrics: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve metrics")
+
+
+@router.get(
+    "/metrics-json",
+    response_model=MetricsResponse,
+    summary="Service metrics (JSON)",
+    description="Get performance metrics and system information in JSON format (legacy endpoint).",
+)
+async def get_metrics_json(
     analyzer: SentimentAnalyzer = Depends(get_sentiment_analyzer),
     settings: Settings = Depends(get_settings),
 ) -> MetricsResponse:
     """
-    Get service performance metrics.
+    Get service performance metrics in JSON format.
 
     Args:
         analyzer: The sentiment analyzer instance
