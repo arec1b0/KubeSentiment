@@ -1,0 +1,29 @@
+# GitHub Actions CI Pipeline
+# This workflow provides a foundational continuous integration setup
+# that can be extended for any software repository
+
+name: CI Pipeline
+
+# Trigger configuration - runs automatically on push to main branch
+on:
+  push:
+    branches: [ main ]
+
+# Job definitions
+jobs:
+  # Build job - handles the core CI operations
+  build:
+    # Use the latest Ubuntu environment for consistent, reliable builds
+    runs-on: ubuntu-latest
+    
+    # Sequential steps for the CI process
+    steps:
+      # Step 1: Checkout repository source code
+      # Uses the official GitHub action to fetch the latest code
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # Step 2: Initialize CI pipeline
+      # Confirms the pipeline has started successfully
+      - name: Start CI Pipeline
+        run: echo "CI Pipeline started!"
