@@ -1,0 +1,109 @@
+# Staging Environment Configuration
+# Конфигурация для staging окружения
+
+name: staging
+
+# URL окружения
+url: https://staging-sentiment-api.yourdomain.com
+
+# Правила защиты
+protection_rules:
+  # Разрешенные ветки для развертывания
+  deployment_branches:
+    - main
+
+  # Требования к reviewers
+  required_reviewers:
+    count: 1
+    users:
+      - devops-team
+    teams:
+      - mlops-reviewers
+
+  # Задержка перед развертыванием (в минутах)
+  wait_timer: 2
+
+# Переменные окружения
+variables:
+  ENVIRONMENT: staging
+  LOG_LEVEL: INFO
+  REPLICAS: 2
+  CPU_REQUEST: 500m
+  CPU_LIMIT: 1000m
+  MEMORY_REQUEST: 1Gi
+  MEMORY_LIMIT: 2Gi
+
+  # Kubernetes настройки
+  NAMESPACE: mlops-sentiment-staging
+  INGRESS_HOST: staging-sentiment-api.yourdomain.com
+
+  # Мониторинг
+  METRICS_ENABLED: true
+  PROMETHEUS_SCRAPE: true
+  GRAFANA_DASHBOARD: true
+
+  # Особенности staging окружения
+  AUTO_RELOAD: false
+  DEBUG_MODE: false
+  ENABLE_PROFILING: false
+  HEALTH_CHECK_INTERVAL: 30
+
+  # SSL/TLS
+  TLS_ENABLED: true
+  CERT_MANAGER_ISSUER: letsencrypt-staging
+
+# Секреты
+secrets:
+  - KUBE_CONFIG
+  - SLACK_WEBHOOK_URL
+  - DB_PASSWORD
+  - API_KEY
+  - SSL_CERT_KEY # Для TLS сертификатов
+
+# Дополнительные настройки
+settings:
+  # Автоматическое тестирование после развертывания
+  post_deployment_tests: true
+  smoke_tests_enabled: true
+  integration_tests_enabled: true
+
+  # Лимиты ресурсов
+  max_concurrent_deployments: 1
+  deployment_timeout_minutes: 15
+  rollback_on_failure: true
+
+  # Blue-Green deployment
+  deployment_strategy: rolling_update
+  max_surge: 1
+  max_unavailable: 0
+
+  # Уведомления
+  notifications:
+    slack:
+      channel: "#staging-deployments"
+      on_success: true
+      on_failure: true
+      include_metrics: true
+
+    github:
+      create_deployment_status: true
+      comment_on_pr: true
+      create_release_notes: true
+
+  # Мониторинг и алерты
+  monitoring:
+    health_checks:
+      - endpoint: /health
+        interval: 30s
+        timeout: 10s
+      - endpoint: /metrics
+        interval: 60s
+        timeout: 5s
+
+    alerts:
+      - name: high_error_rate
+        condition: error_rate > 5%
+        duration: 5m
+      - name: high_latency
+        condition: p95_latency > 1s
+        duration: 2m

@@ -1,0 +1,72 @@
+# Development Environment Configuration
+# Конфигурация для development окружения
+
+name: development
+
+# URL окружения (будет показан в GitHub)
+url: https://dev-sentiment-api.yourdomain.com
+
+# Правила защиты
+protection_rules:
+  # Разрешенные ветки для развертывания
+  deployment_branches:
+    - develop
+    - feature/*
+
+  # Требования к reviewers
+  required_reviewers:
+    count: 0 # Для dev не требуем review
+
+  # Задержка перед развертыванием (в минутах)
+  wait_timer: 0
+
+# Переменные окружения (не секретные)
+variables:
+  ENVIRONMENT: development
+  LOG_LEVEL: DEBUG
+  REPLICAS: 1
+  CPU_REQUEST: 250m
+  CPU_LIMIT: 500m
+  MEMORY_REQUEST: 512Mi
+  MEMORY_LIMIT: 1Gi
+
+  # Kubernetes настройки
+  NAMESPACE: mlops-sentiment-dev
+  INGRESS_HOST: dev-sentiment-api.yourdomain.com
+
+  # Мониторинг
+  METRICS_ENABLED: true
+  PROMETHEUS_SCRAPE: true
+
+  # Особенности dev окружения
+  AUTO_RELOAD: true
+  DEBUG_MODE: true
+  ENABLE_PROFILING: true
+
+# Секреты (настраиваются через GitHub UI)
+secrets:
+  - KUBE_CONFIG # Kubeconfig для dev кластера
+  - SLACK_WEBHOOK_URL # Webhook для dev уведомлений (опционально)
+  - DB_PASSWORD # Пароль базы данных (если используется)
+  - API_KEY # API ключи для внешних сервисов
+
+# Дополнительные настройки
+settings:
+  # Автоматическое удаление старых деплойментов
+  auto_cleanup: true
+  cleanup_after_days: 7
+
+  # Лимиты ресурсов
+  max_concurrent_deployments: 1
+  deployment_timeout_minutes: 10
+
+  # Уведомления
+  notifications:
+    slack:
+      channel: "#dev-deployments"
+      on_success: false # Не уведомляем об успешных dev деплойментах
+      on_failure: true
+
+    github:
+      create_deployment_status: true
+      comment_on_pr: true

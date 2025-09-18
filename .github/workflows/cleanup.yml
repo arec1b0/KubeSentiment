@@ -1,0 +1,219 @@
+# Cleanup Workflow
+# Автоматическая очистка старых артефактов и ресурсов
+
+name: Cleanup
+
+on:
+  schedule:
+    # Запускается каждую неделю в воскресенье в 2:00 UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      cleanup_type:
+        description: 'Type of cleanup to perform'
+        required: true
+        type: choice
+        options:
+        - all
+        - docker-images
+        - workflow-runs
+        - dev-deployments
+      days_to_keep:
+        description: 'Days to keep (default: 30)'
+        required: false
+        type: number
+        default: 30
+
+jobs:
+  cleanup-docker-images:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.cleanup_type == 'docker-images' || github.event.inputs.cleanup_type == 'all' || github.event_name == 'schedule'
+    
+    steps:
+    - name: Cleanup old Docker images
+      uses: actions/delete-package-versions@v4
+      with:
+        package-name: ${{ github.event.repository.name }}
+        package-type: 'container'
+        min-versions-to-keep: 10
+        delete-only-untagged-versions: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Cleanup development tags
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { owner, repo } = context.repo;
+          const daysToKeep = ${{ github.event.inputs.days_to_keep || 30 }};
+          const cutoffDate = new Date();
+          cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+          
+          // Получаем все версии пакета
+          const { data: versions } = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
+            package_type: 'container',
+            package_name: repo,
+            org: owner,
+            per_page: 100
+          });
+          
+          // Фильтруем и удаляем старые development теги
+          for (const version of versions) {
+            const createdAt = new Date(version.created_at);
+            const isDev = version.metadata.container.tags.some(tag => 
+              tag.includes('develop-') || tag.includes('feature-') || tag.includes('pr-')
+            );
+            
+            if (isDev && createdAt < cutoffDate) {
+              console.log(`Deleting old dev version: ${version.id}`);
+              try {
+                await github.rest.packages.deletePackageVersionForOrg({
+                  package_type: 'container',
+                  package_name: repo,
+                  org: owner,
+                  package_version_id: version.id
+                });
+              } catch (error) {
+                console.log(`Failed to delete version ${version.id}: ${error.message}`);
+              }
+            }
+          }
+
+  cleanup-workflow-runs:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.cleanup_type == 'workflow-runs' || github.event.inputs.cleanup_type == 'all' || github.event_name == 'schedule'
+    
+    steps:
+    - name: Cleanup old workflow runs
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { owner, repo } = context.repo;
+          const daysToKeep = ${{ github.event.inputs.days_to_keep || 30 }};
+          const cutoffDate = new Date();
+          cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+          
+          // Получаем все workflow runs
+          const { data: workflows } = await github.rest.actions.listRepoWorkflows({
+            owner,
+            repo
+          });
+          
+          for (const workflow of workflows.workflows) {
+            const { data: runs } = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: workflow.id,
+              per_page: 100,
+              status: 'completed'
+            });
+            
+            // Удаляем старые runs
+            for (const run of runs.workflow_runs) {
+              const createdAt = new Date(run.created_at);
+              if (createdAt < cutoffDate) {
+                console.log(`Deleting old workflow run: ${run.id} from ${run.created_at}`);
+                try {
+                  await github.rest.actions.deleteWorkflowRun({
+                    owner,
+                    repo,
+                    run_id: run.id
+                  });
+                } catch (error) {
+                  console.log(`Failed to delete run ${run.id}: ${error.message}`);
+                }
+              }
+            }
+          }
+
+  cleanup-dev-deployments:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.cleanup_type == 'dev-deployments' || github.event.inputs.cleanup_type == 'all'
+    environment: development
+    
+    steps:
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+
+    - name: Configure kubectl for development
+      run: |
+        echo "${{ secrets.KUBE_CONFIG_DEV }}" | base64 -d > kubeconfig
+        export KUBECONFIG=kubeconfig
+
+    - name: Cleanup old development deployments
+      run: |
+        export KUBECONFIG=kubeconfig
+        
+        echo "🧹 Cleaning up old development deployments..."
+        
+        # Получаем все поды в dev namespace старше 7 дней
+        kubectl get pods -n mlops-sentiment-dev \
+          --field-selector=status.phase!=Running \
+          -o json | jq -r '.items[] | select(.metadata.creationTimestamp | fromdateiso8601 < (now - 7*24*3600)) | .metadata.name' | \
+          while read pod; do
+            echo "Deleting old pod: $pod"
+            kubectl delete pod "$pod" -n mlops-sentiment-dev --ignore-not-found=true
+          done
+        
+        # Очищаем завершенные джобы
+        kubectl delete jobs -n mlops-sentiment-dev --field-selector=status.successful=1
+        
+        echo "✅ Development cleanup completed"
+
+    - name: Cleanup temporary files
+      if: always()
+      run: rm -f kubeconfig
+
+  # Отчет о очистке
+  cleanup-report:
+    needs: [cleanup-docker-images, cleanup-workflow-runs, cleanup-dev-deployments]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Generate cleanup report
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const results = {
+            'Docker Images': '${{ needs.cleanup-docker-images.result }}',
+            'Workflow Runs': '${{ needs.cleanup-workflow-runs.result }}',
+            'Dev Deployments': '${{ needs.cleanup-dev-deployments.result }}'
+          };
+          
+          let report = '## 🧹 Cleanup Report\n\n';
+          
+          for (const [task, result] of Object.entries(results)) {
+            const icon = result === 'success' ? '✅' : result === 'skipped' ? '⏭️' : '❌';
+            report += `- ${icon} ${task}: ${result}\n`;
+          }
+          
+          report += `\n**Cleanup Date**: ${new Date().toISOString()}\n`;
+          report += `**Triggered by**: ${context.eventName}\n`;
+          
+          // Создаем issue с отчетом
+          await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `Cleanup Report - ${new Date().toISOString().split('T')[0]}`,
+            body: report,
+            labels: ['cleanup', 'maintenance']
+          });
+
+    - name: Notify cleanup completion
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#maintenance'
+        text: |
+          🧹 **Cleanup completed**
+          
+          **Docker Images**: ${{ needs.cleanup-docker-images.result }}
+          **Workflow Runs**: ${{ needs.cleanup-workflow-runs.result }}
+          **Dev Deployments**: ${{ needs.cleanup-dev-deployments.result }}
+          
+          Check GitHub Issues for detailed report.
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

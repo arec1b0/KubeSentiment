@@ -1,0 +1,38 @@
+# CodeQL Configuration
+# Конфигурация для GitHub CodeQL анализа
+
+name: "MLOps CodeQL Config"
+
+# Отключаем стандартные запросы и используем кастомные
+disable-default-queries: false
+
+# Дополнительные наборы запросов
+queries:
+  - name: security-extended
+    uses: security-extended
+  - name: security-and-quality
+    uses: security-and-quality
+
+# Пути для сканирования
+paths:
+  - app/
+  - tests/
+
+# Пути для исключения
+paths-ignore:
+  - "**/*.md"
+  - "**/*.txt"
+  - "**/requirements.txt"
+  - "**/__pycache__/**"
+  - "**/node_modules/**"
+  - ".github/"
+  - "k8s/"
+  - "scripts/"
+
+# Настройки для Python
+python:
+  # Дополнительные пути для поиска зависимостей
+  setup-python-dependencies: true
+
+  # Версия Python
+  version: "3.9"
