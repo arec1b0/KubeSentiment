@@ -14,7 +14,8 @@ import torch
 from transformers import pipeline, Pipeline
 
 from ..config import get_settings
-from ..logging_config import get_logger
+from ..logging_config import get_logger, log_model_operation, log_security_event
+from ..error_codes import ErrorCode, raise_validation_error
 
 logger = get_logger(__name__)
 
@@ -103,6 +104,39 @@ class SentimentAnalyzer:
             "cache_hit_ratio": 0.0,  # Could be implemented with hit/miss counters
         }
 
+    def _validate_model_name(self, model_name: str) -> None:
+        """
+        Validate that the model name is in the allowed list.
+
+        Args:
+            model_name: The model name to validate
+
+        Raises:
+            ValueError: If model name is not in the allowed list
+        """
+        if model_name not in self.settings.allowed_models:
+            log_security_event(
+                logger,
+                "invalid_model_name",
+                {
+                    "requested_model": model_name,
+                    "allowed_models": self.settings.allowed_models,
+                },
+            )
+            raise_validation_error(
+                ErrorCode.INVALID_MODEL_NAME,
+                detail=f"Model '{model_name}' is not in the allowed list",
+                status_code=400,
+                requested_model=model_name,
+                allowed_models=self.settings.allowed_models,
+            )
+
+        logger.info(
+            "Model name validation passed",
+            model_name=model_name,
+            operation_type="validation",
+        )
+
     def _load_model(self) -> None:
         """
         Load the sentiment analysis model.
@@ -111,7 +145,16 @@ class SentimentAnalyzer:
         If loading fails, the analyzer will operate in degraded mode.
         """
         try:
-            logger.info(f"Loading sentiment analysis model: {self.settings.model_name}")
+            # Validate model name first
+            self._validate_model_name(self.settings.model_name)
+
+            start_time = time.time()
+            logger.info(
+                "Starting model loading",
+                model_name=self.settings.model_name,
+                operation_type="model",
+                operation="load_start",
+            )
 
             if self.settings.model_cache_dir:
                 self._pipeline = pipeline(
@@ -126,7 +169,14 @@ class SentimentAnalyzer:
                 )
 
             self._is_loaded = True
-            logger.info("Sentiment analysis model loaded successfully")
+            duration_ms = (time.time() - start_time) * 1000
+            log_model_operation(
+                logger,
+                "load",
+                self.settings.model_name,
+                duration_ms=duration_ms,
+                success=True,
+            )
 
             # Update metrics
             try:
@@ -138,7 +188,9 @@ class SentimentAnalyzer:
                 pass
 
         except Exception as e:
-            logger.error(f"Failed to load sentiment analysis model: {e}")
+            log_model_operation(
+                logger, "load", self.settings.model_name, success=False, error=str(e)
+            )
             self._pipeline = None
             self._is_loaded = False
 

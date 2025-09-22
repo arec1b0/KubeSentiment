@@ -35,6 +35,15 @@ class Settings(BaseSettings):
         default="distilbert-base-uncased-finetuned-sst-2-english",
         description="Hugging Face model identifier",
     )
+    allowed_models: list[str] = Field(
+        default_factory=lambda: [
+            "distilbert-base-uncased-finetuned-sst-2-english",
+            "cardiffnlp/twitter-roberta-base-sentiment-latest",
+            "nlptown/bert-base-multilingual-uncased-sentiment",
+            "j-hartmann/emotion-english-distilroberta-base",
+        ],
+        description="List of allowed model names for security",
+    )
     model_cache_dir: Optional[str] = Field(
         default=None, description="Directory to cache downloaded models"
     )

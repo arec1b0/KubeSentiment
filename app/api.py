@@ -13,7 +13,8 @@ from pydantic import BaseModel, Field, validator
 
 from .config import get_settings, Settings
 from .ml.sentiment import get_sentiment_analyzer, SentimentAnalyzer
-from .logging_config import get_logger
+from .logging_config import get_logger, log_api_request
+from .error_codes import ErrorCode, raise_validation_error
 
 logger = get_logger(__name__)
 
@@ -39,7 +40,26 @@ class TextInput(BaseModel):
     def validate_text(cls, v):
         """Validate and clean input text."""
         if not v or not v.strip():
-            raise ValueError("Text cannot be empty or whitespace only")
+            from .error_codes import ErrorCode, raise_validation_error
+
+            raise_validation_error(
+                ErrorCode.TEXT_EMPTY,
+                detail="Text field is required and cannot be empty",
+                text_length=len(v) if v else 0,
+            )
+
+        # Check for maximum length
+        settings = get_settings()
+        if len(v.strip()) > settings.max_text_length:
+            from .error_codes import ErrorCode, raise_validation_error
+
+            raise_validation_error(
+                ErrorCode.TEXT_TOO_LONG,
+                detail=f"Text length {len(v.strip())} exceeds maximum of {settings.max_text_length}",
+                text_length=len(v.strip()),
+                max_length=settings.max_text_length,
+            )
+
         return v.strip()
 
 
@@ -109,9 +129,11 @@ async def predict_sentiment(
         HTTPException: If the model is unavailable or prediction fails
     """
     if not analyzer.is_ready():
-        raise HTTPException(
+        raise_validation_error(
+            ErrorCode.MODEL_NOT_LOADED,
+            detail="Sentiment analysis model is not loaded or failed to initialize",
             status_code=503,
-            detail="Service Unavailable: Sentiment analysis model is not loaded",
+            service_status="unavailable",
         )
 
     try:
@@ -124,9 +146,18 @@ async def predict_sentiment(
         return PredictionResponse(**result)
 
     except Exception as e:
-        from .utils.error_handlers import handle_prediction_error
-
-        handle_prediction_error(e, "prediction")
+        logger.error(
+            "Prediction failed",
+            error=str(e),
+            text_length=len(payload.text),
+            operation_type="prediction",
+        )
+        raise_validation_error(
+            ErrorCode.MODEL_INFERENCE_FAILED,
+            detail=f"Failed to analyze sentiment: {str(e)}",
+            status_code=500,
+            text_length=len(payload.text),
+        )
 
 
 @router.get(
