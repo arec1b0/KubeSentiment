@@ -9,8 +9,8 @@ import requests
 import time
 
 
-def test_endpoint(url, method="GET", data=None, description=""):
-    """Test an API endpoint."""
+def run_endpoint(url, method="GET", data=None, description=""):
+    """Run an API endpoint check (helper for manual testing)."""
     print(f"🧪 Testing {description}: {method} {url}")
 
     try:
@@ -66,7 +66,7 @@ def main():
     total = len(tests)
 
     for test in tests:
-        if test_endpoint(**test):
+        if run_endpoint(**test):
             passed += 1
         print()
 

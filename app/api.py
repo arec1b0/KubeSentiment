@@ -50,14 +50,23 @@ class TextInput(BaseModel):
 
         # Check for maximum length
         settings = get_settings()
-        if len(v.strip()) > settings.max_text_length:
+        # Coerce max_text_length to int safely; tests may provide a Mock
+        try:
+            max_len = int(getattr(settings, "max_text_length", None))
+        except Exception:
+            # Fallback to default defined on Settings
+            from .config import Settings
+
+            max_len = Settings().max_text_length
+
+        if len(v.strip()) > max_len:
             from .error_codes import ErrorCode, raise_validation_error
 
             raise_validation_error(
                 ErrorCode.TEXT_TOO_LONG,
-                detail=f"Text length {len(v.strip())} exceeds maximum of {settings.max_text_length}",
+                detail=f"Text length {len(v.strip())} exceeds maximum of {max_len}",
                 text_length=len(v.strip()),
-                max_length=settings.max_text_length,
+                max_length=max_len,
             )
 
         return v.strip()

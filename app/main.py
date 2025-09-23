@@ -21,6 +21,8 @@ from .config import get_settings
 from .api import router
 from .ml.sentiment import get_sentiment_analyzer
 from .logging_config import setup_structured_logging, get_logger
+from .exceptions import ServiceError
+from .middleware import APIKeyAuthMiddleware
 
 # Setup structured logging
 setup_structured_logging()
@@ -147,6 +149,18 @@ def create_app() -> FastAPI:
         Returns:
             JSONResponse: Error response
         """
+        # Map known service errors to their status codes
+        if isinstance(exc, ServiceError):
+            logger.warning(f"Service error occurred: {exc}", exc_info=False)
+            return JSONResponse(
+                status_code=getattr(exc, "status_code", 400),
+                content={
+                    "detail": str(exc),
+                    "error_code": getattr(exc, "code", "E0000"),
+                    "context": getattr(exc, "context", None),
+                },
+            )
+
         logger.error(f"Unhandled exception: {exc}", exc_info=True)
         return JSONResponse(
             status_code=500,
@@ -178,6 +192,9 @@ def create_app() -> FastAPI:
 
     # Add correlation ID middleware
     app.add_middleware(CorrelationIDMiddleware)
+
+    # Add API key auth middleware (no-op if api_key not configured)
+    app.add_middleware(APIKeyAuthMiddleware)
 
     # Add metrics middleware
     try:

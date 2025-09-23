@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     # Monitoring settings
     enable_metrics: bool = Field(default=True, description="Enable metrics collection")
     log_level: str = Field(default="INFO", description="Logging level")
+    metrics_cache_ttl: int = Field(
+        default=5, description="Seconds to cache generated Prometheus metrics"
+    )
 
     # Security settings
     api_key: Optional[str] = Field(

@@ -6,7 +6,7 @@ the sentiment analysis service performance and health.
 """
 
 import time
-from typing import Dict, Any
+
 from prometheus_client import (
     Counter,
     Histogram,
@@ -84,6 +84,9 @@ class PrometheusMetrics:
         """Initialize metrics with system information."""
         self.settings = get_settings()
         self._initialize_static_metrics()
+        # Metrics caching
+        self._metrics_cache: str | None = None
+        self._metrics_cache_ts: float | None = None
 
     def _initialize_static_metrics(self):
         """Initialize static metrics that don't change during runtime."""
@@ -142,9 +145,22 @@ class PrometheusMetrics:
 
     def get_metrics(self) -> str:
         """Get metrics in Prometheus format."""
-        # Update dynamic metrics before export
+        # Serve cached metrics when TTL hasn't expired
+        now = time.time()
+        ttl = getattr(self.settings, "metrics_cache_ttl", 5)
+        if (
+            self._metrics_cache
+            and self._metrics_cache_ts
+            and (now - self._metrics_cache_ts) < ttl
+        ):
+            return self._metrics_cache
+
+        # Update dynamic metrics before export and refresh cache
         self.update_system_metrics()
-        return generate_latest().decode("utf-8")
+        payload = generate_latest().decode("utf-8")
+        self._metrics_cache = payload
+        self._metrics_cache_ts = now
+        return payload
 
     def get_metrics_content_type(self) -> str:
         """Get the correct content type for Prometheus metrics."""
