@@ -1,0 +1,240 @@
+openapi: 3.0.3
+info:
+  title: Sentiment Analysis API
+  description: |
+    Production-ready sentiment analysis microservice with real-time inference.
+    This API provides sentiment analysis capabilities using a fine-tuned DistilBERT model.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.example.com/v1
+    description: Production server
+
+paths:
+  /predict:
+    post:
+      summary: Analyze sentiment of input text
+      description: |
+        Returns the sentiment (POSITIVE/NEGATIVE) and confidence score for the given text.
+        The service uses a fine-tuned DistilBERT model for sentiment analysis.
+      operationId: predictSentiment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TextInput'
+      responses:
+        '200':
+          description: Successful prediction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      tags:
+        - Analysis
+
+  /health:
+    get:
+      summary: Check service health
+      description: Returns the current health status of the service and its components
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+      tags:
+        - Monitoring
+
+  /metrics:
+    get:
+      summary: Get service metrics (Prometheus format)
+      description: Returns service metrics in Prometheus exposition format
+      operationId: getPrometheusMetrics
+      responses:
+        '200':
+          description: Metrics in Prometheus format
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  # HELP http_requests_total Total number of HTTP requests
+                  # TYPE http_requests_total counter
+                  http_requests_total{method="POST",endpoint="/predict"} 42
+      tags:
+        - Monitoring
+
+  /metrics/json:
+    get:
+      summary: Get service metrics (JSON format)
+      description: Returns service metrics in JSON format
+      operationId: getMetricsJson
+      responses:
+        '200':
+          description: Metrics in JSON format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsResponse'
+      tags:
+        - Monitoring
+
+  /model/info:
+    get:
+      summary: Get model information
+      description: Returns information about the loaded model
+      operationId: getModelInfo
+      responses:
+        '200':
+          description: Model information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  model_name:
+                    type: string
+                    example: "distilbert-base-uncased-finetuned-sst-2-english"
+                  model_version:
+                    type: string
+                    example: "1.0.0"
+                  max_length:
+                    type: integer
+                    example: 512
+                  labels:
+                    type: array
+                    items:
+                      type: string
+                    example: ["NEGATIVE", "POSITIVE"]
+      tags:
+        - Model
+
+components:
+  schemas:
+    TextInput:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          description: Text to analyze for sentiment
+          example: "I love this amazing project!"
+
+    PredictionResponse:
+      type: object
+      properties:
+        label:
+          type: string
+          description: Predicted sentiment label
+          enum: ["POSITIVE", "NEGATIVE"]
+        score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+          description: Confidence score of the prediction
+        inference_time_ms:
+          type: number
+          format: float
+          description: Time taken for model inference in milliseconds
+        model_name:
+          type: string
+          description: Name of the model used for prediction
+        text_length:
+          type: integer
+          description: Length of the processed text
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Overall service status
+          enum: ["healthy", "degraded", "unhealthy"]
+        model_status:
+          type: string
+          description: Status of the ML model
+          enum: ["loaded", "loading", "error"]
+        version:
+          type: string
+          description: Service version
+        timestamp:
+          type: number
+          format: float
+          description: Unix timestamp of the health check
+
+    MetricsResponse:
+      type: object
+      properties:
+        torch_version:
+          type: string
+          description: Version of PyTorch being used
+        cuda_available:
+          type: boolean
+          description: Whether CUDA is available
+        cuda_memory_allocated_mb:
+          type: number
+          format: float
+          description: CUDA memory allocated in MB
+        cuda_memory_reserved_mb:
+          type: number
+          format: float
+          description: CUDA memory reserved in MB
+        total_requests_processed:
+          type: integer
+          description: Total number of requests processed
+        average_inference_time_ms:
+          type: number
+          format: float
+          description: Average inference time in milliseconds
+
+    ErrorResponse:
+      type: object
+      properties:
+        error_code:
+          type: string
+          description: Machine-readable error code
+        detail:
+          type: string
+          description: Human-readable error message
+        text_length:
+          type: integer
+          description: Length of the input text (if applicable)
+        max_length:
+          type: integer
+          description: Maximum allowed text length (if applicable)
+
+tags:
+  - name: Analysis
+    description: Text analysis operations
+  - name: Monitoring
+    description: Health and performance monitoring
+  - name: Model
+    description: Model information and management

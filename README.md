@@ -3,11 +3,20 @@
 ![Python](https://img.shields.io/badge/python-v3.9+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)
-![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
 ![Docker](https://img.shields.io/badge/docker-ready-blue.svg)
+[![Documentation Status](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://github.com/your-org/mlops-sentiment/tree/main/docs)
+[![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0.3-brightgreen)](https://github.com/your-org/mlops-sentiment/blob/main/openapi-specs/sentiment-api.yaml)
 
 **Production-ready sentiment analysis microservice** with real-time inference, Kubernetes deployment, and comprehensive monitoring. Built for scale and reliability using MLOps best practices.
+
+## 📚 Documentation
+
+- [API Documentation](https://github.com/your-org/mlops-sentiment/tree/main/openapi-specs) - Complete API reference
+- [Deployment Guide](deployment-guide.md) - Step-by-step deployment instructions
+- [Troubleshooting Guide](docs/troubleshooting/index.md) - Solutions to common issues
+- [Architecture](docs/architecture.md) - System design and architecture overview
 
 ## 🎬 Demo
 
@@ -40,55 +49,117 @@ curl -X POST http://localhost:8000/predict \
 
 ## 🏗️ Architecture
 
+### High-Level Overview
+
 ```mermaid
-graph TB
+flowchart TD
+    A[Client Applications] -->|HTTP/HTTPS| B[API Gateway / Ingress]
+    B --> C[Load Balancer]
+    C --> D[Service: sentiment-svc]
+    D --> E[Pod 1: sentiment-app]
+    D --> F[Pod 2: sentiment-app]
+    D --> G[Pod N: sentiment-app]
+    
     subgraph "Kubernetes Cluster"
-        subgraph "MLOps Namespace"
-            I[Ingress Controller<br/>nginx] --> S[Service<br/>sentiment-svc:80]
-            S --> P1[Pod 1<br/>sentiment-app:8000]
-            S --> P2[Pod 2<br/>sentiment-app:8000]
-            S --> P3[Pod 3<br/>sentiment-app:8000]
-            
-            P1 --> M1[DistilBERT<br/>Model]
-            P2 --> M2[DistilBERT<br/>Model]
-            P3 --> M3[DistilBERT<br/>Model]
-            
-            HPA[Horizontal Pod Autoscaler] -.-> P1
-            HPA -.-> P2
-            HPA -.-> P3
-        end
+        B
+        C
+        D
+        E --> H[Model Cache]
+        F --> I[Model Cache]
+        G --> J[Model Cache]
         
-        subgraph "Monitoring"
-            P1 --> Met[/metrics endpoint]
-            P2 --> Met
-            P3 --> Met
-            Met --> Prom[Prometheus<br/>Scraper]
-        end
+        K[Prometheus] -->|Scrapes| L[Metrics Endpoint]
+        M[Grafana] -->|Queries| K
+        N[Alertmanager] -->|Alerts| O[Slack/Email]
+        
+        E --> L
+        F --> L
+        G --> L
     end
     
-    Client[Client Applications] --> I
-    LoadBalancer[Load Balancer] --> I
-    
-    style I fill:#ff9999
-    style S fill:#99ccff
-    style P1 fill:#99ff99
-    style P2 fill:#99ff99
-    style P3 fill:#99ff99
-    style HPA fill:#ffcc99
-    style Prom fill:#cc99ff
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style B fill:#bbf,stroke:#333,stroke-width:2px
+    style C fill:#aaf,stroke:#333,stroke-width:2px
+    style D fill:#99f,stroke:#333,stroke-width:2px
+    style E,F,G fill:#9f9,stroke:#333,stroke-width:2px
+    style H,I,J fill:#f99,stroke:#333,stroke-width:2px
+    style K fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style L fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style M fill:#f9f9f9,stroke:#333,stroke-width:2px
+    style N fill:#f9f9f9,stroke:#333,stroke-width:2px
 ```
+
+### Key Components
+
+1. **API Layer**
+   - FastAPI-based REST API
+   - Request validation and rate limiting
+   - Authentication and authorization
+   - Request/response logging
+
+2. **Model Serving**
+   - DistilBERT-based sentiment analysis
+   - Model versioning and A/B testing support
+   - Dynamic model loading and caching
+
+3. **Infrastructure**
+   - Containerized with Docker
+   - Kubernetes-native deployment
+   - Horizontal pod autoscaling
+   - Resource limits and requests
+
+4. **Monitoring & Observability**
+   - Prometheus metrics
+   - Grafana dashboards
+   - Distributed tracing with Jaeger
+   - Structured logging with ELK stack
+
+5. **CI/CD Pipeline**
+   - Automated testing
+   - Container scanning
+   - GitOps workflow with ArgoCD
+   - Canary deployments
 
 ## 🛠️ Tech Stack
 
+### Core Technologies
+
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| **🧠 ML Framework** | Hugging Face Transformers | Pre-trained DistilBERT model |
+| **🧠 ML Framework** | Hugging Face Transformers | Pre-trained and fine-tuned models |
 | **⚡ API Framework** | FastAPI + Uvicorn | High-performance async API |
-| **🐳 Containerization** | Docker | Application packaging |
+| **🐳 Containerization** | Docker + BuildKit | Application packaging |
 | **☸️ Orchestration** | Kubernetes | Container orchestration |
-| **📊 Monitoring** | Prometheus + Custom Metrics | Performance tracking |
+| **🔒 Service Mesh** | Linkerd | Service-to-service communication |
+
+### Monitoring & Observability
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **📊 Metrics** | Prometheus + Custom Metrics | Performance tracking |
+| **📈 Visualization** | Grafana | Metrics visualization |
+| **📝 Logging** | ELK Stack (Elasticsearch, Logstash, Kibana) | Centralized logging |
+| **🔍 Tracing** | Jaeger | Distributed tracing |
+| **🚨 Alerting** | Alertmanager | Alert routing and deduplication |
+
+### Development & Operations
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **🔄 CI/CD** | GitHub Actions | Automated testing and deployment |
+| **📦 Package Management** | Poetry | Dependency management |
+| **🧪 Testing** | Pytest | Unit and integration testing |
+| **📜 Infrastructure as Code** | Terraform | Cloud resource provisioning |
+| **🔗 Service Discovery** | Consul | Service registration and discovery |
+
+### Model Serving
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
 | **🔍 Model** | DistilBERT (SST-2) | Sentiment classification |
-| **📦 Dependencies** | PyTorch, Pydantic | Core ML and validation |
+| **⚙️ Optimization** | ONNX Runtime | Model optimization |
+| **📦 Model Registry** | MLflow | Model versioning and management |
+| **🧪 A/B Testing** | Seldon Core | Model experimentation |
 
 ## ⚡ Quick Start
 
