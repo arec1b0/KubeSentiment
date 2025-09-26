@@ -9,8 +9,6 @@ import logging
 import time
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
-import uuid
-import threading
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -69,38 +67,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Add any cleanup logic here if needed
     logger.info("Application shutdown complete")
 
-
-class CorrelationIDMiddleware(BaseHTTPMiddleware):
-    """
-    Middleware to add a correlation ID to each request/response cycle.
-
-    This helps in tracing requests across services and logging systems.
-
-    Attributes:
-        correlation_id_header (str): The name of the header used for the correlation ID
-    """
-
-    correlation_id_header: str = "X-Correlation-ID"
-
-    async def dispatch(self, request: Request, call_next):
-        """
-        Process the request and add the correlation ID to the response.
-
-        Args:
-            request (Request): The incoming request
-            call_next: The next middleware or endpoint to process the request
-
-        Returns:
-            Response: The response with the correlation ID header added
-        """
-        correlation_id = str(uuid.uuid4())
-
-        # Set correlation ID in thread-local storage for logging
-        setattr(threading.current_thread(), "correlation_id", correlation_id)
-
-        response = await call_next(request)
-        response.headers[self.correlation_id_header] = correlation_id
-        return response
 
 
 def create_app() -> FastAPI:
@@ -190,8 +156,7 @@ def create_app() -> FastAPI:
             "health_url": "/health" if settings.debug else "/api/v1/health",
         }
 
-    # Add correlation ID middleware
-    app.add_middleware(CorrelationIDMiddleware)
+    # Note: Correlation ID handling is now managed via contextvars in the logging system
 
     # Add API key auth middleware (no-op if api_key not configured)
     app.add_middleware(APIKeyAuthMiddleware)

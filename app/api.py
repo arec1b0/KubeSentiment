@@ -40,8 +40,6 @@ class TextInput(BaseModel):
     def validate_text(cls, v):
         """Validate and clean input text."""
         if not v or not v.strip():
-            from .error_codes import ErrorCode, raise_validation_error
-
             raise_validation_error(
                 ErrorCode.TEXT_EMPTY,
                 detail="Text field is required and cannot be empty",
@@ -60,8 +58,6 @@ class TextInput(BaseModel):
             max_len = Settings().max_text_length
 
         if len(v.strip()) > max_len:
-            from .error_codes import ErrorCode, raise_validation_error
-
             raise_validation_error(
                 ErrorCode.TEXT_TOO_LONG,
                 detail=f"Text length {len(v.strip())} exceeds maximum of {max_len}",

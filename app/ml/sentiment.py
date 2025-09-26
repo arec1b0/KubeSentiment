@@ -17,6 +17,13 @@ from ..config import get_settings
 from ..logging_config import get_logger, log_model_operation, log_security_event
 from ..error_codes import ErrorCode, raise_validation_error
 
+# Import monitoring at module level to avoid circular imports
+try:
+    from ..monitoring import get_metrics
+    MONITORING_AVAILABLE = True
+except ImportError:
+    MONITORING_AVAILABLE = False
+
 logger = get_logger(__name__)
 
 
@@ -179,13 +186,9 @@ class SentimentAnalyzer:
             )
 
             # Update metrics
-            try:
-                from ..monitoring import get_metrics
-
+            if MONITORING_AVAILABLE:
                 metrics = get_metrics()
                 metrics.set_model_status(True)
-            except ImportError:
-                pass
 
         except Exception as e:
             log_model_operation(
@@ -195,13 +198,9 @@ class SentimentAnalyzer:
             self._is_loaded = False
 
             # Update metrics
-            try:
-                from ..monitoring import get_metrics
-
+            if MONITORING_AVAILABLE:
                 metrics = get_metrics()
                 metrics.set_model_status(False)
-            except ImportError:
-                pass
 
     def is_ready(self) -> bool:
         """
@@ -270,10 +269,8 @@ class SentimentAnalyzer:
             # Cache the result
             self._cache_prediction(cache_key, prediction_result)
 
-            # Record metrics (import here to avoid circular imports)
-            try:
-                from ..monitoring import get_metrics
-
+            # Record metrics
+            if MONITORING_AVAILABLE:
                 metrics = get_metrics()
                 metrics.record_inference_duration(
                     inference_time / 1000
@@ -281,9 +278,6 @@ class SentimentAnalyzer:
                 metrics.record_prediction_metrics(
                     float(result["score"]), len(original_text)
                 )
-            except ImportError:
-                # Metrics not available, continue without them
-                pass
 
             return prediction_result
 
