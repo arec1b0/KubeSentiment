@@ -1,0 +1,291 @@
+# Advanced Alertmanager Configuration
+# Продвинутая конфигурация Alertmanager для MLOps
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+type: Opaque
+stringData:
+  alertmanager.yml: |
+    global:
+      # SMTP configuration
+      smtp_smarthost: 'smtp.gmail.com:587'
+      smtp_from: 'mlops-alerts@company.com'
+      smtp_auth_username: 'mlops-alerts@company.com'
+      smtp_auth_password: 'your-app-password'  # Use app password for Gmail
+      smtp_require_tls: true
+      
+      # Slack configuration
+      slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+      
+      # PagerDuty configuration
+      pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+      
+      # Resolve timeout
+      resolve_timeout: 5m
+
+    # Templates for notifications
+    templates:
+      - '/etc/alertmanager/templates/*.tmpl'
+
+    # Routing configuration
+    route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: 'default'
+      
+      routes:
+        # Critical alerts - immediate notification
+        - match:
+            severity: critical
+          receiver: 'critical-alerts'
+          group_wait: 10s
+          repeat_interval: 1h
+          routes:
+            # ML model specific critical alerts
+            - match:
+                component: ml-model
+              receiver: 'ml-critical'
+              group_wait: 5s
+              repeat_interval: 30m
+        
+        # Warning alerts - less frequent
+        - match:
+            severity: warning
+          receiver: 'warning-alerts'
+          repeat_interval: 6h
+          routes:
+            # Performance warnings
+            - match:
+                component: performance
+              receiver: 'performance-alerts'
+              repeat_interval: 2h
+            
+            # Security warnings
+            - match:
+                component: security
+              receiver: 'security-alerts'
+              repeat_interval: 1h
+        
+        # Info alerts - daily summary
+        - match:
+            severity: info
+          receiver: 'info-alerts'
+          repeat_interval: 24h
+        
+        # Development environment - less noisy
+        - match:
+            environment: dev
+          receiver: 'dev-alerts'
+          repeat_interval: 24h
+        
+        # Staging environment
+        - match:
+            environment: staging
+          receiver: 'staging-alerts'
+          repeat_interval: 6h
+
+    # Inhibition rules - suppress alerts
+    inhibit_rules:
+      # Suppress warning if critical is firing
+      - source_match:
+          severity: 'critical'
+        target_match:
+          severity: 'warning'
+        equal: ['alertname', 'cluster', 'service']
+      
+      # Suppress individual pod alerts if service is down
+      - source_match:
+          alertname: 'MLOpsServiceDown'
+        target_match_re:
+          alertname: 'MLOps.*'
+        equal: ['service']
+      
+      # Suppress memory alerts if pod is crash looping
+      - source_match:
+          alertname: 'MLOpsPodCrashLooping'
+        target_match:
+          alertname: 'MLOpsHighMemoryUsage'
+        equal: ['pod']
+
+    # Receivers configuration
+    receivers:
+      # Default receiver
+      - name: 'default'
+        slack_configs:
+          - channel: '#alerts'
+            title: '🔔 MLOps Alert'
+            text: |
+              {{ range .Alerts }}
+              **Alert:** {{ .Annotations.summary }}
+              **Description:** {{ .Annotations.description }}
+              **Severity:** {{ .Labels.severity }}
+              **Service:** {{ .Labels.service }}
+              {{ end }}
+            send_resolved: true
+
+      # Critical alerts - multiple channels
+      - name: 'critical-alerts'
+        slack_configs:
+          - channel: '#critical-alerts'
+            title: '🚨 CRITICAL MLOps Alert'
+            text: |
+              <!channel>
+              {{ range .Alerts }}
+              **🚨 CRITICAL ALERT 🚨**
+              **Alert:** {{ .Annotations.summary }}
+              **Description:** {{ .Annotations.description }}
+              **Service:** {{ .Labels.service }}
+              **Environment:** {{ .Labels.environment | default "unknown" }}
+              **Runbook:** {{ .Annotations.runbook_url | default "No runbook available" }}
+              {{ end }}
+            send_resolved: true
+        
+        email_configs:
+          - to: 'oncall@company.com'
+            subject: '🚨 CRITICAL: MLOps Alert - {{ .GroupLabels.alertname }}'
+            body: |
+              CRITICAL Alert in MLOps System
+              
+              {{ range .Alerts }}
+              Alert: {{ .Annotations.summary }}
+              Description: {{ .Annotations.description }}
+              Service: {{ .Labels.service }}
+              Environment: {{ .Labels.environment | default "unknown" }}
+              Severity: {{ .Labels.severity }}
+              
+              Runbook: {{ .Annotations.runbook_url | default "No runbook available" }}
+              {{ end }}
+        
+        # PagerDuty for critical alerts
+        pagerduty_configs:
+          - routing_key: 'YOUR_PAGERDUTY_INTEGRATION_KEY'
+            description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+            severity: 'critical'
+            details:
+              environment: '{{ .GroupLabels.environment | default "unknown" }}'
+              service: '{{ .GroupLabels.service }}'
+              runbook: '{{ .CommonAnnotations.runbook_url | default "No runbook" }}'
+
+      # ML Model specific critical alerts
+      - name: 'ml-critical'
+        slack_configs:
+          - channel: '#ml-alerts'
+            title: '🤖 CRITICAL ML Model Alert'
+            text: |
+              <!channel>
+              **🤖 ML MODEL CRITICAL ISSUE 🤖**
+              {{ range .Alerts }}
+              **Alert:** {{ .Annotations.summary }}
+              **Description:** {{ .Annotations.description }}
+              **Model:** {{ .Labels.model_name | default "unknown" }}
+              **Environment:** {{ .Labels.environment | default "unknown" }}
+              {{ end }}
+            send_resolved: true
+        
+        email_configs:
+          - to: 'ml-team@company.com'
+            subject: '🤖 CRITICAL ML Alert: {{ .GroupLabels.alertname }}'
+            body: |
+              Critical ML Model Alert
+              
+              {{ range .Alerts }}
+              Alert: {{ .Annotations.summary }}
+              Description: {{ .Annotations.description }}
+              Model: {{ .Labels.model_name | default "unknown" }}
+              Environment: {{ .Labels.environment | default "unknown" }}
+              {{ end }}
+
+      # Warning alerts
+      - name: 'warning-alerts'
+        slack_configs:
+          - channel: '#alerts'
+            title: '⚠️ MLOps Warning'
+            text: |
+              {{ range .Alerts }}
+              **⚠️ Warning:** {{ .Annotations.summary }}
+              **Description:** {{ .Annotations.description }}
+              **Service:** {{ .Labels.service }}
+              {{ end }}
+            send_resolved: true
+
+      # Performance alerts
+      - name: 'performance-alerts'
+        slack_configs:
+          - channel: '#performance'
+            title: '⚡ Performance Alert'
+            text: |
+              {{ range .Alerts }}
+              **⚡ Performance Issue:** {{ .Annotations.summary }}
+              **Description:** {{ .Annotations.description }}
+              **Service:** {{ .Labels.service }}
+              **Metric:** {{ .Labels.__name__ | default "unknown" }}
+              {{ end }}
+            send_resolved: true
+
+      # Security alerts
+      - name: 'security-alerts'
+        slack_configs:
+          - channel: '#security'
+            title: '🔒 Security Alert'
+            text: |
+              <!here>
+              {{ range .Alerts }}
+              **🔒 Security Alert:** {{ .Annotations.summary }}
+              **Description:** {{ .Annotations.description }}
+              **Service:** {{ .Labels.service }}
+              **Source IP:** {{ .Labels.source_ip | default "unknown" }}
+              {{ end }}
+            send_resolved: true
+        
+        email_configs:
+          - to: 'security@company.com'
+            subject: '🔒 Security Alert: {{ .GroupLabels.alertname }}'
+            body: |
+              Security Alert in MLOps System
+              
+              {{ range .Alerts }}
+              Alert: {{ .Annotations.summary }}
+              Description: {{ .Annotations.description }}
+              Service: {{ .Labels.service }}
+              {{ end }}
+
+      # Info alerts
+      - name: 'info-alerts'
+        slack_configs:
+          - channel: '#info'
+            title: 'ℹ️ MLOps Info'
+            text: |
+              {{ range .Alerts }}
+              **ℹ️ Info:** {{ .Annotations.summary }}
+              **Description:** {{ .Annotations.description }}
+              {{ end }}
+            send_resolved: true
+
+      # Development environment
+      - name: 'dev-alerts'
+        slack_configs:
+          - channel: '#dev-alerts'
+            title: '🔧 Dev Environment Alert'
+            text: |
+              {{ range .Alerts }}
+              **🔧 Dev Alert:** {{ .Annotations.summary }}
+              **Description:** {{ .Annotations.description }}
+              {{ end }}
+            send_resolved: true
+
+      # Staging environment
+      - name: 'staging-alerts'
+        slack_configs:
+          - channel: '#staging-alerts'
+            title: '🧪 Staging Environment Alert'
+            text: |
+              {{ range .Alerts }}
+              **🧪 Staging Alert:** {{ .Annotations.summary }}
+              **Description:** {{ .Annotations.description }}
+              {{ end }}
+            send_resolved: true

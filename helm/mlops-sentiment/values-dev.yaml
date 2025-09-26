@@ -1,0 +1,68 @@
+# Development environment values
+# Переопределения для dev окружения
+
+# Application settings
+deployment:
+  replicaCount: 1
+  
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  
+  env:
+    MLOPS_DEBUG: "true"
+    MLOPS_LOG_LEVEL: "DEBUG"
+    MLOPS_ENABLE_METRICS: "true"
+
+# Service configuration
+service:
+  type: NodePort
+
+# Ingress
+ingress:
+  enabled: true
+  hosts:
+    - host: mlops-sentiment-dev.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: mlops-sentiment-dev-tls
+      hosts:
+        - mlops-sentiment-dev.local
+
+# HPA disabled for dev
+hpa:
+  enabled: false
+
+# Monitoring with reduced retention
+prometheus:
+  enabled: true
+  server:
+    retention: "7d"
+    persistentVolume:
+      size: 5Gi
+
+grafana:
+  enabled: true
+  adminPassword: "devpassword"
+  persistence:
+    size: 2Gi
+
+# Network policy less restrictive for dev
+networkPolicy:
+  enabled: true
+  egress:
+    # Allow all egress for development
+    - to: []
+      ports:
+      - protocol: TCP
+        port: 80
+      - protocol: TCP
+        port: 443
+      - protocol: UDP
+        port: 53

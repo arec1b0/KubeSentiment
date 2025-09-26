@@ -1,0 +1,436 @@
+# Helm-based Multi-Environment Deployment
+# Продвинутое развертывание с использованием Helm
+
+name: Helm Deploy to Environments
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+        description: 'Target environment (dev, staging, prod)'
+      image_tag:
+        required: true
+        type: string
+        description: 'Docker image tag to deploy'
+      helm_timeout:
+        required: false
+        type: string
+        default: '10m'
+        description: 'Helm deployment timeout'
+    secrets:
+      KUBE_CONFIG:
+        required: true
+      SLACK_WEBHOOK_URL:
+        required: false
+      GRAFANA_API_KEY:
+        required: false
+      MLOPS_API_KEY:
+        required: false
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+        - dev
+        - staging
+        - prod
+      image_tag:
+        description: 'Docker image tag'
+        required: true
+        type: string
+      force_upgrade:
+        description: 'Force Helm upgrade even if no changes'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  HELM_CHART_PATH: ./helm/mlops-sentiment
+
+jobs:
+  # Валидация Helm чарта
+  validate-chart:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: 'v3.12.0'
+
+    - name: Validate Helm chart
+      run: |
+        echo "🔍 Validating Helm chart..."
+        
+        # Lint Helm chart
+        helm lint ${{ env.HELM_CHART_PATH }}
+        
+        # Validate templates
+        helm template test-release ${{ env.HELM_CHART_PATH }} \
+          --values ${{ env.HELM_CHART_PATH }}/values-${{ inputs.environment }}.yaml \
+          --set image.tag=${{ inputs.image_tag }} \
+          --dry-run --debug > /tmp/rendered-templates.yaml
+        
+        # Check for common issues
+        echo "📋 Checking rendered templates..."
+        cat /tmp/rendered-templates.yaml
+        
+        # Validate Kubernetes manifests
+        kubectl --dry-run=client apply -f /tmp/rendered-templates.yaml
+
+    - name: Security scan of Helm chart
+      run: |
+        echo "🔒 Running security scan on Helm chart..."
+        
+        # Check for security best practices
+        if grep -r "privileged.*true" ${{ env.HELM_CHART_PATH }}/templates/; then
+          echo "❌ Found privileged containers"
+          exit 1
+        fi
+        
+        if grep -r "runAsRoot.*true" ${{ env.HELM_CHART_PATH }}/templates/; then
+          echo "❌ Found containers running as root"
+          exit 1
+        fi
+        
+        echo "✅ Security scan passed"
+
+  # Развертывание с помощью Helm
+  helm-deploy:
+    needs: validate-chart
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+
+    - name: Setup Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: 'v3.12.0'
+
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > kubeconfig
+        export KUBECONFIG=kubeconfig
+        kubectl cluster-info
+
+    - name: Add Helm repositories
+      run: |
+        echo "📦 Adding Helm repositories..."
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+        helm repo add grafana https://grafana.github.io/helm-charts
+        helm repo update
+
+    - name: Prepare environment-specific values
+      run: |
+        ENV="${{ inputs.environment }}"
+        IMAGE_TAG="${{ inputs.image_tag }}"
+        
+        echo "🔧 Preparing values for environment: $ENV"
+        
+        # Create environment-specific values file
+        cp ${{ env.HELM_CHART_PATH }}/values-$ENV.yaml /tmp/values-override.yaml
+        
+        # Override image tag
+        yq eval ".image.tag = \"$IMAGE_TAG\"" -i /tmp/values-override.yaml
+        
+        # Set secrets if available
+        if [[ -n "${{ secrets.MLOPS_API_KEY }}" ]]; then
+          yq eval ".deployment.secrets.MLOPS_API_KEY = \"${{ secrets.MLOPS_API_KEY }}\"" -i /tmp/values-override.yaml
+        fi
+        
+        # Environment-specific overrides
+        case $ENV in
+          "dev")
+            yq eval ".ingress.hosts[0].host = \"mlops-sentiment-dev.local\"" -i /tmp/values-override.yaml
+            ;;
+          "staging")
+            yq eval ".ingress.hosts[0].host = \"staging.mlops-sentiment.com\"" -i /tmp/values-override.yaml
+            ;;
+          "prod")
+            yq eval ".ingress.hosts[0].host = \"api.mlops-sentiment.com\"" -i /tmp/values-override.yaml
+            # Set production Grafana password from secret
+            if [[ -n "${{ secrets.GRAFANA_API_KEY }}" ]]; then
+              yq eval ".grafana.adminPassword = \"${{ secrets.GRAFANA_API_KEY }}\"" -i /tmp/values-override.yaml
+            fi
+            ;;
+        esac
+        
+        echo "📋 Final values file:"
+        cat /tmp/values-override.yaml
+
+    - name: Create namespace and setup monitoring
+      run: |
+        export KUBECONFIG=kubeconfig
+        ENV="${{ inputs.environment }}"
+        
+        # Determine namespace
+        if [[ "$ENV" == "prod" ]]; then
+          NAMESPACE="mlops-sentiment"
+        else
+          NAMESPACE="mlops-sentiment-$ENV"
+        fi
+        
+        echo "🏗️ Setting up namespace: $NAMESPACE"
+        
+        # Create namespace if it doesn't exist
+        kubectl create namespace $NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+        kubectl label namespace $NAMESPACE name=$NAMESPACE --overwrite
+        
+        # Create monitoring namespace if it doesn't exist
+        kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+        kubectl label namespace monitoring name=monitoring --overwrite
+        
+        # Install Prometheus Operator if not exists (only for first deployment)
+        if ! helm list -n monitoring | grep -q prometheus-operator; then
+          echo "📊 Installing Prometheus Operator..."
+          helm install prometheus-operator prometheus-community/kube-prometheus-stack \
+            --namespace monitoring \
+            --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
+            --set prometheus.prometheusSpec.ruleSelectorNilUsesHelmValues=false \
+            --wait --timeout=10m
+        fi
+
+    - name: Deploy with Helm
+      run: |
+        export KUBECONFIG=kubeconfig
+        ENV="${{ inputs.environment }}"
+        
+        # Determine namespace and release name
+        if [[ "$ENV" == "prod" ]]; then
+          NAMESPACE="mlops-sentiment"
+          RELEASE_NAME="mlops-sentiment"
+        else
+          NAMESPACE="mlops-sentiment-$ENV"
+          RELEASE_NAME="mlops-sentiment-$ENV"
+        fi
+        
+        echo "🚀 Deploying to namespace: $NAMESPACE with release: $RELEASE_NAME"
+        
+        # Deploy application
+        helm upgrade --install $RELEASE_NAME ${{ env.HELM_CHART_PATH }} \
+          --namespace $NAMESPACE \
+          --values /tmp/values-override.yaml \
+          --set image.tag=${{ inputs.image_tag }} \
+          --wait \
+          --timeout=${{ inputs.helm_timeout || '10m' }} \
+          --atomic \
+          ${{ inputs.force_upgrade && '--force' || '' }}
+        
+        echo "✅ Deployment completed successfully"
+
+    - name: Verify deployment
+      run: |
+        export KUBECONFIG=kubeconfig
+        ENV="${{ inputs.environment }}"
+        
+        if [[ "$ENV" == "prod" ]]; then
+          NAMESPACE="mlops-sentiment"
+          RELEASE_NAME="mlops-sentiment"
+        else
+          NAMESPACE="mlops-sentiment-$ENV"
+          RELEASE_NAME="mlops-sentiment-$ENV"
+        fi
+        
+        echo "🔍 Verifying deployment in namespace: $NAMESPACE"
+        
+        # Check Helm release status
+        helm status $RELEASE_NAME -n $NAMESPACE
+        
+        # Check pods
+        kubectl get pods -n $NAMESPACE -l app.kubernetes.io/name=mlops-sentiment
+        
+        # Check services
+        kubectl get services -n $NAMESPACE
+        
+        # Check ingress
+        kubectl get ingress -n $NAMESPACE
+        
+        # Check HPA
+        kubectl get hpa -n $NAMESPACE
+        
+        # Check ServiceMonitor
+        kubectl get servicemonitor -n $NAMESPACE
+        
+        # Check PrometheusRule
+        kubectl get prometheusrule -n $NAMESPACE
+        
+        # Wait for pods to be ready
+        kubectl wait --for=condition=ready pod \
+          --selector=app.kubernetes.io/name=mlops-sentiment \
+          --namespace=$NAMESPACE \
+          --timeout=300s
+
+    - name: Run comprehensive health checks
+      run: |
+        export KUBECONFIG=kubeconfig
+        ENV="${{ inputs.environment }}"
+        
+        if [[ "$ENV" == "prod" ]]; then
+          NAMESPACE="mlops-sentiment"
+        else
+          NAMESPACE="mlops-sentiment-$ENV"
+        fi
+        
+        echo "🧪 Running comprehensive health checks..."
+        
+        # Get service name
+        SERVICE_NAME=$(kubectl get service -n $NAMESPACE -l app.kubernetes.io/name=mlops-sentiment -o jsonpath='{.items[0].metadata.name}')
+        
+        # Port forward for testing
+        kubectl port-forward -n $NAMESPACE service/$SERVICE_NAME 8080:80 &
+        PF_PID=$!
+        
+        # Wait for port-forward to establish
+        sleep 15
+        
+        # Health check
+        echo "🔍 Testing health endpoint..."
+        curl -f http://localhost:8080/health || (kill $PF_PID && exit 1)
+        
+        # Metrics check
+        echo "📊 Testing metrics endpoint..."
+        curl -f http://localhost:8080/metrics || (kill $PF_PID && exit 1)
+        
+        # API functionality test
+        echo "🤖 Testing prediction API..."
+        RESPONSE=$(curl -X POST http://localhost:8080/predict \
+          -H "Content-Type: application/json" \
+          -d '{"text": "This deployment test is working great!"}' \
+          -s -w "%{http_code}")
+        
+        if [[ "${RESPONSE: -3}" != "200" ]]; then
+          echo "❌ API test failed with response: $RESPONSE"
+          kill $PF_PID
+          exit 1
+        fi
+        
+        echo "✅ API test successful: ${RESPONSE%???}"
+        
+        # Load test (simple)
+        echo "⚡ Running simple load test..."
+        for i in {1..10}; do
+          curl -X POST http://localhost:8080/predict \
+            -H "Content-Type: application/json" \
+            -d "{\"text\": \"Load test message $i\"}" \
+            -s > /dev/null &
+        done
+        wait
+        
+        # Stop port-forward
+        kill $PF_PID
+        
+        echo "✅ All health checks passed!"
+
+    - name: Update monitoring configuration
+      if: inputs.environment == 'prod'
+      run: |
+        export KUBECONFIG=kubeconfig
+        
+        echo "📊 Updating monitoring configuration for production..."
+        
+        # Check if Grafana dashboard was created
+        if kubectl get configmap -n mlops-sentiment mlops-sentiment-dashboard &> /dev/null; then
+          echo "✅ Grafana dashboard ConfigMap created"
+        fi
+        
+        # Check if ServiceMonitor is being scraped
+        if kubectl get servicemonitor -n mlops-sentiment mlops-sentiment &> /dev/null; then
+          echo "✅ ServiceMonitor created for Prometheus scraping"
+        fi
+        
+        # Check if PrometheusRule is active
+        if kubectl get prometheusrule -n mlops-sentiment mlops-sentiment-alerts &> /dev/null; then
+          echo "✅ PrometheusRule created for alerting"
+        fi
+
+    - name: Generate deployment report
+      if: always()
+      run: |
+        export KUBECONFIG=kubeconfig
+        ENV="${{ inputs.environment }}"
+        
+        if [[ "$ENV" == "prod" ]]; then
+          NAMESPACE="mlops-sentiment"
+          RELEASE_NAME="mlops-sentiment"
+        else
+          NAMESPACE="mlops-sentiment-$ENV"
+          RELEASE_NAME="mlops-sentiment-$ENV"
+        fi
+        
+        echo "📋 Generating deployment report..."
+        
+        # Create report file
+        cat > deployment-report.md << EOF
+        # Deployment Report - $ENV Environment
+        
+        **Date**: $(date)
+        **Environment**: $ENV
+        **Image**: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}
+        **Namespace**: $NAMESPACE
+        **Release**: $RELEASE_NAME
+        
+        ## Deployment Status
+        \`\`\`
+        $(helm status $RELEASE_NAME -n $NAMESPACE 2>/dev/null || echo "Helm status unavailable")
+        \`\`\`
+        
+        ## Pods Status
+        \`\`\`
+        $(kubectl get pods -n $NAMESPACE -l app.kubernetes.io/name=mlops-sentiment 2>/dev/null || echo "Pods status unavailable")
+        \`\`\`
+        
+        ## Services
+        \`\`\`
+        $(kubectl get services -n $NAMESPACE 2>/dev/null || echo "Services status unavailable")
+        \`\`\`
+        
+        ## Ingress
+        \`\`\`
+        $(kubectl get ingress -n $NAMESPACE 2>/dev/null || echo "Ingress status unavailable")
+        \`\`\`
+        EOF
+        
+        echo "📄 Deployment report created:"
+        cat deployment-report.md
+
+    - name: Cleanup
+      if: always()
+      run: |
+        rm -f kubeconfig
+        rm -f /tmp/values-override.yaml
+        rm -f deployment-report.md
+
+    - name: Notify deployment result
+      if: always()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        text: |
+          🚀 **Helm Deployment to ${{ inputs.environment }}**
+          
+          **Status**: ${{ job.status == 'success' && '✅ Success' || '❌ Failed' }}
+          **Image**: `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}`
+          **Environment**: `${{ inputs.environment }}`
+          **Commit**: `${{ github.sha }}`
+          
+          ${{ job.status == 'success' && '🎉 Deployment completed successfully with full monitoring stack!' || '💥 Deployment failed - check logs for details' }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

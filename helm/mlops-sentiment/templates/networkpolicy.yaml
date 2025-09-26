@@ -1,0 +1,106 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "mlops-sentiment.fullname" . }}
+  labels:
+    {{- include "mlops-sentiment.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "mlops-sentiment.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    {{- toYaml .Values.networkPolicy.policyTypes | nindent 4 }}
+  {{- if .Values.networkPolicy.ingress }}
+  ingress:
+    {{- toYaml .Values.networkPolicy.ingress | nindent 4 }}
+  {{- end }}
+  {{- if .Values.networkPolicy.egress }}
+  egress:
+    {{- toYaml .Values.networkPolicy.egress | nindent 4 }}
+  {{- end }}
+---
+# Дополнительная NetworkPolicy для строгой изоляции
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "mlops-sentiment.fullname" . }}-strict
+  labels:
+    {{- include "mlops-sentiment.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "mlops-sentiment.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Разрешить трафик от Ingress Controller
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      - podSelector:
+          matchLabels:
+            app.kubernetes.io/name: ingress-nginx
+      ports:
+      - protocol: TCP
+        port: 8000
+    # Разрешить трафик от Prometheus для метрик
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: monitoring
+      - podSelector:
+          matchLabels:
+            app.kubernetes.io/name: prometheus
+      ports:
+      - protocol: TCP
+        port: 8000
+    # Разрешить трафик между подами сервиса
+    - from:
+      - podSelector:
+          matchLabels:
+            {{- include "mlops-sentiment.selectorLabels" . | nindent 12 }}
+      ports:
+      - protocol: TCP
+        port: 8000
+  egress:
+    # Разрешить DNS запросы
+    - to: []
+      ports:
+      - protocol: UDP
+        port: 53
+      - protocol: TCP
+        port: 53
+    # Разрешить HTTPS для загрузки моделей (Hugging Face)
+    - to: []
+      ports:
+      - protocol: TCP
+        port: 443
+    # Разрешить HTTP для внутренних сервисов
+    - to: []
+      ports:
+      - protocol: TCP
+        port: 80
+    # Разрешить связь с Kubernetes API (для health checks)
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            name: kube-system
+      ports:
+      - protocol: TCP
+        port: 443
+    # Разрешить связь с мониторингом
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            name: monitoring
+      ports:
+      - protocol: TCP
+        port: 9090  # Prometheus
+      - protocol: TCP
+        port: 3000  # Grafana
+      - protocol: TCP
+        port: 9093  # Alertmanager
+{{- end }}

@@ -1,0 +1,34 @@
+apiVersion: v2
+name: mlops-sentiment
+description: Production-ready MLOps sentiment analysis microservice with monitoring
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - mlops
+  - sentiment-analysis
+  - machine-learning
+  - monitoring
+  - fastapi
+home: https://github.com/arec1b0/mlops-sentiment
+sources:
+  - https://github.com/arec1b0/mlops-sentiment
+maintainers:
+  - name: Daniil Krizhanovskyi
+    email: daniil@example.com
+dependencies:
+  - name: prometheus
+    version: "25.8.0"
+    repository: "https://prometheus-community.github.io/helm-charts"
+    condition: prometheus.enabled
+  - name: grafana
+    version: "7.0.19"
+    repository: "https://grafana.github.io/helm-charts"
+    condition: grafana.enabled
+  - name: alertmanager
+    version: "1.7.0"
+    repository: "https://prometheus-community.github.io/helm-charts"
+    condition: alertmanager.enabled
+annotations:
+  category: MLOps
+  licenses: MIT

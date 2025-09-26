@@ -1,0 +1,90 @@
+# Grafana Datasources Configuration
+# Конфигурация источников данных для Grafana
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+  labels:
+    grafana_datasource: "1"
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    
+    deleteDatasources:
+      - name: Prometheus
+        orgId: 1
+    
+    datasources:
+      # Primary Prometheus datasource
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        orgId: 1
+        url: http://prometheus-operated:9090
+        isDefault: true
+        version: 1
+        editable: true
+        jsonData:
+          timeInterval: "30s"
+          queryTimeout: "60s"
+          httpMethod: "POST"
+          customQueryParameters: ""
+          manageAlerts: true
+          alertmanagerUid: "alertmanager"
+        secureJsonData: {}
+      
+      # Alertmanager datasource
+      - name: Alertmanager
+        type: alertmanager
+        access: proxy
+        orgId: 1
+        url: http://alertmanager-operated:9093
+        version: 1
+        editable: true
+        uid: "alertmanager"
+        jsonData:
+          implementation: "prometheus"
+          handleGrafanaManagedAlerts: true
+        secureJsonData: {}
+      
+      # Loki for logs (if available)
+      - name: Loki
+        type: loki
+        access: proxy
+        orgId: 1
+        url: http://loki:3100
+        version: 1
+        editable: true
+        jsonData:
+          maxLines: 1000
+          derivedFields:
+            - datasourceUid: "prometheus"
+              matcherRegex: "correlation_id=(\\w+)"
+              name: "Correlation ID"
+              url: "/explore?orgId=1&left=%5B%22now-1h%22,%22now%22,%22Prometheus%22,%7B%22expr%22:%22%7Bcorrelation_id%3D%5C%22$${__value.raw}%5C%22%7D%22%7D%5D"
+        secureJsonData: {}
+      
+      # Jaeger for tracing (if available)
+      - name: Jaeger
+        type: jaeger
+        access: proxy
+        orgId: 1
+        url: http://jaeger-query:16686
+        version: 1
+        editable: true
+        jsonData:
+          tracesToLogs:
+            datasourceUid: "loki"
+            tags:
+              - correlation_id
+            mappedTags:
+              - key: correlation_id
+                value: correlation_id
+            mapTagNamesEnabled: true
+            spanStartTimeShift: "1h"
+            spanEndTimeShift: "1h"
+            filterByTraceID: true
+            filterBySpanID: false
+        secureJsonData: {}

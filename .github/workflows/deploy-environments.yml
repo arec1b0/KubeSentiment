@@ -57,18 +57,13 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
     - name: Setup kubectl
       uses: azure/setup-kubectl@v3
       with:
         version: 'v1.28.0'
 
-    - name: Configure kubectl
-      run: |
-        echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > kubeconfig
-        export KUBECONFIG=kubeconfig
-        kubectl cluster-info
-
+    - name: Setup Helm
+      uses: azure/setup-helm@v3
     - name: Prepare environment-specific configurations
       run: |
         ENV="${{ inputs.environment }}"

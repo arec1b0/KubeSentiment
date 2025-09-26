@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mlops-sentiment.fullname" . }}-config
+  labels:
+    {{- include "mlops-sentiment.labels" . | nindent 4 }}
+data:
+  # Application configuration
+  app.yaml: |
+    app:
+      name: {{ .Values.app.name }}
+      version: {{ .Values.app.version }}
+      debug: {{ .Values.deployment.env.MLOPS_DEBUG | default "false" }}
+      log_level: {{ .Values.deployment.env.MLOPS_LOG_LEVEL | default "INFO" }}
+    
+    server:
+      host: "0.0.0.0"
+      port: {{ .Values.deployment.env.MLOPS_PORT | default "8000" }}
+      workers: 1
+    
+    monitoring:
+      enabled: {{ .Values.deployment.env.MLOPS_ENABLE_METRICS | default "true" }}
+      metrics_cache_ttl: 5
+    
+    model:
+      name: "distilbert-base-uncased-finetuned-sst-2-english"
+      max_text_length: 512
+      cache_dir: "/app/.cache"
+    
+    security:
+      allowed_origins:
+        - "https://{{ (index .Values.ingress.hosts 0).host }}"
+        {{- range .Values.ingress.hosts }}
+        - "https://{{ .host }}"
+        {{- end }}
+    
+    performance:
+      max_request_timeout: 30
+  
+  # Logging configuration
+  logging.yaml: |
+    version: 1
+    disable_existing_loggers: false
+    formatters:
+      standard:
+        format: '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+      json:
+        format: '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s", "module": "%(module)s", "function": "%(funcName)s", "line": %(lineno)d}'
+    handlers:
+      console:
+        class: logging.StreamHandler
+        level: {{ .Values.deployment.env.MLOPS_LOG_LEVEL | default "INFO" }}
+        formatter: json
+        stream: ext://sys.stdout
+    loggers:
+      app:
+        level: {{ .Values.deployment.env.MLOPS_LOG_LEVEL | default "INFO" }}
+        handlers: [console]
+        propagate: false
+      uvicorn:
+        level: INFO
+        handlers: [console]
+        propagate: false
+      transformers:
+        level: WARNING
+        handlers: [console]
+        propagate: false
+    root:
+      level: {{ .Values.deployment.env.MLOPS_LOG_LEVEL | default "INFO" }}
+      handlers: [console]
