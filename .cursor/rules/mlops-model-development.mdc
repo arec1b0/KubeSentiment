@@ -1,0 +1,340 @@
+---
+alwaysApply: true
+---
+# AI/ML Model Development Rules
+
+## Model Architecture and Design
+
+### Framework Standards
+- Use **PyTorch** or **TensorFlow** for deep learning models
+- Implement **scikit-learn** for traditional ML algorithms
+- Use **Transformers** library for NLP models
+- Implement **LightGBM** or **XGBoost** for gradient boosting
+- Use **PyTorch Lightning** for structured deep learning training
+
+### Model Design Patterns
+```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
+import mlflow
+import torch.nn as nn
+
+class BaseModel(ABC):
+    """Base class for all ML models."""
+    
+    @abstractmethod
+    def fit(self, X, y) -> 'BaseModel':
+        """Train the model."""
+        pass
+    
+    @abstractmethod
+    def predict(self, X) -> Any:
+        """Make predictions."""
+        pass
+    
+    @abstractmethod
+    def save(self, path: str) -> None:
+        """Save model artifacts."""
+        pass
+    
+    @abstractmethod
+    def load(self, path: str) -> 'BaseModel':
+        """Load model artifacts."""
+        pass
+
+@dataclass
+class ModelConfig:
+    """Model configuration dataclass."""
+    name: str
+    version: str
+    hyperparameters: Dict[str, Any]
+    experiment_name: str
+    artifact_path: str
+```
+
+### Deep Learning Best Practices
+- Implement **mixed precision training** for efficiency
+- Use **gradient checkpointing** for memory optimization
+- Implement **early stopping** and **learning rate scheduling**
+- Use **data augmentation** for training robustness
+- Implement **model ensembling** for improved performance
+
+## Experiment Tracking and Management
+
+### MLflow Integration
+```python
+import mlflow
+import mlflow.sklearn
+from mlflow.models.signature import infer_signature
+
+class ExperimentTracker:
+    """Wrapper for MLflow experiment tracking."""
+    
+    def __init__(self, experiment_name: str):
+        mlflow.set_experiment(experiment_name)
+        self.run = None
+    
+    def start_run(self, run_name: Optional[str] = None):
+        """Start MLflow run with context manager."""
+        self.run = mlflow.start_run(run_name=run_name)
+        return self.run
+    
+    def log_params(self, params: Dict[str, Any]):
+        """Log model parameters."""
+        mlflow.log_params(params)
+    
+    def log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None):
+        """Log model metrics."""
+        mlflow.log_metrics(metrics, step=step)
+    
+    def log_model(self, model, model_name: str, signature=None):
+        """Log trained model."""
+        if signature is None:
+            # Infer signature from training data
+            signature = infer_signature(self.X_train, model.predict(self.X_train))
+        
+        mlflow.sklearn.log_model(
+            sk_model=model,
+            artifact_path=model_name,
+            signature=signature,
+            registered_model_name=model_name
+        )
+```
+
+### Model Versioning
+- Use **semantic versioning** for model releases
+- Track **model lineage** and **data dependencies**
+- Implement **model comparison** metrics
+- Create **model cards** for documentation
+- Use **MLflow Model Registry** for lifecycle management
+
+## Training Orchestration
+
+### Training Pipeline Structure
+```python
+from hydra import compose, initialize
+from omegaconf import DictConfig
+import pytorch_lightning as pl
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+
+class TrainingPipeline:
+    """Orchestrate model training with best practices."""
+    
+    def __init__(self, config: DictConfig):
+        self.config = config
+        self.model = None
+        self.trainer = None
+    
+    def setup_model(self):
+        """Initialize model from configuration."""
+        model_class = getattr(models, self.config.model.name)
+        self.model = model_class(**self.config.model.params)
+    
+    def setup_trainer(self):
+        """Setup PyTorch Lightning trainer."""
+        callbacks = [
+            ModelCheckpoint(
+                monitor='val_loss',
+                dirpath='checkpoints/',
+                filename='{epoch:02d}-{val_loss:.2f}',
+                save_top_k=3,
+                mode='min'
+            ),
+            EarlyStopping(
+                monitor='val_loss',
+                patience=10,
+                mode='min'
+            )
+        ]
+        
+        self.trainer = pl.Trainer(
+            max_epochs=self.config.training.max_epochs,
+            callbacks=callbacks,
+            accelerator='gpu' if torch.cuda.is_available() else 'cpu',
+            precision=16 if self.config.training.mixed_precision else 32,
+            gradient_clip_val=self.config.training.gradient_clip_val
+        )
+    
+    def train(self, train_loader, val_loader):
+        """Execute training pipeline."""
+        self.trainer.fit(self.model, train_loader, val_loader)
+```
+
+### Hyperparameter Optimization
+- Use **Optuna** or **Weights & Biases** for hyperparameter tuning
+- Implement **Bayesian optimization** for efficient search
+- Use **multi-objective optimization** when appropriate
+- Create **hyperparameter importance analysis**
+- Implement **automated hyperparameter scheduling**
+
+## Model Evaluation and Validation
+
+### Evaluation Frameworks
+```python
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.model_selection import cross_val_score
+import shap
+
+class ModelEvaluator:
+    """Comprehensive model evaluation toolkit."""
+    
+    def __init__(self, model, X_test, y_test):
+        self.model = model
+        self.X_test = X_test
+        self.y_test = y_test
+        self.predictions = None
+    
+    def evaluate_classification(self) -> Dict[str, Any]:
+        """Evaluate classification model."""
+        self.predictions = self.model.predict(self.X_test)
+        
+        return {
+            'accuracy': accuracy_score(self.y_test, self.predictions),
+            'precision': precision_score(self.y_test, self.predictions, average='weighted'),
+            'recall': recall_score(self.y_test, self.predictions, average='weighted'),
+            'f1': f1_score(self.y_test, self.predictions, average='weighted'),
+            'classification_report': classification_report(self.y_test, self.predictions),
+            'confusion_matrix': confusion_matrix(self.y_test, self.predictions).tolist()
+        }
+    
+    def explain_model(self) -> Dict[str, Any]:
+        """Generate model explanations with SHAP."""
+        explainer = shap.TreeExplainer(self.model)
+        shap_values = explainer.shap_values(self.X_test)
+        
+        return {
+            'feature_importance': explainer.expected_value,
+            'shap_values': shap_values,
+            'feature_names': self.X_test.columns.tolist()
+        }
+```
+
+### Cross-Validation Strategies
+- Use **stratified k-fold** for classification tasks
+- Implement **time series cross-validation** for temporal data
+- Use **group k-fold** for data with groups/clusters
+- Implement **nested cross-validation** for model selection
+- Create **custom validation strategies** for domain-specific needs
+
+## Model Inference and Serving
+
+### Inference Optimization
+```python
+import torch
+from torch.jit import script
+import onnx
+import onnxruntime as ort
+
+class ModelOptimizer:
+    """Optimize models for production inference."""
+    
+    @staticmethod
+    def torch_to_torchscript(model: torch.nn.Module, example_input: torch.Tensor):
+        """Convert PyTorch model to TorchScript."""
+        model.eval()
+        traced_model = torch.jit.trace(model, example_input)
+        return traced_model
+    
+    @staticmethod
+    def torch_to_onnx(model: torch.nn.Module, example_input: torch.Tensor, onnx_path: str):
+        """Convert PyTorch model to ONNX format."""
+        torch.onnx.export(
+            model, 
+            example_input, 
+            onnx_path,
+            export_params=True,
+            opset_version=11,
+            do_constant_folding=True,
+            input_names=['input'],
+            output_names=['output'],
+            dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
+        )
+    
+    @staticmethod
+    def load_onnx_model(onnx_path: str):
+        """Load ONNX model for inference."""
+        return ort.InferenceSession(onnx_path)
+```
+
+### Model Serving Patterns
+- Use **FastAPI** with **Pydantic** for model APIs
+- Implement **batch inference** for high-throughput scenarios
+- Use **async/await** patterns for concurrent requests
+- Implement **model warm-up** strategies
+- Create **health checks** and **readiness probes**
+
+## Model Monitoring and Maintenance
+
+### Production Monitoring
+```python
+from evidently import ColumnMapping
+from evidently.report import Report
+from evidently.metric_preset import DataDriftPreset, TargetDriftPreset
+
+class ModelMonitor:
+    """Monitor model performance in production."""
+    
+    def __init__(self, reference_data, column_mapping: ColumnMapping):
+        self.reference_data = reference_data
+        self.column_mapping = column_mapping
+    
+    def detect_data_drift(self, current_data):
+        """Detect data drift between reference and current data."""
+        data_drift_report = Report(metrics=[DataDriftPreset()])
+        
+        data_drift_report.run(
+            reference_data=self.reference_data,
+            current_data=current_data,
+            column_mapping=self.column_mapping
+        )
+        
+        return data_drift_report
+    
+    def detect_target_drift(self, current_data):
+        """Detect target drift in model predictions."""
+        target_drift_report = Report(metrics=[TargetDriftPreset()])
+        
+        target_drift_report.run(
+            reference_data=self.reference_data,
+            current_data=current_data,
+            column_mapping=self.column_mapping
+        )
+        
+        return target_drift_report
+```
+
+### Model Retraining Strategies
+- Implement **automatic retraining triggers**
+- Use **online learning** for streaming scenarios
+- Create **A/B testing frameworks** for model comparison
+- Implement **champion/challenger** deployment patterns
+- Use **gradual rollout** strategies for model updates
+
+## Security and Compliance
+
+### Model Security
+- Implement **input validation** for inference requests
+- Use **model encryption** for sensitive models
+- Implement **differential privacy** when required
+- Create **audit logs** for model predictions
+- Use **secure model serving** with authentication
+
+### Bias and Fairness
+- Implement **fairness metrics** evaluation
+- Use **bias detection** tools like **Fairlearn**
+- Create **demographic parity** checks
+- Implement **adversarial debiasing** techniques
+- Document **model limitations** and **intended use**
+
+## Anti-Patterns to Avoid
+
+### Model Development Anti-Patterns
+- ❌ Don't train models without **proper validation sets**
+- ❌ Avoid **data leakage** in feature engineering
+- ❌ Don't ignore **class imbalance** in classification tasks
+- ❌ Avoid **overfitting** with insufficient regularization
+- ❌ Don't skip **model interpretability** for critical applications
+- ❌ Avoid **manual hyperparameter tuning** without systematic search
+- ❌ Don't deploy models without **proper monitoring**
+- ❌ Avoid **hardcoded model parameters** in production code

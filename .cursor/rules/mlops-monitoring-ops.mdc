@@ -1,0 +1,608 @@
+---
+alwaysApply: true
+---
+# MLOps Monitoring and Observability Rules
+
+## Observability Architecture
+
+### Three Pillars of Observability
+- **Metrics**: Quantitative measurements of system behavior
+- **Logs**: Discrete events with structured information  
+- **Traces**: Request flows through distributed systems
+
+### Monitoring Stack Standards
+- Use **Prometheus** for metrics collection and storage
+- Implement **Grafana** for metrics visualization and dashboards
+- Use **Elasticsearch + Kibana** or **Loki** for log management
+- Implement **Jaeger** or **Zipkin** for distributed tracing
+- Use **AlertManager** for alert routing and management
+
+## Metrics and KPIs
+
+### Model Performance Metrics
+```python
+from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry
+from typing import Dict, Any
+import time
+import logging
+
+class MLMetrics:
+    """MLOps metrics collection using Prometheus."""
+    
+    def __init__(self, registry: CollectorRegistry = None):
+        self.registry = registry or CollectorRegistry()
+        
+        # Model prediction metrics
+        self.predictions_total = Counter(
+            'ml_predictions_total',
+            'Total number of predictions made',
+            ['model_name', 'model_version', 'endpoint'],
+            registry=self.registry
+        )
+        
+        self.prediction_duration = Histogram(
+            'ml_prediction_duration_seconds',
+            'Time spent making predictions',
+            ['model_name', 'model_version'],
+            registry=self.registry
+        )
+        
+        # Model performance metrics
+        self.model_accuracy = Gauge(
+            'ml_model_accuracy',
+            'Current model accuracy',
+            ['model_name', 'model_version', 'dataset'],
+            registry=self.registry
+        )
+        
+        self.data_drift_score = Gauge(
+            'ml_data_drift_score',
+            'Data drift detection score',
+            ['model_name', 'feature_name'],
+            registry=self.registry
+        )
+        
+        # Infrastructure metrics
+        self.model_memory_usage = Gauge(
+            'ml_model_memory_bytes',
+            'Memory usage by model',
+            ['model_name', 'model_version'],
+            registry=self.registry
+        )
+        
+        # Error tracking
+        self.prediction_errors = Counter(
+            'ml_prediction_errors_total',
+            'Total prediction errors',
+            ['model_name', 'error_type'],
+            registry=self.registry
+        )
+    
+    def record_prediction(self, model_name: str, model_version: str, 
+                         endpoint: str, duration: float):
+        """Record a model prediction."""
+        self.predictions_total.labels(
+            model_name=model_name,
+            model_version=model_version, 
+            endpoint=endpoint
+        ).inc()
+        
+        self.prediction_duration.labels(
+            model_name=model_name,
+            model_version=model_version
+        ).observe(duration)
+    
+    def update_model_performance(self, model_name: str, model_version: str,
+                               dataset: str, accuracy: float):
+        """Update model performance metrics."""
+        self.model_accuracy.labels(
+            model_name=model_name,
+            model_version=model_version,
+            dataset=dataset
+        ).set(accuracy)
+    
+    def record_data_drift(self, model_name: str, feature_name: str, 
+                         drift_score: float):
+        """Record data drift detection results."""
+        self.data_drift_score.labels(
+            model_name=model_name,
+            feature_name=feature_name
+        ).set(drift_score)
+```
+
+### Business Metrics Integration
+```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import List, Optional
+import pandas as pd
+
+@dataclass
+class BusinessMetric:
+    """Business metric definition."""
+    name: str
+    description: str
+    target_value: float
+    current_value: Optional[float] = None
+    trend: Optional[str] = None  # "increasing", "decreasing", "stable"
+
+class BusinessMetricsCalculator(ABC):
+    """Abstract base class for business metrics calculation."""
+    
+    @abstractmethod
+    def calculate_metrics(self, predictions_df: pd.DataFrame, 
+                         actuals_df: pd.DataFrame) -> List[BusinessMetric]:
+        """Calculate business-specific metrics."""
+        pass
+
+class ChurnBusinessMetrics(BusinessMetricsCalculator):
+    """Business metrics for churn prediction model."""
+    
+    def calculate_metrics(self, predictions_df: pd.DataFrame,
+                         actuals_df: pd.DataFrame) -> List[BusinessMetric]:
+        """Calculate churn-specific business metrics."""
+        metrics = []
+        
+        # Customer retention rate
+        total_customers = len(predictions_df)
+        retained_customers = len(predictions_df[predictions_df['predicted_churn'] == 0])
+        retention_rate = retained_customers / total_customers * 100
+        
+        metrics.append(BusinessMetric(
+            name="customer_retention_rate",
+            description="Percentage of customers retained",
+            target_value=85.0,
+            current_value=retention_rate
+        ))
+        
+        # Revenue impact
+        prevented_churn = len(actuals_df[
+            (actuals_df['actual_churn'] == 1) & 
+            (predictions_df['predicted_churn'] == 1)
+        ])
+        avg_customer_value = predictions_df['customer_value'].mean()
+        revenue_saved = prevented_churn * avg_customer_value
+        
+        metrics.append(BusinessMetric(
+            name="revenue_saved",
+            description="Revenue saved through churn prevention",
+            target_value=1000000.0,
+            current_value=revenue_saved
+        ))
+        
+        return metrics
+```
+
+## Data Monitoring and Quality
+
+### Data Quality Monitoring
+```python
+from great_expectations import DataContext
+from great_expectations.core.batch import RuntimeBatchRequest
+from typing import Dict, List, Any
+import pandas as pd
+
+class DataQualityMonitor:
+    """Monitor data quality using Great Expectations."""
+    
+    def __init__(self, ge_context_path: str):
+        self.context = DataContext(ge_context_path)
+        self.metrics_collector = MLMetrics()
+    
+    def validate_batch(self, df: pd.DataFrame, 
+                      expectation_suite_name: str) -> Dict[str, Any]:
+        """Validate a data batch against expectations."""
+        
+        # Create runtime batch request
+        batch_request = RuntimeBatchRequest(
+            datasource_name="pandas_datasource",
+            data_connector_name="runtime_data_connector",
+            data_asset_name="validation_data",
+            runtime_parameters={"batch_data": df},
+            batch_identifiers={"run_id": f"validation_{int(time.time())}"}
+        )
+        
+        # Run validation
+        validator = self.context.get_validator(
+            batch_request=batch_request,
+            expectation_suite_name=expectation_suite_name
+        )
+        
+        results = validator.validate()
+        
+        # Record metrics
+        success_rate = results.statistics["successful_expectations"] / \
+                      results.statistics["evaluated_expectations"]
+        
+        self.metrics_collector.data_quality_score.labels(
+            dataset="validation_batch"
+        ).set(success_rate)
+        
+        return {
+            "success": results.success,
+            "statistics": results.statistics,
+            "failed_expectations": [
+                exp.expectation_config.expectation_type 
+                for exp in results.results if not exp.success
+            ]
+        }
+    
+    def create_data_docs(self):
+        """Build and update data documentation."""
+        self.context.build_data_docs()
+```
+
+### Feature Store Monitoring
+```python
+from feast import FeatureStore
+import pandas as pd
+from typing import Dict, List
+
+class FeatureStoreMonitor:
+    """Monitor feature store health and feature quality."""
+    
+    def __init__(self, feature_store_path: str):
+        self.fs = FeatureStore(repo_path=feature_store_path)
+        self.metrics_collector = MLMetrics()
+    
+    def monitor_feature_freshness(self) -> Dict[str, Any]:
+        """Monitor feature freshness across feature views."""
+        freshness_report = {}
+        
+        for fv in self.fs.list_feature_views():
+            # Get latest feature values
+            try:
+                latest_values = self.fs.get_online_features(
+                    features=[f"{fv.name}:*"],
+                    entity_rows=[{"entity_id": "sample"}],
+                ).to_dict()
+                
+                # Calculate freshness metrics
+                last_updated = latest_values.get('event_timestamp', [None])[0]
+                if last_updated:
+                    freshness_minutes = (
+                        pd.Timestamp.now() - pd.Timestamp(last_updated)
+                    ).total_seconds() / 60
+                    
+                    freshness_report[fv.name] = {
+                        "last_updated": last_updated,
+                        "freshness_minutes": freshness_minutes,
+                        "status": "fresh" if freshness_minutes < 60 else "stale"
+                    }
+            
+            except Exception as e:
+                freshness_report[fv.name] = {
+                    "error": str(e),
+                    "status": "error"
+                }
+        
+        return freshness_report
+    
+    def validate_feature_schema(self, feature_view_name: str) -> bool:
+        """Validate feature schema consistency."""
+        try:
+            fv = self.fs.get_feature_view(feature_view_name)
+            # Perform schema validation logic
+            return True
+        except Exception:
+            return False
+```
+
+## Alerting and Incident Management
+
+### Intelligent Alerting System
+```python
+from enum import Enum
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Callable
+import smtplib
+from email.mime.text import MIMEText
+import requests
+import logging
+
+class AlertSeverity(Enum):
+    INFO = "info"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+@dataclass
+class Alert:
+    """Alert definition."""
+    name: str
+    description: str
+    severity: AlertSeverity
+    metric_name: str
+    threshold: float
+    current_value: Optional[float] = None
+    tags: Optional[Dict[str, str]] = None
+
+class AlertManager:
+    """Manage alerts and notifications for MLOps systems."""
+    
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+        self.active_alerts = {}
+        self.notification_handlers = {
+            'email': self._send_email_alert,
+            'slack': self._send_slack_alert,
+            'pagerduty': self._send_pagerduty_alert
+        }
+    
+    def register_alert_rule(self, alert: Alert, 
+                          condition_func: Callable[[float, float], bool]):
+        """Register a new alert rule."""
+        self.alert_rules[alert.name] = {
+            'alert': alert,
+            'condition': condition_func
+        }
+    
+    def evaluate_alerts(self, metrics: Dict[str, float]):
+        """Evaluate alert conditions against current metrics."""
+        triggered_alerts = []
+        
+        for rule_name, rule in self.alert_rules.items():
+            alert = rule['alert']
+            condition = rule['condition']
+            
+            current_value = metrics.get(alert.metric_name)
+            if current_value is None:
+                continue
+                
+            alert.current_value = current_value
+            
+            if condition(current_value, alert.threshold):
+                triggered_alerts.append(alert)
+                
+                # Check if this is a new alert or escalation
+                if rule_name not in self.active_alerts:
+                    self._trigger_alert(alert)
+                    self.active_alerts[rule_name] = alert
+            else:
+                # Clear alert if it was previously active
+                if rule_name in self.active_alerts:
+                    self._resolve_alert(self.active_alerts[rule_name])
+                    del self.active_alerts[rule_name]
+        
+        return triggered_alerts
+    
+    def _trigger_alert(self, alert: Alert):
+        """Trigger alert notifications."""
+        logging.warning(f"Alert triggered: {alert.name}")
+        
+        # Send notifications based on severity
+        notification_channels = self.config.get('notifications', {}).get(
+            alert.severity.value, []
+        )
+        
+        for channel in notification_channels:
+            handler = self.notification_handlers.get(channel)
+            if handler:
+                try:
+                    handler(alert)
+                except Exception as e:
+                    logging.error(f"Failed to send {channel} notification: {e}")
+    
+    def _send_slack_alert(self, alert: Alert):
+        """Send alert to Slack."""
+        webhook_url = self.config['slack']['webhook_url']
+        
+        color_map = {
+            AlertSeverity.INFO: "good",
+            AlertSeverity.WARNING: "warning", 
+            AlertSeverity.CRITICAL: "danger"
+        }
+        
+        message = {
+            "attachments": [{
+                "color": color_map.get(alert.severity, "warning"),
+                "title": f"🚨 MLOps Alert: {alert.name}",
+                "text": alert.description,
+                "fields": [
+                    {
+                        "title": "Metric",
+                        "value": alert.metric_name,
+                        "short": True
+                    },
+                    {
+                        "title": "Current Value",
+                        "value": str(alert.current_value),
+                        "short": True
+                    },
+                    {
+                        "title": "Threshold", 
+                        "value": str(alert.threshold),
+                        "short": True
+                    },
+                    {
+                        "title": "Severity",
+                        "value": alert.severity.value.upper(),
+                        "short": True
+                    }
+                ]
+            }]
+        }
+        
+        response = requests.post(webhook_url, json=message)
+        response.raise_for_status()
+```
+
+### Automated Remediation
+```python
+from abc import ABC, abstractmethod
+from typing import Any, Dict
+
+class RemediationAction(ABC):
+    """Abstract base class for automated remediation actions."""
+    
+    @abstractmethod
+    def can_handle(self, alert: Alert) -> bool:
+        """Check if this action can handle the given alert."""
+        pass
+    
+    @abstractmethod
+    def execute(self, alert: Alert) -> Dict[str, Any]:
+        """Execute the remediation action."""
+        pass
+
+class ModelRollbackAction(RemediationAction):
+    """Rollback to previous model version when performance degrades."""
+    
+    def __init__(self, model_registry):
+        self.model_registry = model_registry
+    
+    def can_handle(self, alert: Alert) -> bool:
+        """Check if this is a model performance alert."""
+        return alert.metric_name in ['model_accuracy', 'prediction_errors']
+    
+    def execute(self, alert: Alert) -> Dict[str, Any]:
+        """Rollback to previous model version."""
+        try:
+            # Get current and previous model versions
+            current_version = self.model_registry.get_latest_version("Production")
+            previous_version = self.model_registry.get_previous_version(current_version)
+            
+            # Transition previous version back to Production
+            self.model_registry.transition_model_version_stage(
+                name=previous_version.name,
+                version=previous_version.version,
+                stage="Production"
+            )
+            
+            # Archive current version
+            self.model_registry.transition_model_version_stage(
+                name=current_version.name,
+                version=current_version.version,
+                stage="Archived"
+            )
+            
+            return {
+                "success": True,
+                "action": "model_rollback",
+                "rolled_back_to": previous_version.version,
+                "archived": current_version.version
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "action": "model_rollback",
+                "error": str(e)
+            }
+
+class AutoRemediationEngine:
+    """Engine for automated incident remediation."""
+    
+    def __init__(self):
+        self.actions = []
+    
+    def register_action(self, action: RemediationAction):
+        """Register a remediation action."""
+        self.actions.append(action)
+    
+    def remediate(self, alert: Alert) -> List[Dict[str, Any]]:
+        """Execute all applicable remediation actions."""
+        results = []
+        
+        for action in self.actions:
+            if action.can_handle(alert):
+                result = action.execute(alert)
+                results.append(result)
+                
+                # Stop if remediation was successful
+                if result.get('success'):
+                    break
+        
+        return results
+```
+
+## Production Health Monitoring
+
+### Model Health Checks
+```python
+import asyncio
+from typing import Dict, Any, List
+import httpx
+import time
+
+class ModelHealthChecker:
+    """Comprehensive health checking for ML models in production."""
+    
+    def __init__(self, model_endpoints: List[str]):
+        self.endpoints = model_endpoints
+        self.health_status = {}
+    
+    async def check_endpoint_health(self, endpoint: str) -> Dict[str, Any]:
+        """Check health of a single model endpoint."""
+        start_time = time.time()
+        
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # Health check
+                health_response = await client.get(f"{endpoint}/health")
+                response_time = time.time() - start_time
+                
+                if health_response.status_code == 200:
+                    health_data = health_response.json()
+                    
+                    # Test prediction endpoint
+                    test_payload = {"features": [0.1, 0.2, 0.3, 0.4]}
+                    pred_response = await client.post(
+                        f"{endpoint}/predict", 
+                        json=test_payload
+                    )
+                    
+                    return {
+                        "endpoint": endpoint,
+                        "status": "healthy" if pred_response.status_code == 200 else "degraded",
+                        "response_time": response_time,
+                        "health_data": health_data,
+                        "test_prediction_success": pred_response.status_code == 200
+                    }
+                else:
+                    return {
+                        "endpoint": endpoint,
+                        "status": "unhealthy",
+                        "response_time": response_time,
+                        "error": f"Health check failed: {health_response.status_code}"
+                    }
+        
+        except Exception as e:
+            return {
+                "endpoint": endpoint,
+                "status": "unhealthy",
+                "response_time": time.time() - start_time,
+                "error": str(e)
+            }
+    
+    async def check_all_endpoints(self) -> Dict[str, Any]:
+        """Check health of all model endpoints concurrently."""
+        tasks = [
+            self.check_endpoint_health(endpoint) 
+            for endpoint in self.endpoints
+        ]
+        
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Aggregate results
+        healthy_endpoints = sum(1 for r in results if r.get('status') == 'healthy')
+        total_endpoints = len(self.endpoints)
+        
+        return {
+            "overall_health": "healthy" if healthy_endpoints == total_endpoints else "degraded",
+            "healthy_endpoints": healthy_endpoints,
+            "total_endpoints": total_endpoints,
+            "endpoint_details": results
+        }
+```
+
+## Anti-Patterns to Avoid
+
+### Monitoring and Observability Anti-Patterns
+- ❌ Don't monitor **vanity metrics** without business context
+- ❌ Avoid **alert fatigue** with too many low-priority notifications
+- ❌ Don't ignore **baseline establishment** for anomaly detection
+- ❌ Avoid **reactive monitoring** without proactive health checks
+- ❌ Don't skip **end-to-end monitoring** of ML pipelines
+- ❌ Avoid **siloed monitoring** without correlation across systems
+- ❌ Don't neglect **business impact** metrics alongside technical metrics
+- ❌ Avoid **manual incident response** without automation capabilities

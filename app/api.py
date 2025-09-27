@@ -15,6 +15,7 @@ from .config import get_settings, Settings
 from .ml.sentiment import get_sentiment_analyzer, SentimentAnalyzer
 from .logging_config import get_logger, log_api_request
 from .error_codes import ErrorCode, raise_validation_error
+from .exceptions import TextEmptyError, TextTooLongError, ModelNotLoadedError
 
 logger = get_logger(__name__)
 
@@ -40,11 +41,7 @@ class TextInput(BaseModel):
     def validate_text(cls, v):
         """Validate and clean input text."""
         if not v or not v.strip():
-            raise_validation_error(
-                ErrorCode.TEXT_EMPTY,
-                detail="Text field is required and cannot be empty",
-                text_length=len(v) if v else 0,
-            )
+            raise TextEmptyError(context={"text_length": len(v) if v else 0})
 
         # Check for maximum length
         settings = get_settings()
@@ -58,11 +55,10 @@ class TextInput(BaseModel):
             max_len = Settings().max_text_length
 
         if len(v.strip()) > max_len:
-            raise_validation_error(
-                ErrorCode.TEXT_TOO_LONG,
-                detail=f"Text length {len(v.strip())} exceeds maximum of {max_len}",
+            raise TextTooLongError(
                 text_length=len(v.strip()),
                 max_length=max_len,
+                context={"raw_length": len(v)},
             )
 
         return v.strip()
@@ -134,11 +130,9 @@ async def predict_sentiment(
         HTTPException: If the model is unavailable or prediction fails
     """
     if not analyzer.is_ready():
-        raise_validation_error(
-            ErrorCode.MODEL_NOT_LOADED,
-            detail="Sentiment analysis model is not loaded or failed to initialize",
-            status_code=503,
-            service_status="unavailable",
+        raise ModelNotLoadedError(
+            model_name=settings.model_name,
+            context={"service_status": "unavailable", "endpoint": "predict"},
         )
 
     try:

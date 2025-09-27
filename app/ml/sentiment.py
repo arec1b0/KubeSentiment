@@ -8,18 +8,23 @@ for sentiment analysis using Hugging Face transformers.
 import time
 import hashlib
 from typing import Dict, Optional, Any
-from functools import lru_cache
 
 import torch
 from transformers import pipeline, Pipeline
 
 from ..config import get_settings
 from ..logging_config import get_logger, log_model_operation, log_security_event
-from ..error_codes import ErrorCode, raise_validation_error
+from ..exceptions import (
+    ModelNotLoadedError,
+    ModelInferenceError,
+    InvalidModelError,
+    TextEmptyError,
+)
 
 # Import monitoring at module level to avoid circular imports
 try:
     from ..monitoring import get_metrics
+
     MONITORING_AVAILABLE = True
 except ImportError:
     MONITORING_AVAILABLE = False
@@ -41,12 +46,15 @@ class SentimentAnalyzer:
         self._pipeline: Optional[Pipeline] = None
         self._is_loaded = False
         self._prediction_cache: Dict[str, Dict[str, Any]] = {}
-        self._cache_max_size = 1000  # Maximum number of cached predictions
+        self._cache_max_size = self.settings.prediction_cache_max_size
         self._load_model()
 
     def _get_cache_key(self, text: str) -> str:
         """
         Generate a cache key for the given text.
+
+        Uses MD5 hashing for fast cache key generation. Not cryptographically secure
+        but sufficient for cache key purposes.
 
         Args:
             text: The input text
@@ -75,7 +83,10 @@ class SentimentAnalyzer:
 
     def _cache_prediction(self, cache_key: str, result: Dict[str, Any]) -> None:
         """
-        Cache a prediction result.
+        Cache a prediction result with FIFO eviction.
+
+        Implements simple FIFO eviction strategy when cache size limit is reached.
+        This could be optimized with a proper LRU cache for better performance.
 
         Args:
             cache_key: The cache key
@@ -115,6 +126,9 @@ class SentimentAnalyzer:
         """
         Validate that the model name is in the allowed list.
 
+        Security-critical function that prevents loading of unauthorized models
+        which could lead to code execution or data exfiltration vulnerabilities.
+
         Args:
             model_name: The model name to validate
 
@@ -130,12 +144,10 @@ class SentimentAnalyzer:
                     "allowed_models": self.settings.allowed_models,
                 },
             )
-            raise_validation_error(
-                ErrorCode.INVALID_MODEL_NAME,
-                detail=f"Model '{model_name}' is not in the allowed list",
-                status_code=400,
-                requested_model=model_name,
+            raise InvalidModelError(
+                model_name=model_name,
                 allowed_models=self.settings.allowed_models,
+                context={"requested_model": model_name},
             )
 
         logger.info(
@@ -146,10 +158,16 @@ class SentimentAnalyzer:
 
     def _load_model(self) -> None:
         """
-        Load the sentiment analysis model.
+        Load the sentiment analysis model from Hugging Face.
 
-        Attempts to load the specified model from Hugging Face.
-        If loading fails, the analyzer will operate in degraded mode.
+        Attempts to load the specified model using the transformers pipeline.
+        Model validation is performed before loading to prevent security issues.
+        If loading fails, the analyzer will operate in degraded mode with is_ready() returning False.
+
+        Side Effects:
+            - Updates self._pipeline and self._is_loaded
+            - Updates monitoring metrics if available
+            - Logs model loading events
         """
         try:
             # Validate model name first
@@ -226,10 +244,17 @@ class SentimentAnalyzer:
             ValueError: If the input text is invalid
         """
         if not self.is_ready():
-            raise RuntimeError("Model is not loaded or unavailable")
+            raise ModelNotLoadedError(
+                model_name=self.settings.model_name, context={"operation": "prediction"}
+            )
 
         if not text or not text.strip():
-            raise ValueError("Input text cannot be empty")
+            raise TextEmptyError(
+                context={
+                    "operation": "prediction",
+                    "text_length": len(text) if text else 0,
+                }
+            )
 
         # Generate cache key
         cache_key = self._get_cache_key(text.strip())
@@ -283,7 +308,14 @@ class SentimentAnalyzer:
 
         except Exception as e:
             logger.error(f"Prediction failed: {e}")
-            raise RuntimeError(f"Prediction failed: {str(e)}")
+            raise ModelInferenceError(
+                message=f"Prediction failed: {str(e)}",
+                model_name=self.settings.model_name,
+                context={
+                    "original_text_length": len(original_text),
+                    "truncated_text_length": len(text),
+                },
+            )
 
     def get_model_info(self) -> Dict[str, Any]:
         """
@@ -342,24 +374,71 @@ class SentimentAnalyzer:
         return metrics
 
 
-# Global sentiment analyzer instance
-_sentiment_analyzer: Optional[SentimentAnalyzer] = None
+class SentimentAnalyzerService:
+    """
+    Service class for managing SentimentAnalyzer instances.
+
+    This class provides dependency injection capabilities and proper
+    lifecycle management for the sentiment analyzer.
+    """
+
+    def __init__(self):
+        self._analyzer: Optional[SentimentAnalyzer] = None
+        self._initialized = False
+
+    def get_analyzer(self) -> SentimentAnalyzer:
+        """
+        Get or create the sentiment analyzer instance.
+
+        Returns:
+            SentimentAnalyzer: The sentiment analyzer instance
+        """
+        if not self._initialized:
+            self._analyzer = SentimentAnalyzer()
+            self._initialized = True
+
+        return self._analyzer
+
+    def reset_analyzer(self) -> None:
+        """
+        Reset the analyzer instance (useful for testing).
+        """
+        self._analyzer = None
+        self._initialized = False
 
 
-@lru_cache()
+# Global service instance
+_analyzer_service: Optional[SentimentAnalyzerService] = None
+
+
 def get_sentiment_analyzer() -> SentimentAnalyzer:
     """
-    Get the global sentiment analyzer instance.
+    Dependency injection function to get the sentiment analyzer.
 
-    This function implements the singleton pattern to ensure
-    only one model instance is loaded per application.
+    This function provides a clean interface for dependency injection
+    while maintaining backward compatibility with existing code.
 
     Returns:
         SentimentAnalyzer: The sentiment analyzer instance
     """
-    global _sentiment_analyzer
+    global _analyzer_service
 
-    if _sentiment_analyzer is None:
-        _sentiment_analyzer = SentimentAnalyzer()
+    if _analyzer_service is None:
+        _analyzer_service = SentimentAnalyzerService()
 
-    return _sentiment_analyzer
+    return _analyzer_service.get_analyzer()
+
+
+def get_analyzer_service() -> SentimentAnalyzerService:
+    """
+    Get the analyzer service for advanced operations like testing.
+
+    Returns:
+        SentimentAnalyzerService: The analyzer service instance
+    """
+    global _analyzer_service
+
+    if _analyzer_service is None:
+        _analyzer_service = SentimentAnalyzerService()
+
+    return _analyzer_service

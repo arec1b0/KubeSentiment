@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     )
     max_text_length: int = Field(default=512, description="Maximum input text length")
 
+    # Cache settings
+    prediction_cache_max_size: int = Field(
+        default=1000, description="Maximum number of cached predictions"
+    )
+
     # Monitoring settings
     enable_metrics: bool = Field(default=True, description="Enable metrics collection")
     log_level: str = Field(default="INFO", description="Logging level")
