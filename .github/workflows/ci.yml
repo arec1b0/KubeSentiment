@@ -1,306 +1,174 @@
-# Complete CI/CD Pipeline for MLOps Sentiment Analysis Service
-# Автоматизирует весь процесс от git push до развертывания в Kubernetes
-
 name: CI/CD Pipeline
 
-# Триггеры для различных событий
 on:
   push:
-    branches: [ main, develop ]
-    tags: [ 'v*' ]
+    branches: [main, develop]
+    tags: ["v*"]
   pull_request:
-    branches: [ main, develop ]
-  workflow_dispatch:  # Ручной запуск
+    branches: [main, develop]
 
-# Переменные окружения
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  PYTHON_VERSION: '3.9'
+  PYTHON_VERSION: "3.9"
 
 jobs:
-  # Job 1: Тестирование и качество кода
+  # Test and lint code
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.9', '3.10', '3.11']
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-        cache: 'pip'
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov black isort flake8 mypy
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest-cov black flake8 isort mypy
+      - name: Code quality checks
+        run: |
+          black --check app/ tests/
+          isort --check-only app/ tests/
+          flake8 app/ tests/ --max-line-length=88 --extend-ignore=E203,W503
+          mypy app/ --ignore-missing-imports
 
-    - name: Code formatting check (Black)
-      run: black --check app/ tests/
+      - name: Run tests
+        run: pytest tests/ -v --cov=app --cov-report=xml
+        env:
+          MLOPS_DEBUG: true
 
-    - name: Import sorting check (isort)
-      run: isort --check-only app/ tests/
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
 
-    - name: Linting (flake8)
-      run: flake8 app/ tests/ --max-line-length=88 --extend-ignore=E203,W503
-
-    - name: Type checking (mypy)
-      run: mypy app/ --ignore-missing-imports
-
-    - name: Run tests with coverage
-      run: |
-        pytest tests/ -v --cov=app --cov-report=xml --cov-report=html
-      env:
-        MLOPS_DEBUG: true
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-
-  # Job 2: Сборка и публикация Docker образа
-  build-and-push:
+  # Build and push Docker image
+  build:
     needs: test
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
-    
     outputs:
-      image-tag: ${{ steps.meta.outputs.tags }}
-      image-digest: ${{ steps.build.outputs.digest }}
+      image: ${{ steps.meta.outputs.tags }}
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,prefix={{branch}}-
 
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
-          type=semver,pattern={{major}}
-          type=sha,prefix={{branch}}-
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-    - name: Build and push Docker image
-      id: build
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        build-args: |
-          BUILDTIME=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
-          VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
-          REVISION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
-
-  # Job 3: Сканирование безопасности
-  security-scan:
-    needs: build-and-push
+  # Security scan
+  security:
+    needs: build
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
 
     steps:
-    - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: ${{ needs.build-and-push.outputs.image-tag }}
-        format: 'sarif'
-        output: 'trivy-results.sarif'
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ needs.build.outputs.image }}
+          format: "sarif"
+          output: "trivy-results.sarif"
 
-    - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
-      if: always()
-      with:
-        sarif_file: 'trivy-results.sarif'
+      - name: Upload results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: "trivy-results.sarif"
 
-  # Job 4: Развертывание в Development
-  deploy-dev:
-    needs: [build-and-push, security-scan]
+  # Deploy to environments
+  deploy:
+    needs: [build, security]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
-    environment: development
+    if: github.event_name == 'push' && github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        environment: [development, staging, production]
+        include:
+          - environment: development
+            branch: develop
+            namespace: mlops-sentiment-dev
+            replicas: 1
+          - environment: staging
+            branch: main
+            namespace: mlops-sentiment-staging
+            replicas: 2
+          - environment: production
+            branch: main
+            namespace: mlops-sentiment
+            replicas: 3
+            requires_tag: true
+    environment: ${{ matrix.environment }}
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v3
+        with:
+          version: "v1.28.0"
 
-    - name: Setup kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'v1.28.0'
+      - name: Setup kubectl
+        run: |
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > kubeconfig
+          export KUBECONFIG=kubeconfig
 
-    - name: Configure kubectl for development
-      run: |
-        echo "${{ secrets.KUBE_CONFIG_DEV }}" | base64 -d > kubeconfig
-        export KUBECONFIG=kubeconfig
+      - name: Deploy with Helm
+        run: |
+          export KUBECONFIG=kubeconfig
 
-    - name: Update Kubernetes manifests
-      run: |
-        sed -i "s|sentiment-service:latest|${{ needs.build-and-push.outputs.image-tag }}|g" k8s/deployment.yaml
+          # Determine if we should deploy based on branch/tag
+          if [[ "${{ matrix.environment }}" == "production" && ! "${{ github.ref }}" =~ ^refs/tags/v ]]; then
+            echo "Skipping production deployment - requires tag"
+            exit 0
+          fi
 
-    - name: Deploy to Development
-      run: |
-        export KUBECONFIG=kubeconfig
-        kubectl apply -f k8s/namespace.yaml
-        kubectl apply -f k8s/configmap.yaml
-        kubectl apply -f k8s/deployment.yaml
-        kubectl apply -f k8s/service.yaml
-        kubectl apply -f k8s/hpa.yaml
-        kubectl rollout status deployment/sentiment-service -n mlops-sentiment --timeout=300s
+          if [[ "${{ matrix.environment }}" != "production" && "${{ github.ref }}" != "refs/heads/${{ matrix.branch }}" ]]; then
+            echo "Skipping ${{ matrix.environment }} deployment - wrong branch"
+            exit 0
+          fi
 
-    - name: Verify deployment
-      run: |
-        export KUBECONFIG=kubeconfig
-        kubectl get pods -n mlops-sentiment
-        kubectl get services -n mlops-sentiment
+          # Deploy using Helm
+          helm upgrade --install mlops-sentiment ./helm/mlops-sentiment \
+            --namespace ${{ matrix.namespace }} \
+            --create-namespace \
+            --set image.tag=${{ needs.build.outputs.image }} \
+            --set replicaCount=${{ matrix.replicas }} \
+            --values ./helm/mlops-sentiment/values-${{ matrix.environment }}.yaml \
+            --wait --timeout=10m
 
-  # Job 5: Развертывание в Staging
-  deploy-staging:
-    needs: [build-and-push, security-scan]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: staging
+      - name: Run health checks
+        run: |
+          export KUBECONFIG=kubeconfig
+          sleep 10
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'v1.28.0'
-
-    - name: Configure kubectl for staging
-      run: |
-        echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > kubeconfig
-        export KUBECONFIG=kubeconfig
-
-    - name: Update Kubernetes manifests
-      run: |
-        sed -i "s|sentiment-service:latest|${{ needs.build-and-push.outputs.image-tag }}|g" k8s/deployment.yaml
-
-    - name: Deploy to Staging
-      run: |
-        export KUBECONFIG=kubeconfig
-        kubectl apply -f k8s/namespace.yaml
-        kubectl apply -f k8s/configmap.yaml
-        kubectl apply -f k8s/deployment.yaml
-        kubectl apply -f k8s/service.yaml
-        kubectl apply -f k8s/hpa.yaml
-        kubectl apply -f k8s/ingress.yaml
-        kubectl rollout status deployment/sentiment-service -n mlops-sentiment --timeout=300s
-
-    - name: Run smoke tests
-      run: |
-        export KUBECONFIG=kubeconfig
-        # Получаем URL сервиса
-        SERVICE_URL=$(kubectl get ingress sentiment-ingress -n mlops-sentiment -o jsonpath='{.spec.rules[0].host}')
-        # Запускаем smoke tests
-        python test_service.py --url "https://$SERVICE_URL"
-
-  # Job 6: Развертывание в Production
-  deploy-production:
-    needs: [deploy-staging]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    environment: production
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'v1.28.0'
-
-    - name: Configure kubectl for production
-      run: |
-        echo "${{ secrets.KUBE_CONFIG_PROD }}" | base64 -d > kubeconfig
-        export KUBECONFIG=kubeconfig
-
-    - name: Update Kubernetes manifests for production
-      run: |
-        # Используем тег релиза для production
-        TAG=${GITHUB_REF#refs/tags/}
-        sed -i "s|sentiment-service:latest|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${TAG}|g" k8s/deployment.yaml
-        # Увеличиваем количество реплик для production
-        sed -i 's|replicas: 2|replicas: 3|g' k8s/deployment.yaml
-
-    - name: Deploy to Production with Blue-Green strategy
-      run: |
-        export KUBECONFIG=kubeconfig
-        
-        # Создаем новую версию деплоймента
-        kubectl apply -f k8s/namespace.yaml
-        kubectl apply -f k8s/configmap.yaml
-        kubectl apply -f k8s/deployment.yaml
-        kubectl apply -f k8s/service.yaml
-        kubectl apply -f k8s/hpa.yaml
-        kubectl apply -f k8s/ingress.yaml
-        
-        # Ждем успешного развертывания
-        kubectl rollout status deployment/sentiment-service -n mlops-sentiment --timeout=600s
-        
-        # Проверяем здоровье сервиса
-        kubectl get pods -n mlops-sentiment
-        
-    - name: Post-deployment verification
-      run: |
-        export KUBECONFIG=kubeconfig
-        # Запускаем полные тесты в production
-        python test_service.py --url "https://sentiment-api.yourdomain.com" --full-test
-
-  # Job 7: Уведомления
-  notify:
-    needs: [deploy-dev, deploy-staging, deploy-production]
-    runs-on: ubuntu-latest
-    if: always()
-
-    steps:
-    - name: Notify Slack on success
-      if: success()
-      uses: 8398a7/action-slack@v3
-      with:
-        status: success
-        channel: '#mlops-deployments'
-        text: '✅ Deployment successful! Environment: ${{ github.ref }}'
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-    - name: Notify Slack on failure
-      if: failure()
-      uses: 8398a7/action-slack@v3
-      with:
-        status: failure
-        channel: '#mlops-deployments'
-        text: '❌ Deployment failed! Check GitHub Actions for details.'
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          # Get service URL
+          if kubectl get ingress -n ${{ matrix.namespace }} mlops-sentiment &>/dev/null; then
+            SERVICE_URL=$(kubectl get ingress mlops-sentiment -n ${{ matrix.namespace }} -o jsonpath='{.spec.rules[0].host}')
+            curl -f http://$SERVICE_URL/health || exit 1
+          fi

@@ -1,0 +1,52 @@
+# Environment-specific configuration
+# This file defines settings for different deployment environments
+
+environments:
+  development:
+    namespace: mlops-sentiment-dev
+    replicas: 1
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    ingress:
+      enabled: false
+    monitoring:
+      enabled: true
+
+  staging:
+    namespace: mlops-sentiment-staging
+    replicas: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+    ingress:
+      enabled: true
+      host: staging-sentiment-api.example.com
+    monitoring:
+      enabled: true
+
+  production:
+    namespace: mlops-sentiment
+    replicas: 3
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    ingress:
+      enabled: true
+      host: sentiment-api.example.com
+      tls: true
+    monitoring:
+      enabled: true
+      alerting: true

@@ -13,17 +13,22 @@
 
 ## 📚 Documentation
 
-- [API Documentation](https://github.com/your-org/mlops-sentiment/tree/main/openapi-specs) - Complete API reference
-- [Deployment Guide](deployment-guide.md) - Step-by-step deployment instructions
-- [Benchmarking Guide](BENCHMARKING.md) - Performance testing and cost analysis
-- [Troubleshooting Guide](docs/troubleshooting/index.md) - Solutions to common issues
-- [Architecture](docs/architecture.md) - System design and architecture overview
+- [Quick Start](docs/setup/QUICKSTART.md) - Get started in 5 minutes
+- [Development Setup](docs/setup/DEVELOPMENT.md) - Local development environment
+- [Deployment Guide](docs/setup/deployment-guide.md) - Production deployment
+- [API Documentation](openapi-specs/sentiment-api.yaml) - OpenAPI specification
+- [Benchmarking Guide](docs/BENCHMARKING.md) - Performance testing
+- [Troubleshooting Guide](docs/troubleshooting/index.md) - Common issues
+- [Architecture](docs/architecture.md) - System design overview
 
 ## 🎬 Demo
 
 ```bash
-# Start the service
-docker run -d -p 8000:8000 sentiment-service:0.1
+# Start the service locally
+docker-compose up -d
+
+# Or run with Docker directly
+docker run -d -p 8000:8000 sentiment-service:latest
 
 # Test positive sentiment
 curl -X POST http://localhost:8000/predict \
@@ -31,7 +36,7 @@ curl -X POST http://localhost:8000/predict \
   -d '{"text": "I love this amazing project!"}'
 # Response: {"label":"POSITIVE","score":0.99}
 
-# Test negative sentiment  
+# Test negative sentiment
 curl -X POST http://localhost:8000/predict \
   -H "Content-Type: application/json" \
   -d '{"text": "This is frustrating and broken"}'
@@ -89,6 +94,46 @@ flowchart TD
     style L fill:#f9f9f9,stroke:#333,stroke-width:2px
     style M fill:#f9f9f9,stroke:#333,stroke-width:2px
     style N fill:#f9f9f9,stroke:#333,stroke-width:2px
+```
+
+## 📁 Project Structure
+
+```
+├── app/                          # Main application code
+│   ├── api.py                   # API endpoints and schemas
+│   ├── config.py                # Application configuration
+│   ├── main.py                  # FastAPI app factory
+│   ├── ml/
+│   │   └── sentiment.py         # ML model inference logic
+│   ├── middleware.py            # Request middleware
+│   ├── monitoring.py            # Metrics and monitoring
+│   └── utils/
+│       └── error_handlers.py    # Error handling utilities
+├── benchmarking/                # Performance testing suite
+│   ├── configs/                 # Benchmark configurations
+│   ├── scripts/                 # Benchmarking scripts
+│   └── examples/                # Usage examples
+├── config/                      # Configuration files
+│   ├── environments.yaml        # Environment-specific configs
+│   ├── alertmanager-config.yaml # Alerting rules
+│   ├── grafana-datasources.yaml # Grafana setup
+│   ├── grafana-advanced-dashboard.json
+│   ├── prometheus-rules.yaml
+│   └── prometheus-config.yaml
+├── docs/                        # Documentation
+│   ├── setup/                   # Setup guides
+│   ├── troubleshooting/         # Troubleshooting docs
+│   └── architecture.md          # Architecture overview
+├── helm/                        # Kubernetes Helm charts
+│   └── mlops-sentiment/
+├── openapi-specs/               # OpenAPI specifications
+├── scripts/                     # Deployment and setup scripts
+├── tests/                       # Test suite
+├── docker-compose.yml           # Local development setup
+├── Dockerfile                   # Container definition
+├── pytest.ini                  # Test configuration
+├── requirements.txt             # Python dependencies
+└── README.md
 ```
 
 ### Key Components
@@ -240,6 +285,7 @@ curl -X POST http://localhost:8000/predict \
 | **Cold Start** | <3 seconds | Model loading time |
 
 ## 🔧 Configuration
+
 All settings can be configured via environment variables:
 
 | Variable | Default | Description |
@@ -266,6 +312,7 @@ docker run -d -p 8000:8000 \
 docker build -t sentiment-service:latest .
 docker run -d -p 8000:8000 sentiment-service:latest
 ```
+
 </details>
 
 <details>
@@ -279,6 +326,7 @@ bash scripts/setup-kind.sh && bash scripts/deploy.sh
 kubectl apply -f k8s/
 kubectl get pods -n mlops-sentiment
 ```
+
 </details>
 
 <details>
@@ -288,6 +336,7 @@ kubectl get pods -n mlops-sentiment
 pip install -r requirements.txt
 python run.py
 ```
+
 </details>
 
 ## 🧹 Cleanup
@@ -321,6 +370,7 @@ kind delete cluster --name mlops-sentiment
 ## 🤝 Contributing
 
 We welcome contributions! Areas of focus:
+
 - 🚀 Performance optimizations
 - 🔧 New model integrations  
 - 📊 Enhanced monitoring
