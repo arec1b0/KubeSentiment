@@ -21,6 +21,7 @@ from .ml.sentiment import get_sentiment_analyzer
 from .logging_config import setup_structured_logging, get_logger
 from .exceptions import ServiceError
 from .middleware import APIKeyAuthMiddleware
+from .correlation_middleware import CorrelationIdMiddleware, RequestLoggingMiddleware
 
 # Setup structured logging
 setup_structured_logging()
@@ -68,7 +69,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Application shutdown complete")
 
 
-
 def create_app() -> FastAPI:
     """
     Application factory function.
@@ -91,6 +91,12 @@ def create_app() -> FastAPI:
         docs_url="/docs" if settings.debug else None,
         redoc_url="/redoc" if settings.debug else None,
     )
+
+    # Add correlation ID middleware (first to ensure all logs have correlation ID)
+    app.add_middleware(CorrelationIdMiddleware)
+
+    # Add request logging middleware
+    app.add_middleware(RequestLoggingMiddleware)
 
     # Add CORS middleware
     app.add_middleware(

@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, validator
 
 from .config import get_settings, Settings
 from .ml.sentiment import get_sentiment_analyzer, SentimentAnalyzer
-from .logging_config import get_logger, log_api_request
+from .logging_config import get_logger, log_api_request, get_contextual_logger
 from .error_codes import ErrorCode, raise_validation_error
 from .exceptions import TextEmptyError, TextTooLongError, ModelNotLoadedError
 
@@ -129,7 +129,22 @@ async def predict_sentiment(
     Raises:
         HTTPException: If the model is unavailable or prediction fails
     """
+    # Create contextual logger for this request
+    request_logger = get_contextual_logger(
+        __name__,
+        endpoint="predict",
+        text_length=len(payload.text),
+        model_name=settings.model_name,
+    )
+
+    request_logger.info("Starting sentiment prediction", operation="predict_start")
+
     if not analyzer.is_ready():
+        request_logger.error(
+            "Model not ready for prediction",
+            model_status="unavailable",
+            operation="predict_failed",
+        )
         raise ModelNotLoadedError(
             model_name=settings.model_name,
             context={"service_status": "unavailable", "endpoint": "predict"},
@@ -142,14 +157,24 @@ async def predict_sentiment(
         # Add inference time to response headers
         response.headers["X-Inference-Time-MS"] = str(result["inference_time_ms"])
 
+        request_logger.info(
+            "Sentiment prediction completed successfully",
+            operation="predict_success",
+            label=result["label"],
+            score=result["score"],
+            inference_time_ms=result["inference_time_ms"],
+            cached=result.get("cached", False),
+        )
+
         return PredictionResponse(**result)
 
     except Exception as e:
-        logger.error(
+        request_logger.error(
             "Prediction failed",
             error=str(e),
-            text_length=len(payload.text),
-            operation_type="prediction",
+            error_type=type(e).__name__,
+            operation="predict_failed",
+            exc_info=True,
         )
         raise_validation_error(
             ErrorCode.MODEL_INFERENCE_FAILED,

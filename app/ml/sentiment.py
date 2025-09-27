@@ -13,7 +13,12 @@ import torch
 from transformers import pipeline, Pipeline
 
 from ..config import get_settings
-from ..logging_config import get_logger, log_model_operation, log_security_event
+from ..logging_config import (
+    get_logger,
+    log_model_operation,
+    log_security_event,
+    get_contextual_logger,
+)
 from ..exceptions import (
     ModelNotLoadedError,
     ModelInferenceError,
@@ -243,12 +248,31 @@ class SentimentAnalyzer:
             RuntimeError: If the model is not loaded
             ValueError: If the input text is invalid
         """
+        # Create contextual logger for this prediction
+        prediction_logger = get_contextual_logger(
+            __name__,
+            operation="prediction",
+            model_name=self.settings.model_name,
+            text_length=len(text) if text else 0,
+        )
+
+        prediction_logger.debug("Starting prediction", operation_stage="validation")
+
         if not self.is_ready():
+            prediction_logger.error(
+                "Model not ready for prediction",
+                model_loaded=self._is_loaded,
+                operation_stage="validation_failed",
+            )
             raise ModelNotLoadedError(
                 model_name=self.settings.model_name, context={"operation": "prediction"}
             )
 
         if not text or not text.strip():
+            prediction_logger.error(
+                "Empty text provided for prediction",
+                operation_stage="validation_failed",
+            )
             raise TextEmptyError(
                 context={
                     "operation": "prediction",
@@ -258,10 +282,17 @@ class SentimentAnalyzer:
 
         # Generate cache key
         cache_key = self._get_cache_key(text.strip())
+        prediction_logger.debug("Generated cache key", cache_key_prefix=cache_key[:8])
 
         # Check cache first
         cached_result = self._get_cached_prediction(cache_key)
         if cached_result:
+            prediction_logger.info(
+                "Returning cached prediction result",
+                operation_stage="cache_hit",
+                label=cached_result["label"],
+                score=cached_result["score"],
+            )
             # Return cached result with cache indicator
             cached_result_copy = cached_result.copy()
             cached_result_copy["cached"] = True
@@ -269,13 +300,22 @@ class SentimentAnalyzer:
 
         # Truncate text if too long
         original_text = text
+        text_truncated = False
         if len(text) > self.settings.max_text_length:
             text = text[: self.settings.max_text_length]
-            logger.warning(
-                f"Input text truncated to {self.settings.max_text_length} characters"
+            text_truncated = True
+            prediction_logger.warning(
+                "Input text truncated for processing",
+                original_length=len(original_text),
+                truncated_length=len(text),
+                max_length=self.settings.max_text_length,
+                operation_stage="preprocessing",
             )
 
         start_time = time.time()
+        prediction_logger.debug(
+            "Starting model inference", operation_stage="inference_start"
+        )
 
         try:
             # Perform prediction
@@ -294,6 +334,16 @@ class SentimentAnalyzer:
             # Cache the result
             self._cache_prediction(cache_key, prediction_result)
 
+            prediction_logger.info(
+                "Prediction completed successfully",
+                operation_stage="inference_complete",
+                label=result["label"],
+                score=float(result["score"]),
+                inference_time_ms=round(inference_time, 2),
+                text_truncated=text_truncated,
+                cache_stored=True,
+            )
+
             # Record metrics
             if MONITORING_AVAILABLE:
                 metrics = get_metrics()
@@ -307,7 +357,15 @@ class SentimentAnalyzer:
             return prediction_result
 
         except Exception as e:
-            logger.error(f"Prediction failed: {e}")
+            inference_time = (time.time() - start_time) * 1000
+            prediction_logger.error(
+                "Model inference failed",
+                error=str(e),
+                error_type=type(e).__name__,
+                operation_stage="inference_failed",
+                inference_time_ms=round(inference_time, 2),
+                exc_info=True,
+            )
             raise ModelInferenceError(
                 message=f"Prediction failed: {str(e)}",
                 model_name=self.settings.model_name,
