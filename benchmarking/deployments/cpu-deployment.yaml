@@ -1,0 +1,234 @@
+# CPU Instance Deployment for Benchmarking
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlops-sentiment-cpu
+  namespace: mlops-benchmark
+  labels:
+    app: mlops-sentiment
+    instance-type: cpu
+    benchmark: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlops-sentiment
+      instance-type: cpu
+  template:
+    metadata:
+      labels:
+        app: mlops-sentiment
+        instance-type: cpu
+        benchmark: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mlops-sentiment-sa
+      
+      # Node selector для CPU инстансов
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        node.kubernetes.io/instance-type: "t3.medium"  # Будет переопределено для разных тестов
+      
+      # Tolerations для специальных нод
+      tolerations:
+      - key: "benchmark"
+        operator: "Equal"
+        value: "cpu"
+        effect: "NoSchedule"
+      
+      containers:
+      - name: mlops-sentiment
+        image: mlops-sentiment:latest
+        imagePullPolicy: Always
+        
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 8081
+          name: metrics
+          protocol: TCP
+        
+        # Ресурсы для CPU инстанса
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "2000m"
+            memory: "4Gi"
+        
+        # Environment variables
+        env:
+        - name: MODEL_TYPE
+          value: "cpu"
+        - name: BATCH_SIZE
+          value: "32"
+        - name: MAX_WORKERS
+          value: "4"
+        - name: PROMETHEUS_ENABLED
+          value: "true"
+        - name: LOG_LEVEL
+          value: "INFO"
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        
+        # Startup probe для медленного старта
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        
+        # Volume mounts
+        volumeMounts:
+        - name: model-cache
+          mountPath: /app/models
+        - name: tmp
+          mountPath: /tmp
+      
+      # Volumes
+      volumes:
+      - name: model-cache
+        emptyDir:
+          sizeLimit: 2Gi
+      - name: tmp
+        emptyDir:
+          sizeLimit: 1Gi
+      
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      
+      # DNS configuration
+      dnsPolicy: ClusterFirst
+      
+      # Restart policy
+      restartPolicy: Always
+
+---
+# Service для CPU deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlops-sentiment-cpu-svc
+  namespace: mlops-benchmark
+  labels:
+    app: mlops-sentiment
+    instance-type: cpu
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 8081
+    targetPort: 8081
+    protocol: TCP
+    name: metrics
+  selector:
+    app: mlops-sentiment
+    instance-type: cpu
+
+---
+# HorizontalPodAutoscaler для CPU deployment
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mlops-sentiment-cpu-hpa
+  namespace: mlops-benchmark
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: mlops-sentiment-cpu
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+
+---
+# PodDisruptionBudget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mlops-sentiment-cpu-pdb
+  namespace: mlops-benchmark
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: mlops-sentiment
+      instance-type: cpu
+
+---
+# ServiceMonitor для Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mlops-sentiment-cpu-monitor
+  namespace: mlops-benchmark
+  labels:
+    app: mlops-sentiment
+    instance-type: cpu
+spec:
+  selector:
+    matchLabels:
+      app: mlops-sentiment
+      instance-type: cpu
+  endpoints:
+  - port: metrics
+    interval: 15s
+    path: /metrics
+    honorLabels: true

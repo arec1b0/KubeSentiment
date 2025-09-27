@@ -1,0 +1,299 @@
+# GPU Instance Deployment for Benchmarking
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlops-sentiment-gpu
+  namespace: mlops-benchmark
+  labels:
+    app: mlops-sentiment
+    instance-type: gpu
+    benchmark: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlops-sentiment
+      instance-type: gpu
+  template:
+    metadata:
+      labels:
+        app: mlops-sentiment
+        instance-type: gpu
+        benchmark: "true"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mlops-sentiment-sa
+      
+      # Node selector для GPU инстансов
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        accelerator: nvidia-tesla-t4  # Будет переопределено для разных GPU
+      
+      # Tolerations для GPU нод
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "benchmark"
+        operator: "Equal"
+        value: "gpu"
+        effect: "NoSchedule"
+      
+      containers:
+      - name: mlops-sentiment
+        image: mlops-sentiment:gpu-latest
+        imagePullPolicy: Always
+        
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        - containerPort: 8081
+          name: metrics
+          protocol: TCP
+        
+        # Ресурсы для GPU инстанса
+        resources:
+          requests:
+            cpu: "1000m"
+            memory: "4Gi"
+            nvidia.com/gpu: 1
+          limits:
+            cpu: "4000m"
+            memory: "16Gi"
+            nvidia.com/gpu: 1
+        
+        # Environment variables для GPU
+        env:
+        - name: MODEL_TYPE
+          value: "gpu"
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        - name: BATCH_SIZE
+          value: "64"
+        - name: MAX_WORKERS
+          value: "8"
+        - name: GPU_MEMORY_FRACTION
+          value: "0.8"
+        - name: PROMETHEUS_ENABLED
+          value: "true"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: NVIDIA_VISIBLE_DEVICES
+          value: "all"
+        - name: NVIDIA_DRIVER_CAPABILITIES
+          value: "compute,utility"
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60  # GPU инициализация занимает больше времени
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 2
+        
+        # Startup probe для медленного GPU старта
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 40  # До 10 минут на старт
+        
+        # Volume mounts
+        volumeMounts:
+        - name: model-cache
+          mountPath: /app/models
+        - name: gpu-cache
+          mountPath: /root/.cache
+        - name: tmp
+          mountPath: /tmp
+        - name: shm
+          mountPath: /dev/shm
+      
+      # Volumes
+      volumes:
+      - name: model-cache
+        emptyDir:
+          sizeLimit: 10Gi  # Больше места для GPU моделей
+      - name: gpu-cache
+        emptyDir:
+          sizeLimit: 5Gi
+      - name: tmp
+        emptyDir:
+          sizeLimit: 2Gi
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 2Gi  # Shared memory для GPU операций
+      
+      # Security context
+      securityContext:
+        runAsNonRoot: false  # GPU драйверы могут требовать root
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
+      
+      # DNS configuration
+      dnsPolicy: ClusterFirst
+      
+      # Restart policy
+      restartPolicy: Always
+
+---
+# Service для GPU deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlops-sentiment-gpu-svc
+  namespace: mlops-benchmark
+  labels:
+    app: mlops-sentiment
+    instance-type: gpu
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 8081
+    targetPort: 8081
+    protocol: TCP
+    name: metrics
+  selector:
+    app: mlops-sentiment
+    instance-type: gpu
+
+---
+# HorizontalPodAutoscaler для GPU deployment (ограниченное масштабирование)
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mlops-sentiment-gpu-hpa
+  namespace: mlops-benchmark
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: mlops-sentiment-gpu
+  minReplicas: 1
+  maxReplicas: 3  # Ограничиваем из-за стоимости GPU
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 120  # Медленнее масштабирование для GPU
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 600  # Долгое ожидание перед уменьшением
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 120
+
+---
+# PodDisruptionBudget для GPU
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mlops-sentiment-gpu-pdb
+  namespace: mlops-benchmark
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: mlops-sentiment
+      instance-type: gpu
+
+---
+# ServiceMonitor для Prometheus (GPU)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mlops-sentiment-gpu-monitor
+  namespace: mlops-benchmark
+  labels:
+    app: mlops-sentiment
+    instance-type: gpu
+spec:
+  selector:
+    matchLabels:
+      app: mlops-sentiment
+      instance-type: gpu
+  endpoints:
+  - port: metrics
+    interval: 15s
+    path: /metrics
+    honorLabels: true
+
+---
+# NVIDIA Device Plugin DaemonSet (если не установлен)
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-device-plugin-daemonset
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-device-plugin-ds
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: nvidia-device-plugin-ds
+    spec:
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      priorityClassName: "system-node-critical"
+      containers:
+      - image: nvcr.io/nvidia/k8s-device-plugin:v0.14.1
+        name: nvidia-device-plugin-ctr
+        args: ["--fail-on-init-error=false"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+        - name: device-plugin
+          mountPath: /var/lib/kubelet/device-plugins
+      volumes:
+      - name: device-plugin
+        hostPath:
+          path: /var/lib/kubelet/device-plugins
+      nodeSelector:
+        accelerator: nvidia-tesla-t4

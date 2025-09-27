@@ -1,7 +1,10 @@
 # Extended Prometheus Rules for MLOps
 # Расширенные правила Prometheus для MLOps системы
 
+# For kube-prometheus-stack (common in newer installations):
 apiVersion: monitoring.coreos.com/v1
+# For older versions, you might need:
+# apiVersion: monitoring.coreos.com/v1alpha1
 kind: PrometheusRule
 metadata:
   name: mlops-extended-rules

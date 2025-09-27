@@ -1,0 +1,157 @@
+# Конфигурация бенчмаркинга MLOps Sentiment Analysis
+benchmark:
+  name: "mlops-sentiment-benchmark"
+  version: "1.0.0"
+  
+  # Параметры нагрузочного тестирования
+  load_test:
+    duration: 300                # Длительность теста в секундах (5 минут)
+    ramp_up_time: 60            # Время нарастания нагрузки в секундах
+    concurrent_users: [1, 5, 10, 20, 50, 100, 200]  # Количество одновременных пользователей
+    request_timeout: 30         # Таймаут запроса в секундах
+    
+  # Тестовые данные
+  test_data:
+    samples_count: 1000         # Количество тестовых образцов
+    batch_sizes: [1, 10, 32, 64, 128]  # Размеры батчей для тестирования
+    
+  # Метрики для сбора
+  metrics:
+    latency_percentiles: [50, 90, 95, 99, 99.9]
+    resource_sampling_interval: 5  # Интервал сбора метрик ресурсов в секундах
+    
+# Конфигурация инстансов
+instances:
+  cpu:
+    - name: "cpu-small"
+      type: "t3.medium"
+      vcpu: 2
+      memory: "4Gi"
+      cost_per_hour: 0.0416      # USD/час (AWS)
+      
+    - name: "cpu-medium"
+      type: "c5.large"
+      vcpu: 2
+      memory: "4Gi"
+      cost_per_hour: 0.096
+      
+    - name: "cpu-large"
+      type: "c5.xlarge"
+      vcpu: 4
+      memory: "8Gi"
+      cost_per_hour: 0.192
+      
+    - name: "cpu-xlarge"
+      type: "c5.2xlarge"
+      vcpu: 8
+      memory: "16Gi"
+      cost_per_hour: 0.384
+
+  gpu:
+    - name: "gpu-t4"
+      type: "g4dn.xlarge"
+      vcpu: 4
+      memory: "16Gi"
+      gpu: "T4"
+      gpu_memory: "16Gi"
+      cost_per_hour: 0.526
+      
+    - name: "gpu-v100"
+      type: "p3.2xlarge"
+      vcpu: 8
+      memory: "61Gi"
+      gpu: "V100"
+      gpu_memory: "16Gi"
+      cost_per_hour: 3.06
+      
+    - name: "gpu-a100"
+      type: "p4d.xlarge"
+      vcpu: 4
+      memory: "96Gi"
+      gpu: "A100"
+      gpu_memory: "40Gi"
+      cost_per_hour: 3.912
+
+# Kubernetes конфигурация
+kubernetes:
+  namespace: "mlops-benchmark"
+  service_account: "benchmark-sa"
+  
+  # Ресурсы для бенчмарк подов
+  benchmark_pod:
+    cpu_request: "500m"
+    cpu_limit: "2000m"
+    memory_request: "1Gi"
+    memory_limit: "4Gi"
+
+# Мониторинг
+monitoring:
+  prometheus:
+    enabled: true
+    scrape_interval: "15s"
+    
+  grafana:
+    enabled: true
+    dashboard_refresh: "5s"
+    
+  # Алерты для бенчмарка
+  alerts:
+    high_latency_threshold: 1000  # мс
+    low_success_rate_threshold: 95  # %
+    high_error_rate_threshold: 5   # %
+
+# Отчеты
+reporting:
+  formats: ["html", "json", "csv", "pdf"]
+  
+  # Автоматическая отправка отчетов
+  notifications:
+    slack:
+      enabled: false
+      webhook_url: ""
+      channel: "#mlops-alerts"
+      
+    email:
+      enabled: false
+      smtp_server: ""
+      recipients: []
+
+# Тестовые сценарии
+scenarios:
+  # Базовый тест производительности
+  - name: "performance_baseline"
+    description: "Базовое тестирование производительности"
+    concurrent_users: [1, 5, 10]
+    duration: 180
+    
+  # Стресс-тест
+  - name: "stress_test"
+    description: "Стресс-тестирование с высокой нагрузкой"
+    concurrent_users: [50, 100, 200]
+    duration: 300
+    
+  # Тест масштабируемости
+  - name: "scalability_test"
+    description: "Тест масштабируемости с постепенным увеличением нагрузки"
+    concurrent_users: [1, 2, 5, 10, 20, 50, 100]
+    duration: 600
+    
+  # Тест стабильности
+  - name: "stability_test"
+    description: "Длительный тест стабильности"
+    concurrent_users: [20]
+    duration: 3600  # 1 час
+
+# Дополнительные настройки
+advanced:
+  # Кэширование результатов
+  cache_results: true
+  cache_duration: "24h"
+  
+  # Параллельное выполнение тестов
+  parallel_execution: true
+  max_parallel_tests: 3
+  
+  # Автоматическая очистка ресурсов
+  auto_cleanup: true
+  cleanup_timeout: 300

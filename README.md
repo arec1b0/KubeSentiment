@@ -15,6 +15,7 @@
 
 - [API Documentation](https://github.com/your-org/mlops-sentiment/tree/main/openapi-specs) - Complete API reference
 - [Deployment Guide](deployment-guide.md) - Step-by-step deployment instructions
+- [Benchmarking Guide](BENCHMARKING.md) - Performance testing and cost analysis
 - [Troubleshooting Guide](docs/troubleshooting/index.md) - Solutions to common issues
 - [Architecture](docs/architecture.md) - System design and architecture overview
 
@@ -46,6 +47,7 @@ curl -X POST http://localhost:8000/predict \
 - 🛡️ **Robust Error Handling** - Graceful degradation and comprehensive logging
 - ⚡ **High Performance** - Async FastAPI with optimized CPU inference
 - 🔄 **Zero Downtime Deployment** - Kubernetes rolling updates and health probes
+- 📈 **Performance Benchmarking** - Comprehensive testing framework for CPU/GPU instances
 
 ## 🏗️ Architecture
 
