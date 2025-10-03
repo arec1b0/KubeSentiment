@@ -143,8 +143,12 @@ class Settings(BaseSettings):
     def validate_cors_origins(cls, v):
         """Validate CORS origin URLs."""
         for origin in v:
+            # Wildcard CORS is a security risk - require explicit origins
             if origin == "*":
-                continue  # Allow wildcard for development
+                raise ValueError(
+                    "Wildcard CORS origin '*' is not allowed. "
+                    "Specify explicit origins for security."
+                )
 
             # Validate URL format
             url_pattern = re.compile(r"^https?://[a-zA-Z0-9.-]+(?:\:[0-9]+)?(?:/.*)?$")

@@ -1,4 +1,4 @@
-from typing import Optional
+import secrets
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
@@ -39,7 +39,8 @@ class APIKeyAuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         provided = request.headers.get(self.header_name)
-        if not provided or provided != expected:
+        # Use constant-time comparison to prevent timing attacks
+        if not provided or not secrets.compare_digest(provided, expected):
             log_security_event(
                 logger,
                 "auth_failure",

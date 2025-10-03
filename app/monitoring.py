@@ -6,6 +6,7 @@ the sentiment analysis service performance and health.
 """
 
 import time
+from typing import Optional
 
 from prometheus_client import (
     Counter,
@@ -85,8 +86,8 @@ class PrometheusMetrics:
         self.settings = get_settings()
         self._initialize_static_metrics()
         # Metrics caching
-        self._metrics_cache: str | None = None
-        self._metrics_cache_ts: float | None = None
+        self._metrics_cache: Optional[str] = None
+        self._metrics_cache_ts: Optional[float] = None
 
     def _initialize_static_metrics(self):
         """Initialize static metrics that don't change during runtime."""

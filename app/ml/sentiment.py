@@ -58,8 +58,8 @@ class SentimentAnalyzer:
         """
         Generate a cache key for the given text.
 
-        Uses MD5 hashing for fast cache key generation. Not cryptographically secure
-        but sufficient for cache key purposes.
+        Uses SHA-256 hashing for secure cache key generation, preventing
+        collision attacks that could poison the cache.
 
         Args:
             text: The input text
@@ -68,7 +68,7 @@ class SentimentAnalyzer:
             str: A hash-based cache key
         """
         # Create a hash of the text for cache key
-        return hashlib.md5(text.encode("utf-8")).hexdigest()
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     def _get_cached_prediction(self, cache_key: str) -> Optional[Dict[str, Any]]:
         """
