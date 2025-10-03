@@ -1,106 +1,106 @@
 # GitHub Secrets Configuration Guide
 
-Этот документ описывает все необходимые секреты и переменные для работы CI/CD пайплайна.
+This document describes all the necessary secrets and variables for the CI/CD pipeline to work.
 
 ## 🔐 Repository Secrets
 
-### Обязательные секреты
+### Required Secrets
 
 #### Kubernetes Configuration
 
 ```
-KUBE_CONFIG_DEV      # Base64-encoded kubeconfig для development окружения
-KUBE_CONFIG_STAGING  # Base64-encoded kubeconfig для staging окружения  
-KUBE_CONFIG_PROD     # Base64-encoded kubeconfig для production окружения
+KUBE_CONFIG_DEV      # Base64-encoded kubeconfig for the development environment
+KUBE_CONFIG_STAGING  # Base64-encoded kubeconfig for the staging environment
+KUBE_CONFIG_PROD     # Base64-encoded kubeconfig for the production environment
 ```
 
-**Как получить:**
+**How to obtain:**
 
 ```bash
-# Получить kubeconfig и закодировать в base64
+# Get the kubeconfig and encode it in base64
 cat ~/.kube/config | base64 -w 0
 ```
 
-#### Container Signing (опционально, но рекомендуется)
+#### Container Signing (optional, but recommended)
 
 ```
-COSIGN_PRIVATE_KEY   # Приватный ключ для подписи Docker образов
-COSIGN_PASSWORD      # Пароль для приватного ключа cosign
+COSIGN_PRIVATE_KEY   # Private key for signing Docker images
+COSIGN_PASSWORD      # Password for the cosign private key
 ```
 
-**Как создать:**
+**How to create:**
 
 ```bash
-# Генерация ключей для cosign
+# Generate keys for cosign
 cosign generate-key-pair
-# Сохранить содержимое cosign.key в COSIGN_PRIVATE_KEY
-# Сохранить пароль в COSIGN_PASSWORD
+# Save the contents of cosign.key to COSIGN_PRIVATE_KEY
+# Save the password to COSIGN_PASSWORD
 ```
 
-### Интеграции (опционально)
+### Integrations (optional)
 
 #### Slack Notifications
 
 ```
-SLACK_WEBHOOK_URL    # Webhook URL для уведомлений в Slack
+SLACK_WEBHOOK_URL    # Webhook URL for Slack notifications
 ```
 
 #### Jira Integration
 
 ```
-JIRA_API_TOKEN       # API токен для интеграции с Jira
+JIRA_API_TOKEN       # API token for Jira integration
 ```
 
 ## 🌍 Repository Variables
 
-### Общие переменные
+### General Variables
 
 ```
-JIRA_BASE_URL        # URL Jira инстанса (например: https://company.atlassian.net)
-JIRA_USER_EMAIL      # Email пользователя Jira
-JIRA_PROJECT_KEY     # Ключ проекта в Jira (например: MLOPS)
+JIRA_BASE_URL        # Jira instance URL (e.g., https://company.atlassian.net)
+JIRA_USER_EMAIL      # Jira user email
+JIRA_PROJECT_KEY     # Jira project key (e.g., MLOPS)
 ```
 
 ## 🏢 Environment Secrets
 
-Секреты, специфичные для каждого окружения (настраиваются в Settings > Environments):
+Secrets specific to each environment (configured in Settings > Environments):
 
 ### Development Environment
 
-- `KUBE_CONFIG`: Kubeconfig для dev кластера
-- `SLACK_WEBHOOK_URL`: Webhook для dev уведомлений
+- `KUBE_CONFIG`: Kubeconfig for the dev cluster
+- `SLACK_WEBHOOK_URL`: Webhook for dev notifications
 
-### Staging Environment  
+### Staging Environment
 
-- `KUBE_CONFIG`: Kubeconfig для staging кластера
-- `SLACK_WEBHOOK_URL`: Webhook для staging уведомлений
+- `KUBE_CONFIG`: Kubeconfig for the staging cluster
+- `SLACK_WEBHOOK_URL`: Webhook for staging notifications
 
 ### Production Environment
 
-- `KUBE_CONFIG`: Kubeconfig для prod кластера
-- `SLACK_WEBHOOK_URL`: Webhook для prod уведомлений
+- `KUBE_CONFIG`: Kubeconfig for the prod cluster
+- `SLACK_WEBHOOK_URL`: Webhook for prod notifications
 
-## 📋 Настройка Environments
+## 📋 Environment Setup
 
-1. Перейдите в `Settings > Environments`
-2. Создайте три окружения:
+1. Go to `Settings > Environments`
+2. Create three environments:
    - `development`
    - `staging`
    - `production`
 
-3. Для каждого окружения настройте:
-   - **Protection rules**: Требование review для production
-   - **Environment secrets**: Соответствующие KUBE_CONFIG
-   - **Deployment branches**: Ограничения по веткам
+3. For each environment, configure:
+   - **Protection rules**: Require review for production
+   - **Environment secrets**: Corresponding KUBE_CONFIG
+   - **Deployment branches**: Branch restrictions
 
-### Пример настройки Protection Rules
+### Example Protection Rules Setup
 
 #### Development
 
 - Deployment branches: `develop`
 - Required reviewers: 0
 
-#### Staging  
+#### Staging
 
 - Deployment branches: `main`
 - Required reviewers: 1
@@ -111,49 +111,49 @@ JIRA_PROJECT_KEY     # Ключ проекта в Jira (например: MLOPS)
 - Required reviewers: 2
 - Wait timer: 5 minutes
 
-## 🔧 Автоматическая настройка секретов
+## 🔧 Automatic Secret Setup
 
-Создайте скрипт для автоматической настройки:
+Create a script for automatic setup:
 
 ```bash
 #!/bin/bash
 # setup-secrets.sh
 
-# Установка GitHub CLI если не установлен
+# Install GitHub CLI if not installed
 if ! command -v gh &> /dev/null; then
     echo "Please install GitHub CLI first"
     exit 1
 fi
 
-# Аутентификация
+# Authenticate
 gh auth login
 
-# Установка Kubernetes секретов
+# Set Kubernetes secrets
 echo "Setting up Kubernetes secrets..."
 gh secret set KUBE_CONFIG_DEV < ~/.kube/config-dev
-gh secret set KUBE_CONFIG_STAGING < ~/.kube/config-staging  
+gh secret set KUBE_CONFIG_STAGING < ~/.kube/config-staging
 gh secret set KUBE_CONFIG_PROD < ~/.kube/config-prod
 
-# Установка Slack webhook (замените на свой URL)
+# Set Slack webhook (replace with your URL)
 read -p "Enter Slack Webhook URL: " SLACK_URL
 gh secret set SLACK_WEBHOOK_URL -b "$SLACK_URL"
 
-# Генерация cosign ключей
+# Generate cosign keys
 echo "Generating cosign keys..."
 cosign generate-key-pair
 gh secret set COSIGN_PRIVATE_KEY < cosign.key
 read -s -p "Enter cosign key password: " COSIGN_PASS
 gh secret set COSIGN_PASSWORD -b "$COSIGN_PASS"
 
-# Очистка временных файлов
+# Clean up temporary files
 rm -f cosign.key cosign.pub
 
 echo "✅ Secrets setup completed!"
 ```
 
-## 🔍 Проверка конфигурации
+## 🔍 Configuration Check
 
-Используйте этот workflow для проверки настроек:
+Use this workflow to check the settings:
 
 ```yaml
 name: Verify Secrets
@@ -168,14 +168,14 @@ jobs:
       run: |
         secrets_ok=true
         
-        # Проверяем наличие обязательных секретов
+        # Check for the presence of required secrets
         if [ -z "${{ secrets.KUBE_CONFIG_DEV }}" ]; then
           echo "❌ KUBE_CONFIG_DEV is missing"
           secrets_ok=false
         fi
         
         if [ -z "${{ secrets.KUBE_CONFIG_STAGING }}" ]; then
-          echo "❌ KUBE_CONFIG_STAGING is missing"  
+          echo "❌ KUBE_CONFIG_STAGING is missing"
           secrets_ok=false
         fi
         
@@ -192,15 +192,15 @@ jobs:
         fi
 ```
 
-## 🔄 Ротация секретов
+## 🔄 Secret Rotation
 
-Регулярно обновляйте секреты:
+Regularly update secrets:
 
-1. **Kubernetes configs**: При обновлении кластеров
-2. **API токены**: Каждые 90 дней
-3. **Cosign ключи**: Каждые 365 дней
+1. **Kubernetes configs**: When clusters are updated
+2. **API tokens**: Every 90 days
+3. **Cosign keys**: Every 365 days
 
-## 📚 Дополнительные ресурсы
+## 📚 Additional Resources
 
 - [GitHub Secrets Documentation](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
 - [Environment Protection Rules](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment)
