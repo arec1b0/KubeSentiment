@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     model_cache_dir: Optional[str] = Field(
         default=None, description="Directory to cache downloaded models"
     )
+    onnx_model_path: Optional[str] = Field(
+        default=None, description="Path to ONNX model directory for optimized inference"
+    )
 
     # Performance settings
     max_request_timeout: int = Field(
@@ -137,6 +140,11 @@ class Settings(BaseSettings):
             if not os.path.exists(parent_dir):
                 raise ValueError(f"Parent directory does not exist: {parent_dir}")
         return v
+
+    @property
+    def cors_origins(self) -> List[str]:
+        """Get CORS origins for middleware configuration."""
+        return self.allowed_origins
 
     @field_validator("allowed_origins")
     @classmethod

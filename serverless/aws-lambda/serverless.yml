@@ -1,0 +1,77 @@
+service: sentiment-analysis-onnx
+
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  timeout: 30
+  memorySize: 2048
+  environment:
+    MODEL_PATH: /opt/ml/model
+    LOG_LEVEL: INFO
+
+  # IAM permissions
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "*"
+
+functions:
+  predict:
+    handler: handler.lambda_handler
+    description: ONNX-based sentiment analysis
+    events:
+      - httpApi:
+          path: /predict
+          method: post
+      - httpApi:
+          path: /health
+          method: get
+    layers:
+      - !Ref ModelLayer
+    environment:
+      PYTHONPATH: /opt/python:/var/task
+
+layers:
+  model:
+    path: model_layer
+    name: ${self:service}-model-${sls:stage}
+    description: ONNX model and dependencies
+    compatibleRuntimes:
+      - python3.11
+    retain: false
+
+package:
+  exclude:
+    - node_modules/**
+    - venv/**
+    - __pycache__/**
+    - .pytest_cache/**
+    - tests/**
+    - "*.md"
+  include:
+    - handler.py
+    - requirements.txt
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    layer: true
+    slim: true
+    strip: true
+    zip: true
+    useDownloadCache: true
+    useStaticCache: true
+    pipCmdExtraArgs:
+      - "--platform manylinux2014_x86_64"
+      - "--only-binary=:all:"

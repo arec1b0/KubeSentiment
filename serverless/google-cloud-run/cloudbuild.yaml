@@ -1,0 +1,56 @@
+# Cloud Build configuration for Cloud Run deployment
+steps:
+  # Build the container image
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/sentiment-analysis-onnx:$COMMIT_SHA"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/sentiment-analysis-onnx:latest"
+      - "."
+    dir: "serverless/google-cloud-run"
+
+  # Push the container image to Container Registry
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "gcr.io/$PROJECT_ID/sentiment-analysis-onnx:$COMMIT_SHA"
+
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "gcr.io/$PROJECT_ID/sentiment-analysis-onnx:latest"
+
+  # Deploy container image to Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "sentiment-analysis-onnx"
+      - "--image"
+      - "gcr.io/$PROJECT_ID/sentiment-analysis-onnx:$COMMIT_SHA"
+      - "--region"
+      - "us-central1"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--memory"
+      - "2Gi"
+      - "--cpu"
+      - "2"
+      - "--timeout"
+      - "60"
+      - "--min-instances"
+      - "0"
+      - "--max-instances"
+      - "10"
+      - "--concurrency"
+      - "80"
+
+images:
+  - "gcr.io/$PROJECT_ID/sentiment-analysis-onnx:$COMMIT_SHA"
+  - "gcr.io/$PROJECT_ID/sentiment-analysis-onnx:latest"
+
+timeout: 1200s
