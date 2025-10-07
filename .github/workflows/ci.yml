@@ -26,19 +26,32 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install pytest pytest-cov black isort flake8 mypy
+          pip install pytest pytest-cov pytest-asyncio black isort flake8 mypy ruff
 
       - name: Code quality checks
         run: |
           black --check app/ tests/
           isort --check-only app/ tests/
+          ruff check app/ tests/
           flake8 app/ tests/ --max-line-length=88 --extend-ignore=E203,W503
-          mypy app/ --ignore-missing-imports
+          mypy app/ --ignore-missing-imports --allow-untyped-decorators
 
-      - name: Run tests
-        run: pytest tests/ -v --cov=app --cov-report=xml
+      - name: Run unit tests
+        run: pytest tests/ -v -m "unit or not integration" --cov=app --cov-report=xml --cov-report=term-missing
         env:
           MLOPS_DEBUG: true
+          MLOPS_LOG_LEVEL: DEBUG
+
+      - name: Run integration tests
+        run: pytest tests/ -v -m "integration" --cov=app --cov-append --cov-report=xml
+        env:
+          MLOPS_DEBUG: true
+          MLOPS_LOG_LEVEL: DEBUG
+
+      - name: Test coverage report
+        run: |
+          echo "## Test Coverage Report" >> $GITHUB_STEP_SUMMARY
+          pytest --cov=app --cov-report=term >> $GITHUB_STEP_SUMMARY || true
 
       - name: Upload coverage
         uses: codecov/codecov-action@v3

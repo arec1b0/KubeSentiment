@@ -54,6 +54,38 @@ app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(CorrelationIDMiddleware)
 
 
+# Global exception handler for ServiceError and subclasses
+from fastapi.responses import JSONResponse
+from .exceptions import ServiceError
+
+
+@app.exception_handler(ServiceError)
+async def service_error_handler(request: Request, exc: ServiceError) -> JSONResponse:
+    """Handle custom service errors consistently."""
+    logger.warning(f"Service error: {exc}", exc_info=False)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": str(exc),
+            "error_code": exc.code,
+            "context": exc.context,
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handle unexpected errors."""
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "error_id": f"error_{int(time.time())}",
+        },
+    )
+
+
 # Request/Response models
 class SentimentRequest(BaseModel):
     """Request model for sentiment analysis."""
@@ -101,10 +133,7 @@ class ModelInfoResponse(BaseModel):
 # Dependency injection
 def get_analyzer() -> ONNXSentimentAnalyzer:
     """Dependency injection for ONNX analyzer."""
-    onnx_path = (
-        settings.onnx_model_path
-        or "./onnx_models/distilbert-base-uncased-finetuned-sst-2-english"
-    )
+    onnx_path = settings.onnx_model_path or settings.onnx_model_path_default
     return get_onnx_sentiment_analyzer(onnx_path)
 
 
@@ -137,7 +166,11 @@ async def health_check(analyzer: ONNXSentimentAnalyzer = Depends(get_analyzer)):
         )
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        raise HTTPException(status_code=503, detail="Service unhealthy")
+        from .exceptions import ServiceUnavailableError
+
+        raise ServiceUnavailableError(
+            message="Health check failed", context={"error": str(e)}
+        )
 
 
 @app.get("/ready", tags=["Health"])
@@ -148,7 +181,11 @@ async def readiness_check(analyzer: ONNXSentimentAnalyzer = Depends(get_analyzer
     Returns 200 if the service is ready to accept traffic.
     """
     if not analyzer.is_ready():
-        raise HTTPException(status_code=503, detail="Service not ready")
+        from .exceptions import ServiceUnavailableError
+
+        raise ServiceUnavailableError(
+            message="Service not ready", context={"model_loaded": analyzer._is_loaded}
+        )
 
     return {"status": "ready"}
 
@@ -165,7 +202,11 @@ async def get_model_info(analyzer: ONNXSentimentAnalyzer = Depends(get_analyzer)
         return ModelInfoResponse(**info)
     except Exception as e:
         logger.error(f"Failed to get model info: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve model info")
+        from .exceptions import InternalError
+
+        raise InternalError(
+            message="Failed to retrieve model info", context={"error": str(e)}
+        )
 
 
 @app.post("/predict", response_model=SentimentResponse, tags=["Prediction"])
@@ -206,19 +247,24 @@ async def predict_sentiment(
 
     except TextEmptyError as e:
         logger.warning(f"Empty text provided: {e}")
-        raise HTTPException(status_code=400, detail="Text cannot be empty")
+        raise  # Re-raise custom exception to be handled by global exception handler
 
     except ModelNotLoadedError as e:
         logger.error(f"Model not loaded: {e}")
-        raise HTTPException(status_code=503, detail="Model not available")
+        raise  # Re-raise custom exception to be handled by global exception handler
 
     except ModelInferenceError as e:
         logger.error(f"Inference failed: {e}")
-        raise HTTPException(status_code=500, detail="Prediction failed")
+        raise  # Re-raise custom exception to be handled by global exception handler
 
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        from .exceptions import InternalError
+
+        raise InternalError(
+            message=f"Unexpected error during prediction: {str(e)}",
+            context={"error_type": type(e).__name__},
+        )
 
 
 @app.get("/metrics", tags=["Monitoring"])
@@ -243,10 +289,7 @@ async def startup_event():
 
     try:
         # Initialize analyzer
-        onnx_path = (
-            settings.onnx_model_path
-            or "./onnx_models/distilbert-base-uncased-finetuned-sst-2-english"
-        )
+        onnx_path = settings.onnx_model_path or settings.onnx_model_path_default
         analyzer = get_onnx_sentiment_analyzer(onnx_path)
 
         if analyzer.is_ready():

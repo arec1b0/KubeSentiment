@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     onnx_model_path: Optional[str] = Field(
         default=None, description="Path to ONNX model directory for optimized inference"
     )
+    onnx_model_path_default: str = Field(
+        default="./onnx_models/distilbert-base-uncased-finetuned-sst-2-english",
+        description="Default ONNX model path when onnx_model_path is not set",
+    )
 
     # Performance settings
     max_request_timeout: int = Field(
@@ -176,10 +180,8 @@ class Settings(BaseSettings):
                 raise ValueError("API key must contain both letters and numbers")
         return v
 
-    @model_validator(mode="after")
-    def validate_configuration_consistency(self):
-        """Validate cross-field configuration consistency."""
-        # Ensure model_name is in allowed_models
+    def _validate_model_in_allowed_list(self) -> None:
+        """Ensure model_name is in allowed_models list."""
         if (
             self.model_name
             and self.allowed_models
@@ -189,11 +191,13 @@ class Settings(BaseSettings):
                 f"Model '{self.model_name}' must be in allowed_models list: {self.allowed_models}"
             )
 
-        # Validate worker count based on debug mode
+    def _validate_worker_count_consistency(self) -> None:
+        """Validate worker count based on debug mode."""
         if self.debug and self.workers > 1:
             raise ValueError("Cannot use multiple workers in debug mode")
 
-        # Validate cache settings consistency
+    def _validate_cache_memory_usage(self) -> None:
+        """Validate cache settings to prevent excessive memory usage."""
         # Rough estimate: each cache entry might be ~1KB per 100 chars
         estimated_memory_mb = (
             self.prediction_cache_max_size * self.max_text_length
@@ -204,6 +208,12 @@ class Settings(BaseSettings):
                 "Reduce cache_size or max_text_length."
             )
 
+    @model_validator(mode="after")
+    def validate_configuration_consistency(self):
+        """Validate cross-field configuration consistency."""
+        self._validate_model_in_allowed_list()
+        self._validate_worker_count_consistency()
+        self._validate_cache_memory_usage()
         return self
 
     class Config:

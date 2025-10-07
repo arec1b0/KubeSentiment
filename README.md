@@ -6,8 +6,8 @@
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
 ![Docker](https://img.shields.io/badge/docker-ready-blue.svg)
-[![Documentation Status](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://github.com/your-org/mlops-sentiment/tree/main/docs)
-[![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0.3-brightgreen)](https://github.com/your-org/mlops-sentiment/blob/main/openapi-specs/sentiment-api.yaml)
+[![Documentation Status](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://github.com/arec1b0/mlops-sentiment/tree/main/docs)
+[![OpenAPI](https://img.shields.io/badge/OpenAPI-3.0.3-brightgreen)](https://github.com/arec1b0/mlops-sentiment/blob/main/openapi-specs/sentiment-api.yaml)
 
 **Production-ready sentiment analysis microservice** with real-time inference, Kubernetes deployment, and comprehensive monitoring. Built for scale and reliability using MLOps best practices.
 
