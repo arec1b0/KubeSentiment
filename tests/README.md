@@ -12,7 +12,7 @@ Comprehensive test suite for the refactored MLOps sentiment analysis service, co
 
 ## Test Structure
 
-```
+```plaintext
 tests/
 ├── README.md                      # This file
 ├── test_api.py                    # Original API tests
