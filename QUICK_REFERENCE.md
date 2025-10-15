@@ -1,75 +1,75 @@
-# ⚡ Быстрая справка - Линтинг и форматирование
+# ⚡ Quick Reference - Linting and Formatting
 
-## 🚀 Самые важные команды
+## 🚀 Most Important Commands
 
 ```powershell
-# === УСТАНОВКА ===
-make install-dev              # Установить все инструменты
+# === INSTALLATION ===
+make install-dev              # Install all tools
 
-# === ФОРМАТИРОВАНИЕ (изменяет файлы) ===
-make format                   # Отформатировать весь код
-black app/ tests/             # Только Black
-isort app/ tests/             # Только isort
+# === FORMATTING (modifies files) ===
+make format                   # Format all code
+black app/ tests/             # Black only
+isort app/ tests/             # isort only
 
-# === ПРОВЕРКА (без изменений) ===
-make lint                     # Все проверки сразу
-black --check app/            # Проверить форматирование
-flake8 app/                   # Проверить стиль PEP 8
-mypy app/                     # Проверить типы
+# === CHECKING (no changes) ===
+make lint                     # All checks at once
+black --check app/            # Check formatting
+flake8 app/                   # Check PEP 8 style
+mypy app/                     # Check types
 
 # === PRE-COMMIT ===
-pre-commit install            # Установить (один раз)
-pre-commit run --all-files    # Проверить все файлы
+pre-commit install            # Install (once)
+pre-commit run --all-files    # Check all files
 
-# === КОМБО ===
+# === COMBO ===
 make all                      # Clean + install + lint + test + build
 ```
 
-## 📁 Главные файлы
+## 📁 Main Files
 
-| Файл | Что настраивает |
-|------|----------------|
+| File | Configures |
+|------|-----------|
 | `pyproject.toml` | Black, isort, pytest, mypy, bandit |
-| `.flake8` | Flake8 (стиль кода) |
-| `.pre-commit-config.yaml` | Автоматические проверки |
-| `requirements-dev.txt` | Инструменты разработки |
+| `.flake8` | Flake8 (code style) |
+| `.pre-commit-config.yaml` | Automatic checks |
+| `requirements-dev.txt` | Development tools |
 
 ## 🎯 Workflow
 
 ```
-1. Пишу код →
-2. Сохраняю (Ctrl+S) → VSCode автоформатирует →
-3. Перед коммитом: make lint →
-4. git commit → pre-commit автоматически запустится →
-5. ✅ Готово!
+1. Write code →
+2. Save (Ctrl+S) → VSCode auto-formats →
+3. Before commit: make lint →
+4. git commit → pre-commit runs automatically →
+5. ✅ Done!
 ```
 
-## ⚙️ Настройки
+## ⚙️ Settings
 
-- **Длина строки**: 100 символов
+- **Line length**: 100 characters
 - **Python**: 3.11+
-- **Стиль**: PEP 8 + Black
+- **Style**: PEP 8 + Black
 
-## 📚 Документация
+## 📚 Documentation
 
-- [CODE_QUALITY_SETUP.md](./CODE_QUALITY_SETUP.md) - Полная инструкция
-- [LINTING_GUIDE.md](./LINTING_GUIDE.md) - Подробный гайд
-- [SETUP_LINTING.md](./SETUP_LINTING.md) - Быстрый старт
+- [CODE_QUALITY_SETUP.md](./CODE_QUALITY_SETUP.md) - Full instructions
+- [LINTING_GUIDE.md](./LINTING_GUIDE.md) - Detailed guide
+- [SETUP_LINTING.md](./SETUP_LINTING.md) - Quick start
 
-## ✨ Первый запуск
+## ✨ First Run
 
 ```powershell
-# 1. Установка
+# 1. Installation
 make install-dev
 
-# 2. Настройка pre-commit
+# 2. Setup pre-commit
 pre-commit install
 
-# 3. Форматирование существующего кода
+# 3. Format existing code
 make format
 
-# 4. Проверка
+# 4. Check
 make lint
 
-# 5. Готово! 🎉
+# 5. Done! 🎉
 ```

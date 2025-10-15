@@ -1,10 +1,10 @@
 # Development environment values
-# Переопределения для dev окружения
+# Overrides for dev environment
 
 # Application settings
 deployment:
   replicaCount: 1
-  
+
   resources:
     limits:
       cpu: 500m
@@ -12,7 +12,7 @@ deployment:
     requests:
       cpu: 250m
       memory: 256Mi
-  
+
   env:
     MLOPS_DEBUG: "true"
     MLOPS_LOG_LEVEL: "DEBUG"
@@ -60,9 +60,9 @@ networkPolicy:
     # Allow all egress for development
     - to: []
       ports:
-      - protocol: TCP
-        port: 80
-      - protocol: TCP
-        port: 443
-      - protocol: UDP
-        port: 53
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+        - protocol: UDP
+          port: 53

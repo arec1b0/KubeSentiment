@@ -1,5 +1,5 @@
 # Extended Prometheus Rules for MLOps
-# Расширенные правила Prometheus для MLOps системы
+# Extended Prometheus rules for MLOps system
 
 # For kube-prometheus-stack (common in newer installations):
 apiVersion: monitoring.coreos.com/v1
@@ -21,38 +21,38 @@ spec:
     # Request rate recording rules
     - record: mlops:http_requests:rate5m
       expr: rate(http_requests_total{job="mlops-sentiment"}[5m])
-    
+
     - record: mlops:http_requests:rate1h
       expr: rate(http_requests_total{job="mlops-sentiment"}[1h])
-    
+
     # Error rate recording rules
     - record: mlops:http_errors:rate5m
       expr: rate(http_requests_total{job="mlops-sentiment",status=~"5.."}[5m])
-    
+
     - record: mlops:http_error_rate:ratio5m
       expr: mlops:http_errors:rate5m / mlops:http_requests:rate5m
-    
+
     # Latency recording rules
     - record: mlops:http_request_duration:p50
       expr: histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job="mlops-sentiment"}[5m]))
-    
+
     - record: mlops:http_request_duration:p95
       expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="mlops-sentiment"}[5m]))
-    
+
     - record: mlops:http_request_duration:p99
       expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job="mlops-sentiment"}[5m]))
-    
+
     # ML inference recording rules
     - record: mlops:inference_duration:avg5m
       expr: rate(mlops_inference_duration_seconds_sum{job="mlops-sentiment"}[5m]) / rate(mlops_inference_duration_seconds_count{job="mlops-sentiment"}[5m])
-    
+
     - record: mlops:prediction_confidence:avg5m
       expr: rate(mlops_prediction_confidence_sum{job="mlops-sentiment"}[5m]) / rate(mlops_prediction_confidence_count{job="mlops-sentiment"}[5m])
-    
+
     # Resource utilization recording rules
     - record: mlops:cpu_usage:avg5m
       expr: avg(rate(container_cpu_usage_seconds_total{pod=~"mlops-sentiment-.*"}[5m])) by (pod)
-    
+
     - record: mlops:memory_usage:avg5m
       expr: avg(container_memory_usage_bytes{pod=~"mlops-sentiment-.*"}) by (pod)
 
@@ -72,7 +72,7 @@ spec:
         summary: "SLO breach: Availability below 99.9%"
         description: "Service availability is {{ $value }}%, which is below the 99.9% SLO target"
         runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#slo-availability"
-    
+
     # Latency SLI (95% of requests < 200ms)
     - alert: MLOpsSLOLatencyBreach
       expr: mlops:http_request_duration:p95 > 0.2
@@ -85,7 +85,7 @@ spec:
         summary: "SLO breach: 95th percentile latency above 200ms"
         description: "95th percentile latency is {{ $value }}s, which exceeds the 200ms SLO target"
         runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#slo-latency"
-    
+
     # ML Quality SLI (average confidence > 80%)
     - alert: MLOpsSLOQualityBreach
       expr: mlops:prediction_confidence:avg5m < 0.8
@@ -116,7 +116,7 @@ spec:
         summary: "Unusual traffic spike detected"
         description: "Current request rate ({{ $value }}) is 5x higher than the hourly average"
         runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#traffic-spike"
-    
+
     - alert: MLOpsTrafficDrop
       expr: mlops:http_requests:rate5m < 0.2 * mlops:http_requests:rate1h and mlops:http_requests:rate1h > 0.1
       for: 10m
@@ -128,12 +128,12 @@ spec:
         summary: "Significant traffic drop detected"
         description: "Current request rate ({{ $value }}) is 80% lower than the hourly average"
         runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#traffic-drop"
-    
+
     # ML model drift detection
     - alert: MLOpsPredictionPatternChange
       expr: |
         abs(
-          avg_over_time(mlops:prediction_confidence:avg5m[1h]) - 
+          avg_over_time(mlops:prediction_confidence:avg5m[1h]) -
           avg_over_time(mlops:prediction_confidence:avg5m[1h] offset 24h)
         ) > 0.1
       for: 30m
@@ -145,7 +145,7 @@ spec:
         summary: "ML prediction pattern change detected"
         description: "Average prediction confidence has changed by {{ $value }} compared to 24h ago"
         runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#model-drift"
-    
+
     # Resource efficiency alerts
     - alert: MLOpsResourceInefficiency
       expr: mlops:cpu_usage:avg5m < 0.1 and kube_deployment_status_replicas{deployment="mlops-sentiment"} > 2
@@ -175,7 +175,7 @@ spec:
         summary: "Kubernetes node not ready"
         description: "Node {{ $labels.node }} has been not ready for more than 5 minutes"
         runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#node-not-ready"
-    
+
     # Persistent Volume issues
     - alert: MLOpsPVCPendingOrLost
       expr: kube_persistentvolumeclaim_status_phase{phase=~"Pending|Lost"} == 1
@@ -188,7 +188,7 @@ spec:
         summary: "PVC in problematic state"
         description: "PVC {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }} is in {{ $labels.phase }} state"
         runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#pvc-issues"
-    
+
     # Network policy violations (if monitoring is available)
     - alert: MLOpsNetworkPolicyViolation
       expr: increase(networkpolicy_drop_count_total{pod=~"mlops-sentiment-.*"}[5m]) > 10
@@ -210,7 +210,7 @@ spec:
     - alert: MLOpsDiskSpaceExhaustionPredicted
       expr: |
         predict_linear(
-          node_filesystem_avail_bytes{fstype!="tmpfs"}[1h], 
+          node_filesystem_avail_bytes{fstype!="tmpfs"}[1h],
           4 * 3600
         ) < 0
       for: 5m
@@ -222,12 +222,12 @@ spec:
         summary: "Disk space exhaustion predicted"
         description: "Disk {{ $labels.device }} on {{ $labels.instance }} is predicted to run out of space in 4 hours"
         runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#disk-space"
-    
+
     # Predict memory exhaustion
     - alert: MLOpsMemoryExhaustionPredicted
       expr: |
         predict_linear(
-          container_memory_usage_bytes{pod=~"mlops-sentiment-.*"}[30m], 
+          container_memory_usage_bytes{pod=~"mlops-sentiment-.*"}[30m],
           2 * 3600
         ) > container_spec_memory_limit_bytes{pod=~"mlops-sentiment-.*"}
       for: 10m

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Скрипт для форматирования всего кода проекта
+# Script for formatting all project code
 
 set -e
 
@@ -8,11 +8,11 @@ echo "🎨 Auto-formatting code with Black & isort"
 echo "=========================================="
 echo ""
 
-# Проверяем наличие инструментов
+# Check for tools
 command -v black >/dev/null 2>&1 || { echo "❌ Black not installed. Run: pip install -r requirements-dev.txt"; exit 1; }
 command -v isort >/dev/null 2>&1 || { echo "❌ isort not installed. Run: pip install -r requirements-dev.txt"; exit 1; }
 
-# Определяем директории для форматирования
+# Define directories to format
 DIRS="app tests scripts run.py"
 
 echo "📝 Formatting with Black..."
@@ -34,4 +34,3 @@ echo "  1. Review changes: git diff"
 echo "  2. Run linting: make lint"
 echo "  3. Run tests: make test"
 echo "  4. Commit: git commit -am 'style: format code'"
-

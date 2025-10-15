@@ -1,178 +1,202 @@
 # 🚀 MLOps Sentiment Analysis - Benchmarking Guide
 
-## 📊 Обзор
+## 📊 Overview
 
-Комплексная система бенчмаркинга для тестирования производительности модели анализа тональности на различных типах инстансов (CPU и GPU). Этот модуль позволяет:
+Comprehensive benchmarking system for testing sentiment analysis model performance on various instance types (CPU and GPU). This module allows you to:
 
-- **Измерить производительность** - латентность, RPS, throughput
-- **Проанализировать стоимость** - стоимость 1000 предсказаний для каждого типа инстанса
-- **Мониторить ресурсы** - утилизация CPU, GPU, памяти во время нагрузки
-- **Сравнить инстансы** - выбрать оптимальный тип для ваших требований
+- **Measure performance** - latency, RPS, throughput
+- **Analyze costs** - cost of 1000 predictions for each instance type
+- **Monitor resources** - CPU, GPU, memory utilization during load
+- **Compare instances** - choose optimal type for your requirements
 
-## 🎯 Цели бенчмаркинга
+## 🎯 Benchmarking Goals
 
-### Производительность
-- ⚡ **Латентность** - время отклика на запросы (P50, P95, P99)
-- 🚀 **RPS** - количество запросов в секунду
-- 📊 **Throughput** - общая пропускная способность
-- ❌ **Error Rate** - процент неуспешных запросов
+### Performance
 
-### Ресурсы
-- 🖥️ **CPU Utilization** - использование процессора
-- 💾 **Memory Usage** - потребление памяти
-- 🎮 **GPU Utilization** - использование GPU (для GPU инстансов)
-- 🌐 **Network I/O** - сетевой трафик
+- ⚡ **Latency** - request response time (P50, P95, P99)
+- 🚀 **RPS** - requests per second
+- 📊 **Throughput** - overall throughput
+- ❌ **Error Rate** - percentage of failed requests
 
-### Стоимость
-- 💰 **Cost per 1000 predictions** - основная метрика стоимости
-- ⏰ **Cost per hour** - почасовая стоимость инстанса
-- 📈 **Cost efficiency** - соотношение производительность/стоимость
+### Resources
 
-## 🚀 Быстрый старт
+- 🖥️ **CPU Utilization** - processor usage
+- 💾 **Memory Usage** - memory consumption
+- 🎮 **GPU Utilization** - GPU usage (for GPU instances)
+- 🌐 **Network I/O** - network traffic
 
-### 1. Простой тест
+### Cost
+
+- 💰 **Cost per 1000 predictions** - main cost metric
+- ⏰ **Cost per hour** - hourly instance cost
+- 📈 **Cost efficiency** - performance/cost ratio
+
+## 🚀 Quick Start
+
+### 1. Simple Test
+
 ```bash
 cd benchmarking
 
-# Установка зависимостей
+# Install dependencies
 pip install -r requirements.txt
 
-# Быстрый тест с настройками по умолчанию
+# Quick test with default settings
 ./quick-benchmark.sh
 ```
 
-### 2. Тест конкретного инстанса
+### 2. Test Specific Instance
+
 ```bash
-# CPU инстанс с 20 пользователями на 2 минуты
+# CPU instance with 20 users for 2 minutes
 ./quick-benchmark.sh -t cpu-medium -u 20 -d 120
 
-# GPU инстанс с высокой нагрузкой
+# GPU instance with high load
 ./quick-benchmark.sh -t gpu-t4 -u 100 -d 300
 ```
 
-### 3. Полный бенчмарк всех инстансов
+### 3. Full Benchmark of All Instances
+
 ```bash
-# Автоматическое тестирование всех типов инстансов
+# Automatic testing of all instance types
 ./scripts/deploy-benchmark.sh
 ```
 
-## 📋 Поддерживаемые типы инстансов
+## 📋 Supported Instance Types
 
-### CPU Инстансы
-| Тип | vCPU | Memory | Стоимость/час | Рекомендации |
-|-----|------|--------|---------------|--------------|
-| `cpu-small` (t3.medium) | 2 | 4GB | $0.0416 | Разработка, тестирование |
-| `cpu-medium` (c5.large) | 2 | 4GB | $0.096 | Небольшая нагрузка |
-| `cpu-large` (c5.xlarge) | 4 | 8GB | $0.192 | Средняя нагрузка |
-| `cpu-xlarge` (c5.2xlarge) | 8 | 16GB | $0.384 | Высокая нагрузка |
+### CPU Instances
 
-### GPU Инстансы
-| Тип | GPU | vCPU | Memory | Стоимость/час | Рекомендации |
-|-----|-----|------|--------|---------------|--------------|
-| `gpu-t4` (g4dn.xlarge) | T4 | 4 | 16GB | $0.526 | Инференс, средняя нагрузка |
-| `gpu-v100` (p3.2xlarge) | V100 | 8 | 61GB | $3.06 | Высокопроизводительный инференс |
-| `gpu-a100` (p4d.xlarge) | A100 | 4 | 96GB | $3.912 | Максимальная производительность |
+| Type | vCPU | Memory | Cost/hour | Recommendations |
+|------|------|--------|-----------|----------------|
+| `cpu-small` (t3.medium) | 2 | 4GB | $0.0416 | Development, testing |
+| `cpu-medium` (c5.large) | 2 | 4GB | $0.096 | Low load |
+| `cpu-large` (c5.xlarge) | 4 | 8GB | $0.192 | Medium load |
+| `cpu-xlarge` (c5.2xlarge) | 8 | 16GB | $0.384 | High load |
 
-## 📊 Интерпретация результатов
+### GPU Instances
 
-### Метрики производительности
+| Type | GPU | vCPU | Memory | Cost/hour | Recommendations |
+|------|-----|------|--------|-----------|----------------|
+| `gpu-t4` (g4dn.xlarge) | T4 | 4 | 16GB | $0.526 | Inference, medium load |
+| `gpu-v100` (p3.2xlarge) | V100 | 8 | 61GB | $3.06 | High-performance inference |
+| `gpu-a100` (p4d.xlarge) | A100 | 4 | 96GB | $3.912 | Maximum performance |
 
-#### Латентность
-- **P50 < 100ms** - отличная производительность
-- **P95 < 200ms** - хорошая производительность  
-- **P99 < 500ms** - приемлемая производительность
-- **P99 > 1000ms** - требует оптимизации
+## 📊 Interpreting Results
+
+### Performance Metrics
+
+#### Latency
+
+- **P50 < 100ms** - excellent performance
+- **P95 < 200ms** - good performance
+- **P99 < 500ms** - acceptable performance
+- **P99 > 1000ms** - requires optimization
 
 #### RPS (Requests Per Second)
-- **< 10 RPS** - низкая производительность
-- **10-50 RPS** - средняя производительность
-- **50-100 RPS** - хорошая производительность
-- **> 100 RPS** - отличная производительность
+
+- **< 10 RPS** - low performance
+- **10-50 RPS** - medium performance
+- **50-100 RPS** - good performance
+- **> 100 RPS** - excellent performance
 
 #### Error Rate
-- **< 1%** - отличная стабильность
-- **1-5%** - приемлемая стабильность
-- **> 5%** - требует исследования
 
-### Анализ стоимости
+- **< 1%** - excellent stability
+- **1-5%** - acceptable stability
+- **> 5%** - requires investigation
 
-#### Стоимость 1000 предсказаний
-- **< $0.01** - очень экономично
-- **$0.01-0.05** - экономично
-- **$0.05-0.10** - умеренно
-- **> $0.10** - дорого
+### Cost Analysis
 
-#### Эффективность
-Рассчитывается как: `(RPS × Latency_Score) / Cost_per_Hour`
+#### Cost per 1000 Predictions
 
-## 🎯 Рекомендации по выбору инстанса
+- **< $0.01** - very economical
+- **$0.01-0.05** - economical
+- **$0.05-0.10** - moderate
+- **> $0.10** - expensive
 
-### Для разработки и тестирования
+#### Efficiency
+
+Calculated as: `(RPS × Latency_Score) / Cost_per_Hour`
+
+## 🎯 Instance Selection Recommendations
+
+### For Development and Testing
+
 ```bash
-# Рекомендуется: cpu-small
+# Recommended: cpu-small
 ./quick-benchmark.sh -t cpu-small -u 5 -d 60
 ```
-- ✅ Низкая стоимость
-- ✅ Достаточно для разработки
-- ❌ Ограниченная производительность
 
-### Для production с низкой нагрузкой (< 20 RPS)
+- ✅ Low cost
+- ✅ Sufficient for development
+- ❌ Limited performance
+
+### For Production with Low Load (< 20 RPS)
+
 ```bash
-# Рекомендуется: cpu-medium
+# Recommended: cpu-medium
 ./quick-benchmark.sh -t cpu-medium -u 20 -d 300
 ```
-- ✅ Хорошее соотношение цена/производительность
-- ✅ Стабильная работа
-- ✅ Возможность автомасштабирования
 
-### Для production со средней нагрузкой (20-100 RPS)
+- ✅ Good price/performance ratio
+- ✅ Stable operation
+- ✅ Auto-scaling capability
+
+### For Production with Medium Load (20-100 RPS)
+
 ```bash
-# Рекомендуется: cpu-large или gpu-t4
+# Recommended: cpu-large or gpu-t4
 ./quick-benchmark.sh -t cpu-large -u 50 -d 300
 ./quick-benchmark.sh -t gpu-t4 -u 50 -d 300
 ```
-- ✅ Высокая производительность
-- ✅ Низкая латентность
-- ⚠️ Средняя стоимость
 
-### Для production с высокой нагрузкой (> 100 RPS)
+- ✅ High performance
+- ✅ Low latency
+- ⚠️ Medium cost
+
+### For Production with High Load (> 100 RPS)
+
 ```bash
-# Рекомендуется: gpu-v100 или gpu-a100
+# Recommended: gpu-v100 or gpu-a100
 ./quick-benchmark.sh -t gpu-v100 -u 100 -d 600
 ```
-- ✅ Максимальная производительность
-- ✅ Минимальная латентность
-- ❌ Высокая стоимость
 
-## 📈 Мониторинг и алерты
+- ✅ Maximum performance
+- ✅ Minimum latency
+- ❌ High cost
 
-### Рекомендуемые алерты
+## 📈 Monitoring and Alerts
+
+### Recommended Alerts
+
 ```yaml
 # Prometheus alerts
 - alert: HighLatency
   expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 0.5
-  
-- alert: HighErrorRate  
+
+- alert: HighErrorRate
   expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
 
 - alert: LowThroughput
   expr: rate(http_requests_total[5m]) < 10
 ```
 
-### Grafana дашборды
-После бенчмарка импортируйте дашборды из `results/grafana_dashboards/`
+### Grafana Dashboards
 
-## 🔧 Настройка и кастомизация
+After benchmarking, import dashboards from `results/grafana_dashboards/`
 
-### Изменение параметров тестирования
-Отредактируйте `configs/benchmark-config.yaml`:
+## 🔧 Configuration and Customization
+
+### Changing Test Parameters
+
+Edit `configs/benchmark-config.yaml`:
 
 ```yaml
 benchmark:
   load_test:
-    duration: 300  # Длительность теста в секундах
-    concurrent_users: [1, 5, 10, 20, 50, 100]  # Количество пользователей
-    
+    duration: 300  # Test duration in seconds
+    concurrent_users: [1, 5, 10, 20, 50, 100]  # Number of users
+
 instances:
   cpu:
     - name: "my-custom-cpu"
@@ -180,63 +204,68 @@ instances:
       cost_per_hour: 0.768
 ```
 
-### Добавление новых типов инстансов
-1. Обновите `configs/benchmark-config.yaml`
-2. Создайте соответствующие Kubernetes манифесты в `deployments/`
-3. Запустите бенчмарк
+### Adding New Instance Types
 
-## 📁 Структура результатов
+1. Update `configs/benchmark-config.yaml`
+2. Create corresponding Kubernetes manifests in `deployments/`
+3. Run benchmark
 
-После выполнения бенчмарка в директории `results/` будут созданы:
+## 📁 Results Structure
+
+After benchmark execution, the `results/` directory will contain:
 
 ```
 results/
-├── benchmark_*.json              # Результаты нагрузочного тестирования
-├── resource_metrics_*.json       # Метрики использования ресурсов
-├── cost_analysis.json           # Анализ стоимости
-├── consolidated_results.json    # Сводные результаты
-├── reports/                     # Графики и визуализация
+├── benchmark_*.json              # Load test results
+├── resource_metrics_*.json       # Resource usage metrics
+├── cost_analysis.json           # Cost analysis
+├── consolidated_results.json    # Consolidated results
+├── reports/                     # Charts and visualization
 │   ├── benchmark_report_*.png
 │   └── cost_performance_*.png
-├── cost_reports/               # Отчеты по стоимости
+├── cost_reports/               # Cost reports
 │   ├── cost_analysis.png
 │   └── cost_performance_bubble.png
-└── benchmark_final_report.md   # Итоговый отчет
+└── benchmark_final_report.md   # Final report
 ```
 
 ## 🚨 Troubleshooting
 
-### Проблема: "No connection to Kubernetes cluster"
+### Problem: "No connection to Kubernetes cluster"
+
 ```bash
-# Проверьте подключение к кластеру
+# Check cluster connection
 kubectl cluster-info
 
-# Настройте kubeconfig
+# Configure kubeconfig
 export KUBECONFIG=/path/to/your/kubeconfig
 ```
 
-### Проблема: "GPU not available"
+### Problem: "GPU not available"
+
 ```bash
-# Проверьте наличие GPU нод
+# Check for GPU nodes
 kubectl get nodes -l accelerator=nvidia-tesla-t4
 
-# Установите NVIDIA Device Plugin
+# Install NVIDIA Device Plugin
 kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.14.1/nvidia-device-plugin.yml
 ```
 
-### Проблема: "High error rate during testing"
-1. Проверьте логи приложения: `kubectl logs -l app=mlops-sentiment`
-2. Увеличьте ресурсы в deployment
-3. Уменьшите количество одновременных пользователей
+### Problem: "High error rate during testing"
 
-## 🔗 Интеграция с CI/CD
+1. Check application logs: `kubectl logs -l app=mlops-sentiment`
+2. Increase resources in deployment
+3. Reduce number of concurrent users
+
+## 🔗 CI/CD Integration
 
 ### GitHub Actions
+
 ```yaml
 name: Performance Benchmark
 on:
   schedule:
-    - cron: '0 2 * * 1'  # Каждый понедельник в 2:00
+    - cron: '0 2 * * 1'  # Every Monday at 2:00
 
 jobs:
   benchmark:
@@ -254,18 +283,19 @@ jobs:
         path: benchmarking/results/
 ```
 
-## 📚 Дополнительные ресурсы
+## 📚 Additional Resources
 
-- [Основная документация проекта](../README.md)
-- [Руководство по развертыванию](../deployment-guide.md)
-- [Архитектура системы](../docs/architecture.md)
+- [Main project documentation](../README.md)
+- [Deployment guide](../deployment-guide.md)
+- [System architecture](../docs/architecture.md)
 - [Troubleshooting](../docs/troubleshooting/index.md)
-- [OpenAPI спецификация](../openapi-specs/sentiment-api.yaml)
+- [OpenAPI specification](../openapi-specs/sentiment-api.yaml)
 
 ---
 
-**Следующие шаги:**
-1. Запустите быстрый бенчмарк: `./quick-benchmark.sh`
-2. Проанализируйте результаты в HTML отчете
-3. Выберите оптимальный тип инстанса для ваших требований
-4. Настройте production deployment с выбранными параметрами
+**Next Steps:**
+
+1. Run quick benchmark: `./quick-benchmark.sh`
+2. Analyze results in HTML report
+3. Choose optimal instance type for your requirements
+4. Configure production deployment with selected parameters

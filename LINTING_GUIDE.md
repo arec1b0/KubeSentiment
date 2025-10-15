@@ -1,105 +1,105 @@
-# Руководство по линтингу и форматированию кода
+# Code Linting and Formatting Guide
 
-## Обзор инструментов
+## Tools Overview
 
-В проекте используются следующие инструменты для контроля качества кода:
+The following tools are used in the project for code quality control:
 
-### 1. **Black** - Автоматический форматтер кода
+### 1. **Black** - Automatic Code Formatter
 
-- **Назначение**: Автоматическое форматирование Python кода в единообразный стиль
-- **Конфигурация**: `pyproject.toml`
-- **Длина строки**: 100 символов
+- **Purpose**: Automatic Python code formatting in a consistent style
+- **Configuration**: `pyproject.toml`
+- **Line length**: 100 characters
 
-### 2. **Flake8** - Линтер для проверки стиля и синтаксиса
+### 2. **Flake8** - Linter for Style and Syntax Checking
 
-- **Назначение**: Проверка кода на соответствие PEP 8 и поиск потенциальных ошибок
-- **Конфигурация**: `.flake8`
-- **Плагины**:
-  - `flake8-bugbear` - находит распространенные ошибки
-  - `flake8-comprehensions` - улучшает list/dict comprehensions
-  - `flake8-simplify` - предлагает упрощения кода
+- **Purpose**: Check code compliance with PEP 8 and find potential errors
+- **Configuration**: `.flake8`
+- **Plugins**:
+  - `flake8-bugbear` - finds common bugs
+  - `flake8-comprehensions` - improves list/dict comprehensions
+  - `flake8-simplify` - suggests code simplifications
 
-### 3. **isort** - Сортировка импортов
+### 3. **isort** - Import Sorting
 
-- **Назначение**: Автоматическая сортировка и группировка импортов
-- **Конфигурация**: `pyproject.toml`
-- **Профиль**: black (совместимость с black)
+- **Purpose**: Automatic sorting and grouping of imports
+- **Configuration**: `pyproject.toml`
+- **Profile**: black (compatibility with black)
 
-### 4. **mypy** - Статическая проверка типов
+### 4. **mypy** - Static Type Checking
 
-- **Назначение**: Проверка типов Python
-- **Настройки**: Игнорирование отсутствующих импортов
+- **Purpose**: Python type checking
+- **Settings**: Ignore missing imports
 
-### 5. **Bandit** - Проверка безопасности
+### 5. **Bandit** - Security Scanning
 
-- **Назначение**: Поиск проблем безопасности в коде
-- **Исключения**: Не применяется к тестам
+- **Purpose**: Find security issues in code
+- **Exclusions**: Not applied to tests
 
-## Установка
+## Installation
 
-### Основные зависимости
+### Main Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Зависимости для разработки
+### Development Dependencies
 
 ```bash
 pip install -r requirements-dev.txt
 ```
 
-### Или всё вместе
+### Or All Together
 
 ```bash
 make install-dev
 ```
 
-## Использование
+## Usage
 
-### Проверка кода (без изменений)
+### Code Checking (no changes)
 
 ```bash
-# Все проверки сразу
+# All checks at once
 make lint
 
-# Или по отдельности
-black --check app/ tests/        # Проверить форматирование
-flake8 app/ tests/               # Проверить стиль и синтаксис
-isort --check-only app/ tests/   # Проверить импорты
-mypy app/                        # Проверить типы
+# Or separately
+black --check app/ tests/        # Check formatting
+flake8 app/ tests/               # Check style and syntax
+isort --check-only app/ tests/   # Check imports
+mypy app/                        # Check types
 ```
 
-### Автоматическое исправление
+### Automatic Fixing
 
 ```bash
-# Форматирование всего кода
+# Format all code
 make format
 
-# Или автоматическое исправление линтинга
+# Or automatic lint fixing
 make lint-fix
 
-# Или по отдельности
-black app/ tests/                # Отформатировать код
-isort app/ tests/                # Отсортировать импорты
+# Or separately
+black app/ tests/                # Format code
+isort app/ tests/                # Sort imports
 ```
 
-### Pre-commit hooks (рекомендуется)
+### Pre-commit Hooks (recommended)
 
-Pre-commit автоматически проверяет код перед каждым коммитом:
+Pre-commit automatically checks code before each commit:
 
 ```bash
-# Установка pre-commit хуков
+# Install pre-commit hooks
 pip install pre-commit
 pre-commit install
 
-# Запуск вручную на всех файлах
+# Run manually on all files
 pre-commit run --all-files
 
-# Pre-commit будет автоматически запускаться при git commit
+# Pre-commit will automatically run on git commit
 ```
 
-## Конфигурация
+## Configuration
 
 ### pyproject.toml
 
@@ -122,11 +122,11 @@ max-complexity = 10
 extend-ignore = E203, W503, E501
 ```
 
-## Интеграция с IDE
+## IDE Integration
 
 ### VSCode
 
-Добавьте в `.vscode/settings.json`:
+Add to `.vscode/settings.json`:
 
 ```json
 {
@@ -147,30 +147,30 @@ extend-ignore = E203, W503, E501
 
 ### PyCharm
 
-1. Настройки → Tools → Black
-   - Включить "On code reformat"
-   - Включить "On save"
-2. Настройки → Tools → External Tools
-   - Добавить flake8 и isort
+1. Settings → Tools → Black
+   - Enable "On code reformat"
+   - Enable "On save"
+2. Settings → Tools → External Tools
+   - Add flake8 and isort
 
-## Игнорирование предупреждений
+## Ignoring Warnings
 
-### В коде (используйте экономно!)
+### In Code (use sparingly!)
 
 ```python
-# Игнорировать конкретное правило для одной строки
+# Ignore specific rule for one line
 result = some_complex_function()  # noqa: E501
 
-# Игнорировать для всего файла
+# Ignore for entire file
 # flake8: noqa
 
-# Игнорировать конкретное правило для всего файла
+# Ignore specific rule for entire file
 # flake8: noqa: E501
 ```
 
-### В конфигурации
+### In Configuration
 
-Редактировать `.flake8` для глобальных исключений:
+Edit `.flake8` for global exclusions:
 
 ```ini
 per-file-ignores =
@@ -178,72 +178,72 @@ per-file-ignores =
     tests/*:F401,F811
 ```
 
-## CI/CD интеграция
+## CI/CD Integration
 
-В CI pipeline линтинг запускается автоматически:
+Linting runs automatically in CI pipeline:
 
 ```yaml
-# Пример для GitHub Actions
+# Example for GitHub Actions
 - name: Lint code
   run: make lint
 ```
 
-## Решение проблем
+## Troubleshooting
 
-### Конфликт между Black и Flake8
+### Conflict Between Black and Flake8
 
-Конфигурация уже настроена на игнорирование конфликтующих правил:
+Configuration is already set to ignore conflicting rules:
 
-- E203 (пробелы перед ':')
-- W503 (перенос строки перед бинарным оператором)
-- E501 (длина строки, управляется Black)
+- E203 (whitespace before ':')
+- W503 (line break before binary operator)
+- E501 (line length, managed by Black)
 
-### Исправление всех проблем сразу
+### Fixing All Issues at Once
 
 ```bash
-# 1. Отформатировать код
+# 1. Format code
 make format
 
-# 2. Проверить оставшиеся проблемы
+# 2. Check remaining issues
 make lint
 
-# 3. Исправить вручную то, что не может быть исправлено автоматически
+# 3. Manually fix what cannot be fixed automatically
 ```
 
-## Рекомендации
+## Recommendations
 
-1. **Запускайте линтинг часто**: Лучше исправлять проблемы сразу
-2. **Используйте pre-commit**: Автоматизирует проверки
-3. **Настройте IDE**: Автоформатирование при сохранении экономит время
-4. **Не игнорируйте предупреждения без причины**: Они существуют для улучшения качества кода
-5. **Регулярно обновляйте инструменты**: `pip install -U -r requirements-dev.txt`
+1. **Run linting frequently**: Better to fix issues immediately
+2. **Use pre-commit**: Automates checks
+3. **Configure IDE**: Auto-formatting on save saves time
+4. **Don't ignore warnings without reason**: They exist to improve code quality
+5. **Regularly update tools**: `pip install -U -r requirements-dev.txt`
 
-## Полезные команды
+## Useful Commands
 
 ```bash
-# Установка
-make install-dev              # Установить dev зависимости
+# Installation
+make install-dev              # Install dev dependencies
 
-# Проверка
-make lint                     # Проверить код
-make test                     # Запустить тесты
+# Checking
+make lint                     # Check code
+make test                     # Run tests
 
-# Форматирование
-make format                   # Отформатировать код
-make lint-fix                 # Автоисправление
+# Formatting
+make format                   # Format code
+make lint-fix                 # Auto-fix
 
 # Pre-commit
-pre-commit install           # Установить хуки
-pre-commit run --all-files   # Запустить на всех файлах
+pre-commit install           # Install hooks
+pre-commit run --all-files   # Run on all files
 
-# Полный цикл CI локально
+# Full CI cycle locally
 make all                     # Clean, install, lint, test, build
 ```
 
-## Дополнительная информация
+## Additional Information
 
-- [Black документация](https://black.readthedocs.io/)
-- [Flake8 документация](https://flake8.pycqa.org/)
-- [isort документация](https://pycqa.github.io/isort/)
-- [mypy документация](https://mypy.readthedocs.io/)
+- [Black documentation](https://black.readthedocs.io/)
+- [Flake8 documentation](https://flake8.pycqa.org/)
+- [isort documentation](https://pycqa.github.io/isort/)
+- [mypy documentation](https://mypy.readthedocs.io/)
 - [PEP 8 Style Guide](https://pep8.org/)

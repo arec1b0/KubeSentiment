@@ -1,4 +1,4 @@
-# Скрипт для форматирования всего кода проекта (PowerShell)
+# Script for formatting all project code (PowerShell)
 
 $ErrorActionPreference = "Stop"
 
@@ -7,7 +7,7 @@ Write-Host "🎨 Auto-formatting code with Black & isort" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Проверяем наличие инструментов
+# Check for tools
 try {
     black --version | Out-Null
 }
@@ -24,7 +24,7 @@ catch {
     exit 1
 }
 
-# Определяем директории для форматирования
+# Define directories to format
 $Dirs = @("app", "tests", "scripts", "run.py")
 
 Write-Host "📝 Formatting with Black..." -ForegroundColor Yellow
@@ -46,4 +46,3 @@ Write-Host "  1. Review changes: git diff" -ForegroundColor Gray
 Write-Host "  2. Run linting: make lint" -ForegroundColor Gray
 Write-Host "  3. Run tests: make test" -ForegroundColor Gray
 Write-Host "  4. Commit: git commit -am 'style: format code'" -ForegroundColor Gray
-

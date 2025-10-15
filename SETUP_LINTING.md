@@ -1,169 +1,169 @@
-# 🚀 Быстрая настройка линтинга и форматирования
+# 🚀 Quick Linting and Formatting Setup
 
-## Что было настроено
+## What Was Configured
 
-В проекте KubeSentiment теперь настроены профессиональные инструменты для контроля качества кода:
+Professional code quality tools are now configured in the KubeSentiment project:
 
-### ✅ Инструменты
+### ✅ Tools
 
-1. **Black** - автоматическое форматирование кода
-2. **Flake8** - проверка синтаксиса и стиля (PEP 8)
-3. **isort** - сортировка импортов
-4. **mypy** - проверка типов
-5. **Bandit** - проверка безопасности
-6. **Pre-commit** - автоматические проверки перед коммитом
+1. **Black** - automatic code formatting
+2. **Flake8** - syntax and style checking (PEP 8)
+3. **isort** - import sorting
+4. **mypy** - type checking
+5. **Bandit** - security scanning
+6. **Pre-commit** - automatic pre-commit checks
 
-### 📁 Созданные файлы
+### 📁 Created Files
 
-- `pyproject.toml` - центральная конфигурация (black, isort, pytest, mypy, bandit)
-- `.flake8` - конфигурация flake8
-- `requirements-dev.txt` - зависимости для разработки
-- `.pre-commit-config.yaml` - настройка pre-commit хуков
-- `.editorconfig` - универсальные настройки редактора
-- `.vscode/settings.json` - настройки VSCode
-- `.vscode/extensions.json` - рекомендуемые расширения VSCode
-- `LINTING_GUIDE.md` - подробное руководство
+- `pyproject.toml` - central configuration (black, isort, pytest, mypy, bandit)
+- `.flake8` - flake8 configuration
+- `requirements-dev.txt` - development dependencies
+- `.pre-commit-config.yaml` - pre-commit hooks setup
+- `.editorconfig` - universal editor settings
+- `.vscode/settings.json` - VSCode settings
+- `.vscode/extensions.json` - recommended VSCode extensions
+- `LINTING_GUIDE.md` - detailed guide
 
-## ⚡ Быстрый старт
+## ⚡ Quick Start
 
-### Шаг 1: Установка зависимостей
+### Step 1: Install Dependencies
 
 ```bash
-# Установить все зависимости разработки
+# Install all development dependencies
 make install-dev
 
-# Или вручную
+# Or manually
 pip install -r requirements.txt
 pip install -r requirements-dev.txt
 ```
 
-### Шаг 2: Проверка кода
+### Step 2: Check Code
 
 ```bash
-# Запустить все проверки
+# Run all checks
 make lint
 
-# Выход будет содержать результаты:
-# - Black: проверка форматирования
-# - isort: проверка импортов
-# - Flake8: проверка стиля и синтаксиса
-# - mypy: проверка типов
+# Output will contain results:
+# - Black: formatting check
+# - isort: import check
+# - Flake8: style and syntax check
+# - mypy: type check
 ```
 
-### Шаг 3: Автоматическое исправление
+### Step 3: Auto-fix
 
 ```bash
-# Автоматически отформатировать весь код
+# Automatically format all code
 make format
 
-# Или
+# Or
 make lint-fix
 ```
 
-### Шаг 4: Настройка Pre-commit (рекомендуется)
+### Step 4: Setup Pre-commit (recommended)
 
 ```bash
-# Установить pre-commit хуки
+# Install pre-commit hooks
 pre-commit install
 
-# Теперь при каждом git commit автоматически будет:
-# ✓ Форматироваться код
-# ✓ Проверяться стиль
-# ✓ Валидироваться YAML/JSON
-# ✓ Проверяться безопасность
+# Now on every git commit it will automatically:
+# ✓ Format code
+# ✓ Check style
+# ✓ Validate YAML/JSON
+# ✓ Check security
 ```
 
-### Шаг 5: Запуск вручную
+### Step 5: Run Manually
 
 ```bash
-# Проверить все файлы с pre-commit
+# Check all files with pre-commit
 pre-commit run --all-files
 
-# Проверить только измененные файлы
+# Check only changed files
 pre-commit run
 ```
 
-## 🔧 Использование отдельных инструментов
+## 🔧 Using Individual Tools
 
-### Black (форматирование)
+### Black (formatting)
 
 ```bash
-# Проверить форматирование
+# Check formatting
 black --check app/ tests/
 
-# Отформатировать код
+# Format code
 black app/ tests/
 
-# Отформатировать один файл
+# Format one file
 black app/main.py
 ```
 
-### Flake8 (линтинг)
+### Flake8 (linting)
 
 ```bash
-# Проверить весь проект
+# Check entire project
 flake8 app/ tests/
 
-# Проверить один файл
+# Check one file
 flake8 app/main.py
 
-# Показать статистику
+# Show statistics
 flake8 --statistics app/
 ```
 
-### isort (импорты)
+### isort (imports)
 
 ```bash
-# Проверить импорты
+# Check imports
 isort --check-only app/ tests/
 
-# Исправить импорты
+# Fix imports
 isort app/ tests/
 
-# Показать diff без изменений
+# Show diff without changes
 isort --diff app/
 ```
 
-### mypy (типы)
+### mypy (types)
 
 ```bash
-# Проверить типы
+# Check types
 mypy app/
 
-# Проверить с подробным выводом
+# Check with detailed output
 mypy app/ --show-error-codes --pretty
 ```
 
-## 📝 Конфигурация
+## 📝 Configuration
 
-### Основные параметры
+### Main Parameters
 
-- **Длина строки**: 100 символов (настроено в black и flake8)
-- **Отступы**: 4 пробела для Python
-- **Кодировка**: UTF-8
-- **Окончания строк**: LF (Unix-style)
+- **Line length**: 100 characters (configured in black and flake8)
+- **Indentation**: 4 spaces for Python
+- **Encoding**: UTF-8
+- **Line endings**: LF (Unix-style)
 
-### Игнорируемые правила Flake8
+### Ignored Flake8 Rules
 
 ```ini
-E203  # пробелы перед ':' (конфликт с black)
-W503  # перенос строки перед оператором (конфликт с black)
-E501  # длина строки (управляется black)
+E203  # whitespace before ':' (conflicts with black)
+W503  # line break before operator (conflicts with black)
+E501  # line length (managed by black)
 ```
 
-### Сложность кода
+### Code Complexity
 
-- **Максимальная цикломатическая сложность**: 10
-- Flake8 предупредит о слишком сложных функциях
+- **Maximum cyclomatic complexity**: 10
+- Flake8 will warn about overly complex functions
 
-## 💻 Интеграция с VSCode
+## 💻 VSCode Integration
 
-### Рекомендуемые расширения
+### Recommended Extensions
 
-Откройте палитру команд (Ctrl+Shift+P) и выберите:
+Open command palette (Ctrl+Shift+P) and select:
 `Extensions: Show Recommended Extensions`
 
-Установите:
+Install:
 
 - Python (ms-python.python)
 - Black Formatter (ms-python.black-formatter)
@@ -171,48 +171,48 @@ E501  # длина строки (управляется black)
 - Flake8 (ms-python.flake8)
 - Mypy Type Checker (ms-python.mypy-type-checker)
 
-### Автоматическое форматирование
+### Automatic Formatting
 
-После установки расширений:
+After installing extensions:
 
-1. Код будет автоматически форматироваться при сохранении (Ctrl+S)
-2. Импорты будут автоматически сортироваться
-3. Ошибки линтинга будут подсвечиваться в реальном времени
+1. Code will automatically format on save (Ctrl+S)
+2. Imports will automatically sort
+3. Linting errors will highlight in real-time
 
-## 🎯 Рабочий процесс
+## 🎯 Workflow
 
-### Ежедневная работа
+### Daily Work
 
 ```bash
-# 1. Написать код
-# 2. Сохранить файл (VSCode автоматически отформатирует)
-# 3. Проверить перед коммитом
+# 1. Write code
+# 2. Save file (VSCode auto-formats)
+# 3. Check before commit
 make lint
 
-# 4. Если есть ошибки - исправить автоматически
+# 4. If there are errors - fix automatically
 make format
 
-# 5. Сделать коммит (pre-commit автоматически запустится)
+# 5. Make commit (pre-commit runs automatically)
 git add .
 git commit -m "feat: add new feature"
 ```
 
-### Перед Pull Request
+### Before Pull Request
 
 ```bash
-# Запустить все проверки
+# Run all checks
 make lint
 make test
 
-# Или полный CI цикл локально
+# Or full CI cycle locally
 make all
 ```
 
-## 🔍 Примеры
+## 🔍 Examples
 
-### Пример форматирования Black
+### Black Formatting Example
 
-**До:**
+**Before:**
 
 ```python
 def my_function(x,y,z):
@@ -220,7 +220,7 @@ def my_function(x,y,z):
     return result
 ```
 
-**После:**
+**After:**
 
 ```python
 def my_function(x, y, z):
@@ -228,9 +228,9 @@ def my_function(x, y, z):
     return result
 ```
 
-### Пример сортировки isort
+### isort Sorting Example
 
-**До:**
+**Before:**
 
 ```python
 import sys
@@ -239,7 +239,7 @@ import os
 from typing import List
 ```
 
-**После:**
+**After:**
 
 ```python
 import os
@@ -249,15 +249,15 @@ from typing import List
 from app.config import settings
 ```
 
-### Пример проверки Flake8
+### Flake8 Check Example
 
 ```python
-# Ошибка: неиспользуемая переменная
+# Error: unused variable
 def calculate(x, y):
     z = 10  # F841: local variable 'z' is assigned to but never used
     return x + y
 
-# Ошибка: слишком сложная функция
+# Error: too complex function
 def complex_function(a, b, c, d, e):  # C901: too complex (11)
     if a:
         if b:
@@ -268,77 +268,77 @@ def complex_function(a, b, c, d, e):  # C901: too complex (11)
     return False
 ```
 
-## 🐛 Решение проблем
+## 🐛 Troubleshooting
 
-### Конфликт между инструментами
+### Conflicts Between Tools
 
-Конфигурация уже настроена на устранение конфликтов между black и flake8.
+Configuration is already set to eliminate conflicts between black and flake8.
 
-### Pre-commit не работает
+### Pre-commit Not Working
 
 ```bash
-# Переустановить хуки
+# Reinstall hooks
 pre-commit uninstall
 pre-commit install
 
-# Очистить кеш
+# Clean cache
 pre-commit clean
 ```
 
-### Слишком много ошибок
+### Too Many Errors
 
 ```bash
-# Исправить автоматически всё, что возможно
+# Auto-fix everything possible
 make format
 
-# Затем проверить оставшиеся ошибки
+# Then check remaining errors
 make lint
 
-# Оставшиеся ошибки нужно исправить вручную
+# Remaining errors must be fixed manually
 ```
 
-## 📚 Дополнительные ресурсы
+## 📚 Additional Resources
 
-- [Подробное руководство](./LINTING_GUIDE.md)
-- [Black документация](https://black.readthedocs.io/)
-- [Flake8 документация](https://flake8.pycqa.org/)
+- [Detailed guide](./LINTING_GUIDE.md)
+- [Black documentation](https://black.readthedocs.io/)
+- [Flake8 documentation](https://flake8.pycqa.org/)
 - [PEP 8 Style Guide](https://pep8.org/)
 
-## ✨ Полезные команды
+## ✨ Useful Commands
 
 ```bash
-# Установка
-make install-dev              # Установить dev зависимости
+# Installation
+make install-dev              # Install dev dependencies
 
-# Проверка
-make lint                     # Проверить код (без изменений)
-make lint-fix                 # Автоисправление
+# Checking
+make lint                     # Check code (no changes)
+make lint-fix                 # Auto-fix
 
-# Форматирование
-make format                   # Отформатировать код
+# Formatting
+make format                   # Format code
 
-# Тестирование
-make test                     # Запустить тесты
+# Testing
+make test                     # Run tests
 
 # Pre-commit
-pre-commit install            # Установить хуки
-pre-commit run --all-files    # Проверить все файлы
+pre-commit install            # Install hooks
+pre-commit run --all-files    # Check all files
 
-# Очистка
-make clean                    # Удалить кеш и артефакты
+# Cleanup
+make clean                    # Remove cache and artifacts
 
-# Полный цикл
+# Full cycle
 make all                      # Clean + install + lint + test + build
 ```
 
-## 🎉 Готово
+## 🎉 Done
 
-Теперь ваш код будет:
+Now your code will:
 
-- ✅ Автоматически форматироваться
-- ✅ Соответствовать PEP 8
-- ✅ Иметь правильную сортировку импортов
-- ✅ Проверяться на безопасность
-- ✅ Валидироваться перед каждым коммитом
+- ✅ Automatically format
+- ✅ Comply with PEP 8
+- ✅ Have proper import sorting
+- ✅ Be checked for security
+- ✅ Validate before each commit
 
-**Следующий шаг**: Запустите `make format` чтобы отформатировать весь существующий код!
+**Next step**: Run `make format` to format all existing code!

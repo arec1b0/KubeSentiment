@@ -1,182 +1,182 @@
 ================================================================================
-✅ НАСТРОЙКА ЛИНТИНГА И ФОРМАТИРОВАНИЯ ЗАВЕРШЕНА!
+✅ LINTING AND FORMATTING SETUP COMPLETE!
 ================================================================================
 
-📦 УСТАНОВЛЕННЫЕ ИНСТРУМЕНТЫ:
+📦 INSTALLED TOOLS:
 
-  ✓ Black 23.12.1          - Автоматическое форматирование кода
-  ✓ Flake8 7.0.0           - Проверка синтаксиса и стиля (PEP 8)
-  ✓ isort 5.13.2           - Сортировка импортов
-  ✓ mypy 1.7.1             - Статическая проверка типов
-  ✓ Bandit 1.7.6           - Проверка безопасности
-  ✓ Pre-commit 3.6.0       - Автоматические проверки перед коммитом
+  ✓ Black 23.12.1          - Automatic code formatting
+  ✓ Flake8 7.0.0           - Syntax and style checking (PEP 8)
+  ✓ isort 5.13.2           - Import sorting
+  ✓ mypy 1.7.1             - Static type checking
+  ✓ Bandit 1.7.6           - Security scanning
+  ✓ Pre-commit 3.6.0       - Automatic pre-commit checks
 
-📁 СОЗДАННЫЕ ФАЙЛЫ КОНФИГУРАЦИИ:
+📁 CREATED CONFIGURATION FILES:
 
-  ✓ pyproject.toml                - Центральная конфигурация
-  ✓ .flake8                       - Настройки Flake8
-  ✓ .pre-commit-config.yaml       - Pre-commit хуки
-  ✓ .editorconfig                 - Настройки редактора
-  ✓ requirements-dev.txt          - Dev зависимости
-  ✓ .vscode/settings.json         - Настройки VSCode
-  ✓ .vscode/extensions.json       - Рекомендуемые расширения
-  ✓ .gitignore                    - Обновленный gitignore
+  ✓ pyproject.toml                - Central configuration
+  ✓ .flake8                       - Flake8 settings
+  ✓ .pre-commit-config.yaml       - Pre-commit hooks
+  ✓ .editorconfig                 - Editor settings
+  ✓ requirements-dev.txt          - Dev dependencies
+  ✓ .vscode/settings.json         - VSCode settings
+  ✓ .vscode/extensions.json       - Recommended extensions
+  ✓ .gitignore                    - Updated gitignore
 
-📚 ДОКУМЕНТАЦИЯ:
+📚 DOCUMENTATION:
 
-  ✓ CODE_QUALITY_SETUP.md         - Полная инструкция по настройке
-  ✓ LINTING_GUIDE.md              - Подробное руководство
-  ✓ SETUP_LINTING.md              - Быстрый старт
-  ✓ QUICK_REFERENCE.md            - Быстрая справка
+  ✓ CODE_QUALITY_SETUP.md         - Complete setup guide
+  ✓ LINTING_GUIDE.md              - Detailed guide
+  ✓ SETUP_LINTING.md              - Quick start
+  ✓ QUICK_REFERENCE.md            - Quick reference
 
-🛠️ СКРИПТЫ:
+🛠️ SCRIPTS:
 
-  ✓ scripts/check_code_quality.py - Проверка качества с отчетом
-  ✓ scripts/format_code.sh        - Форматирование (Bash)
-  ✓ scripts/format_code.ps1       - Форматирование (PowerShell)
+  ✓ scripts/check_code_quality.py - Quality check with report
+  ✓ scripts/format_code.sh        - Formatting (Bash)
+  ✓ scripts/format_code.ps1       - Formatting (PowerShell)
 
-📝 ОБНОВЛЕННЫЕ ФАЙЛЫ:
+📝 UPDATED FILES:
 
-  ✓ Makefile                      - Добавлены команды lint, format, lint-fix
+  ✓ Makefile                      - Added lint, format, lint-fix commands
 
 ================================================================================
-🚀 БЫСТРЫЙ СТАРТ
+🚀 QUICK START
 ================================================================================
 
-1️⃣  УСТАНОВКА ЗАВИСИМОСТЕЙ:
+1️⃣  INSTALL DEPENDENCIES:
 
    make install-dev
 
-   или:
+   or:
 
    pip install -r requirements.txt
    pip install -r requirements-dev.txt
 
-2️⃣  НАСТРОЙКА PRE-COMMIT (рекомендуется):
+2️⃣  SETUP PRE-COMMIT (recommended):
 
    pre-commit install
 
-3️⃣  ФОРМАТИРОВАНИЕ СУЩЕСТВУЮЩЕГО КОДА:
+3️⃣  FORMAT EXISTING CODE:
 
    make format
 
-   или:
+   or:
 
    .\scripts\format_code.ps1
 
-4️⃣  ПРОВЕРКА КАЧЕСТВА КОДА:
+4️⃣  CHECK CODE QUALITY:
 
    make lint
 
-   или:
+   or:
 
    python scripts\check_code_quality.py
 
 ================================================================================
-⚡ ОСНОВНЫЕ КОМАНДЫ
+⚡ MAIN COMMANDS
 ================================================================================
 
-ФОРМАТИРОВАНИЕ (изменяет файлы):
-  make format              - Отформатировать весь код
-  black app/ tests/        - Только форматирование
-  isort app/ tests/        - Только сортировка импортов
+FORMATTING (modifies files):
+  make format              - Format all code
+  black app/ tests/        - Formatting only
+  isort app/ tests/        - Import sorting only
 
-ПРОВЕРКА (без изменений):
-  make lint                - Все проверки сразу
-  black --check app/       - Проверить форматирование
-  flake8 app/              - Проверить стиль
-  mypy app/                - Проверить типы
+CHECKING (no changes):
+  make lint                - All checks at once
+  black --check app/       - Check formatting
+  flake8 app/              - Check style
+  mypy app/                - Check types
 
-АВТОИСПРАВЛЕНИЕ:
-  make lint-fix            - Автоматически исправить что возможно
+AUTO-FIX:
+  make lint-fix            - Automatically fix what's possible
 
 PRE-COMMIT:
-  pre-commit install       - Установить хуки (один раз)
-  pre-commit run --all     - Проверить все файлы
+  pre-commit install       - Install hooks (once)
+  pre-commit run --all     - Check all files
 
-ПОЛНЫЙ ЦИКЛ:
+FULL CYCLE:
   make all                 - Clean + install + lint + test + build
 
 ================================================================================
-💻 ИНТЕГРАЦИЯ С VSCODE
+💻 VSCODE INTEGRATION
 ================================================================================
 
-1. Откройте палитру команд: Ctrl+Shift+P
-2. Выберите: "Extensions: Show Recommended Extensions"
-3. Установите рекомендуемые расширения (см. .vscode/extensions.json)
+1. Open command palette: Ctrl+Shift+P
+2. Select: "Extensions: Show Recommended Extensions"
+3. Install recommended extensions (see .vscode/extensions.json)
 
-После установки расширений:
-  ✓ Автоформатирование при сохранении (Ctrl+S)
-  ✓ Автосортировка импортов
-  ✓ Линтинг в реальном времени
-  ✓ Подсветка ошибок
-
-================================================================================
-⚙️ КОНФИГУРАЦИЯ
-================================================================================
-
-ПАРАМЕТРЫ:
-  • Длина строки: 100 символов
-  • Отступы: 4 пробела (Python)
-  • Python версия: 3.11+
-  • Стиль: PEP 8 с учетом Black
-
-ИГНОРИРУЕМЫЕ ПРАВИЛА FLAKE8:
-  • E203 - пробелы перед ':' (конфликт с Black)
-  • W503 - перенос строки перед оператором
-  • E501 - длина строки (управляется Black)
-
-СЛОЖНОСТЬ КОДА:
-  • Максимальная цикломатическая сложность: 10
+After installing extensions:
+  ✓ Auto-formatting on save (Ctrl+S)
+  ✓ Auto-import sorting
+  ✓ Real-time linting
+  ✓ Error highlighting
 
 ================================================================================
-📊 ПРИМЕРЫ ИСПОЛЬЗОВАНИЯ
+⚙️ CONFIGURATION
 ================================================================================
 
-ЕЖЕДНЕВНАЯ РАЗРАБОТКА:
-  1. Пишете код
-  2. Сохраняете (Ctrl+S) - автоформатирование
-  3. Перед коммитом: make lint
-  4. git commit - pre-commit автоматически запустится
+PARAMETERS:
+  • Line length: 100 characters
+  • Indentation: 4 spaces (Python)
+  • Python version: 3.11+
+  • Style: PEP 8 with Black
 
-ПЕРЕД PULL REQUEST:
-  make all                 # Полная проверка
+IGNORED FLAKE8 RULES:
+  • E203 - whitespace before ':' (conflicts with Black)
+  • W503 - line break before operator
+  • E501 - line length (managed by Black)
 
-ИСПРАВЛЕНИЕ ОШИБОК:
-  make format              # Автоисправление
-  make lint                # Проверка оставшихся ошибок
-  # Исправить вручную то, что не было исправлено автоматически
+CODE COMPLEXITY:
+  • Maximum cyclomatic complexity: 10
 
 ================================================================================
-🔧 РЕШЕНИЕ ПРОБЛЕМ
+📊 USAGE EXAMPLES
 ================================================================================
 
-ОШИБКА: "black/flake8 not found"
+DAILY DEVELOPMENT:
+  1. Write code
+  2. Save (Ctrl+S) - auto-formatting
+  3. Before commit: make lint
+  4. git commit - pre-commit runs automatically
+
+BEFORE PULL REQUEST:
+  make all                 # Full check
+
+FIX ERRORS:
+  make format              # Auto-fix
+  make lint                # Check remaining errors
+  # Manually fix what wasn't auto-fixed
+
+================================================================================
+🔧 TROUBLESHOOTING
+================================================================================
+
+ERROR: "black/flake8 not found"
   → pip install -r requirements-dev.txt
 
-PRE-COMMIT НЕ РАБОТАЕТ:
+PRE-COMMIT NOT WORKING:
   → pre-commit uninstall
   → pre-commit install
   → pre-commit clean
 
-СЛИШКОМ МНОГО ОШИБОК:
-  → make format             # Автоисправление
-  → make lint               # Проверка оставшихся
+TOO MANY ERRORS:
+  → make format             # Auto-fix
+  → make lint               # Check remaining
 
-КОНФЛИКТЫ МЕЖДУ ИНСТРУМЕНТАМИ:
-  → Уже настроено! Просто используйте make format
+CONFLICTS BETWEEN TOOLS:
+  → Already configured! Just use make format
 
 ================================================================================
-📚 ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ
+📚 ADDITIONAL INFORMATION
 ================================================================================
 
-ДОКУМЕНТАЦИЯ:
-  • CODE_QUALITY_SETUP.md  - Полная инструкция
-  • LINTING_GUIDE.md       - Подробный гайд
-  • SETUP_LINTING.md       - Быстрый старт
-  • QUICK_REFERENCE.md     - Шпаргалка
+DOCUMENTATION:
+  • CODE_QUALITY_SETUP.md  - Complete guide
+  • LINTING_GUIDE.md       - Detailed guide
+  • SETUP_LINTING.md       - Quick start
+  • QUICK_REFERENCE.md     - Cheat sheet
 
-ВНЕШНИЕ ССЫЛКИ:
+EXTERNAL LINKS:
   • Black: https://black.readthedocs.io/
   • Flake8: https://flake8.pycqa.org/
   • isort: https://pycqa.github.io/isort/
@@ -184,26 +184,25 @@ PRE-COMMIT НЕ РАБОТАЕТ:
   • PEP 8: https://pep8.org/
 
 ================================================================================
-✨ СЛЕДУЮЩИЕ ШАГИ
+✨ NEXT STEPS
 ================================================================================
 
-[ ] 1. Установить зависимости:        make install-dev
-[ ] 2. Настроить pre-commit:          pre-commit install
-[ ] 3. Отформатировать код:           make format
-[ ] 4. Проверить качество:            make lint
-[ ] 5. Запустить тесты:               make test
-[ ] 6. Установить VSCode расширения:  См. .vscode/extensions.json
+[ ] 1. Install dependencies:        make install-dev
+[ ] 2. Setup pre-commit:            pre-commit install
+[ ] 3. Format code:                 make format
+[ ] 4. Check quality:               make lint
+[ ] 5. Run tests:                   make test
+[ ] 6. Install VSCode extensions:   See .vscode/extensions.json
 
 ================================================================================
-🎉 ГОТОВО! ВАША СИСТЕМА КОНТРОЛЯ КАЧЕСТВА КОДА НАСТРОЕНА!
+🎉 DONE! YOUR CODE QUALITY CONTROL SYSTEM IS CONFIGURED!
 ================================================================================
 
-Теперь ваш код будет:
-  ✅ Автоматически форматироваться
-  ✅ Соответствовать PEP 8
-  ✅ Иметь правильную сортировку импортов
-  ✅ Проверяться на безопасность
-  ✅ Валидироваться перед каждым коммитом
+Now your code will:
+  ✅ Automatically format
+  ✅ Comply with PEP 8
+  ✅ Have proper import sorting
+  ✅ Be security checked
+  ✅ Validate before each commit
 
-Вопросы? Смотрите CODE_QUALITY_SETUP.md для подробностей!
-
+Questions? See CODE_QUALITY_SETUP.md for details!

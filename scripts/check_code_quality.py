@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Скрипт для проверки качества кода и генерации отчета.
+Script for checking code quality and generating a report.
 """
 
 import subprocess
@@ -10,14 +10,14 @@ from typing import Dict, List, Tuple
 
 
 class CodeQualityChecker:
-    """Проверка качества кода с отчетом."""
+    """Code quality checker with reporting."""
 
     def __init__(self, project_root: Path):
         self.project_root = project_root
         self.results: Dict[str, Dict] = {}
 
     def run_command(self, name: str, cmd: List[str]) -> Tuple[bool, str]:
-        """Запустить команду и вернуть результат."""
+        """Run command and return result."""
         try:
             result = subprocess.run(
                 cmd, cwd=self.project_root, capture_output=True, text=True, timeout=60
@@ -31,7 +31,7 @@ class CodeQualityChecker:
             return False, str(e)
 
     def check_black(self) -> None:
-        """Проверить форматирование с Black."""
+        """Check formatting with Black."""
         print("🎨 Checking Black formatting...", end=" ")
         success, output = self.run_command(
             "black", ["black", "--check", "app/", "tests/", "scripts/", "run.py"]
@@ -40,7 +40,7 @@ class CodeQualityChecker:
         print("✅" if success else "❌")
 
     def check_isort(self) -> None:
-        """Проверить сортировку импортов."""
+        """Check import sorting."""
         print("📦 Checking isort...", end=" ")
         success, output = self.run_command(
             "isort",
@@ -50,7 +50,7 @@ class CodeQualityChecker:
         print("✅" if success else "❌")
 
     def check_flake8(self) -> None:
-        """Проверить стиль кода с Flake8."""
+        """Check code style with Flake8."""
         print("🔍 Checking Flake8...", end=" ")
         success, output = self.run_command(
             "flake8", ["flake8", "app/", "tests/", "scripts/", "run.py"]
@@ -59,7 +59,7 @@ class CodeQualityChecker:
         print("✅" if success else "❌")
 
     def check_mypy(self) -> None:
-        """Проверить типы с mypy."""
+        """Check types with mypy."""
         print("🔬 Checking mypy...", end=" ")
         success, output = self.run_command(
             "mypy", ["mypy", "app/", "--ignore-missing-imports"]
@@ -68,14 +68,14 @@ class CodeQualityChecker:
         print("✅" if success else "❌")
 
     def check_bandit(self) -> None:
-        """Проверить безопасность с Bandit."""
+        """Check security with Bandit."""
         print("🔒 Checking Bandit security...", end=" ")
         success, output = self.run_command("bandit", ["bandit", "-r", "app/"])
         self.results["bandit"] = {"success": success, "output": output}
         print("✅" if success else "❌")
 
     def run_all_checks(self) -> bool:
-        """Запустить все проверки."""
+        """Run all checks."""
         print("\n" + "=" * 60)
         print("🚀 Running Code Quality Checks")
         print("=" * 60 + "\n")
@@ -89,7 +89,7 @@ class CodeQualityChecker:
         return all(result["success"] for result in self.results.values())
 
     def print_summary(self) -> None:
-        """Вывести сводку результатов."""
+        """Print results summary."""
         print("\n" + "=" * 60)
         print("📊 Summary")
         print("=" * 60 + "\n")
@@ -115,7 +115,7 @@ class CodeQualityChecker:
                     print(result["output"])
 
     def suggest_fixes(self) -> None:
-        """Предложить исправления."""
+        """Suggest fixes."""
         failed = [tool for tool, r in self.results.items() if not r["success"]]
 
         if not failed:
@@ -152,7 +152,7 @@ class CodeQualityChecker:
 
 
 def main():
-    """Главная функция."""
+    """Main function."""
     project_root = Path(__file__).parent.parent
 
     checker = CodeQualityChecker(project_root)
@@ -165,4 +165,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

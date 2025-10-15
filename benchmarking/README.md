@@ -1,113 +1,120 @@
 # 🚀 MLOps Sentiment Analysis - Benchmarking Framework
 
-## 📊 Обзор
+## 📊 Overview
 
-Комплексная система бенчмаркинга для тестирования производительности модели анализа тональности на различных типах инстансов (CPU и GPU).
+Comprehensive benchmarking system for testing sentiment analysis model performance on various instance types (CPU and GPU).
 
-## 🎯 Цели бенчмаркинга
+## 🎯 Benchmarking Goals
 
-- **Измерение латентности** - время отклика на запросы
-- **Тестирование RPS** - количество запросов в секунду
-- **Мониторинг ресурсов** - утилизация CPU, GPU, памяти
-- **Расчет стоимости** - стоимость 1000 предсказаний для каждого типа инстанса
+- **Measure latency** - request response time
+- **Test RPS** - requests per second
+- **Monitor resources** - CPU, GPU, memory utilization
+- **Calculate costs** - cost of 1000 predictions for each instance type
 
-## 🏗️ Структура проекта
+## 🏗️ Project Structure
 
 ```
 benchmarking/
-├── configs/                    # Конфигурации для разных типов инстансов
+├── configs/                    # Configurations for different instance types
 │   ├── cpu-instances.yaml
 │   ├── gpu-instances.yaml
 │   └── benchmark-config.yaml
-├── scripts/                    # Скрипты для бенчмаркинга
-│   ├── load-test.py           # Нагрузочное тестирование
-│   ├── resource-monitor.py    # Мониторинг ресурсов
-│   ├── cost-calculator.py     # Расчет стоимости
-│   └── deploy-benchmark.sh    # Автоматическое развертывание
-├── deployments/               # Kubernetes манифесты
+├── scripts/                    # Benchmarking scripts
+│   ├── load-test.py           # Load testing
+│   ├── resource-monitor.py    # Resource monitoring
+│   ├── cost-calculator.py     # Cost calculation
+│   └── deploy-benchmark.sh    # Automatic deployment
+├── deployments/               # Kubernetes manifests
 │   ├── cpu-deployment.yaml
 │   ├── gpu-deployment.yaml
 │   └── monitoring.yaml
-├── results/                   # Результаты бенчмарков
+├── results/                   # Benchmark results
 │   ├── reports/
 │   ├── metrics/
 │   └── charts/
-└── requirements.txt           # Python зависимости
+└── requirements.txt           # Python dependencies
 ```
 
-## 🚀 Быстрый запуск
+## 🚀 Quick Start
 
-### 1. Установка зависимостей
+### 1. Install Dependencies
+
 ```bash
 cd benchmarking
 pip install -r requirements.txt
 
-# Сделайте скрипты исполняемыми (Linux/macOS)
+# Make scripts executable (Linux/macOS)
 chmod +x scripts/*.sh
 chmod +x quick-benchmark.sh
 ```
 
-### 2. Быстрый тест одного инстанса
+### 2. Quick Test of Single Instance
+
 ```bash
-# Простой тест с настройками по умолчанию
+# Simple test with default settings
 ./quick-benchmark.sh
 
-# Тест с кастомными параметрами
+# Test with custom parameters
 ./quick-benchmark.sh -t cpu-medium -u 20 -d 120
 
-# Тест GPU инстанса
+# Test GPU instance
 ./quick-benchmark.sh -t gpu-t4 -u 50 -d 300
 ```
 
-### 3. Полный бенчмарк всех инстансов
+### 3. Full Benchmark of All Instances
+
 ```bash
-# Автоматический бенчмарк на всех типах инстансов
+# Automatic benchmark on all instance types
 ./scripts/deploy-benchmark.sh
 
-# С кастомными параметрами
+# With custom parameters
 ./scripts/deploy-benchmark.sh --namespace my-benchmark --results-dir ./my-results
 ```
 
-### 4. Ручной запуск отдельных компонентов
+### 4. Manual Launch of Individual Components
+
 ```bash
-# Только нагрузочное тестирование
+# Load testing only
 python scripts/load-test.py --instance-type cpu-small --users 10 --duration 60
 
-# Только мониторинг ресурсов
+# Resource monitoring only
 python scripts/resource-monitor.py --duration 300 --namespace mlops-benchmark
 
-# Только расчет стоимости
+# Cost calculation only
 python scripts/cost-calculator.py --results results/benchmark_results.json
 ```
 
-## 📈 Метрики
+## 📈 Metrics
 
-### Производительность
-- **Latency P50/P95/P99** - процентили времени отклика
-- **RPS (Requests Per Second)** - пропускная способность
-- **Throughput** - количество обработанных запросов
+### Performance
 
-### Ресурсы
-- **CPU Utilization** - использование процессора
-- **GPU Utilization** - использование GPU (для GPU инстансов)
-- **Memory Usage** - потребление памяти
-- **Network I/O** - сетевой трафик
+- **Latency P50/P95/P99** - response time percentiles
+- **RPS (Requests Per Second)** - throughput
+- **Throughput** - number of processed requests
 
-### Стоимость
-- **Cost per 1000 predictions** - стоимость 1000 предсказаний
-- **Cost per hour** - почасовая стоимость
-- **Cost efficiency** - соотношение производительность/стоимость
+### Resources
 
-## 🔧 Конфигурация
+- **CPU Utilization** - processor usage
+- **GPU Utilization** - GPU usage (for GPU instances)
+- **Memory Usage** - memory consumption
+- **Network I/O** - network traffic
 
-Основные параметры в `configs/benchmark-config.yaml`:
+### Cost
+
+- **Cost per 1000 predictions** - cost of 1000 predictions
+- **Cost per hour** - hourly instance cost
+- **Cost efficiency** - performance/cost ratio
+
+## 🔧 Configuration
+
+Main parameters in `configs/benchmark-config.yaml`:
 
 ```yaml
 benchmark:
-  duration: 300s              # Длительность теста
-  concurrent_users: [1, 5, 10, 20, 50, 100]  # Количество одновременных пользователей
-  ramp_up_time: 30s          # Время нарастания нагрузки
-  
+  duration: 300s              # Test duration
+  concurrent_users: [1, 5, 10, 20, 50, 100]  # Number of concurrent users
+  ramp_up_time: 30s          # Load ramp-up time
+
 instances:
   cpu:
     - type: "t3.medium"
@@ -116,9 +123,9 @@ instances:
   gpu:
     - type: "p3.2xlarge"
     - type: "g4dn.xlarge"
-    
+
 costs:
-  # Стоимость инстансов в USD/час (AWS)
+  # Instance costs in USD/hour (AWS)
   t3.medium: 0.0416
   c5.large: 0.096
   c5.xlarge: 0.192
@@ -126,28 +133,31 @@ costs:
   g4dn.xlarge: 0.526
 ```
 
-## 📊 Отчеты
+## 📊 Reports
 
-После завершения бенчмарка будут созданы:
+After benchmark completion, the following will be created:
 
-1. **HTML отчет** - интерактивные графики и таблицы
-2. **JSON метрики** - сырые данные для дальнейшего анализа
-3. **CSV файлы** - данные для импорта в Excel/Google Sheets
-4. **Grafana дашборд** - реальное время мониторинга
+1. **HTML report** - interactive charts and tables
+2. **JSON metrics** - raw data for further analysis
+3. **CSV files** - data for import to Excel/Google Sheets
+4. **Grafana dashboard** - real-time monitoring
 
-## 🎯 Примеры использования
+## 🎯 Usage Examples
 
-### Сравнение CPU vs GPU
+### Compare CPU vs GPU
+
 ```bash
 python scripts/load-test.py --compare-instances --output results/cpu-vs-gpu.json
 ```
 
-### Тест масштабируемости
+### Scalability Test
+
 ```bash
 python scripts/load-test.py --scalability-test --max-users 200
 ```
 
-### Анализ стоимости
+### Cost Analysis
+
 ```bash
 python scripts/cost-calculator.py --predictions 1000000 --report results/cost-analysis.html
 ```

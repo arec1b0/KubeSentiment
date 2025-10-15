@@ -1,10 +1,10 @@
 # Production environment values
-# Переопределения для production окружения
+# Overrides for production environment
 
 # Application settings
 deployment:
   replicaCount: 5
-  
+
   resources:
     limits:
       cpu: 2000m
@@ -12,15 +12,15 @@ deployment:
     requests:
       cpu: 1000m
       memory: 1Gi
-  
+
   env:
     MLOPS_DEBUG: "false"
     MLOPS_LOG_LEVEL: "INFO"
     MLOPS_ENABLE_METRICS: "true"
-  
+
   # Production secrets (should be set via CI/CD)
   secrets:
-    MLOPS_API_KEY: ""  # Set this in CI/CD pipeline
+    MLOPS_API_KEY: "" # Set this in CI/CD pipeline
 
 # Service configuration
 service:
@@ -75,7 +75,7 @@ prometheus:
 
 grafana:
   enabled: true
-  adminPassword: "CHANGE_ME_IN_PRODUCTION"  # Should be set via secret
+  adminPassword: "CHANGE_ME_IN_PRODUCTION" # Should be set via secret
   persistence:
     size: 20Gi
   resources:
@@ -90,49 +90,49 @@ alertmanager:
   enabled: true
   config:
     global:
-      smtp_smarthost: 'smtp.company.com:587'
-      smtp_from: 'alerts@company.com'
-      smtp_auth_username: 'alerts@company.com'
-      smtp_auth_password: 'SMTP_PASSWORD'  # Should be set via secret
+      smtp_smarthost: "smtp.company.com:587"
+      smtp_from: "alerts@company.com"
+      smtp_auth_username: "alerts@company.com"
+      smtp_auth_password: "SMTP_PASSWORD" # Should be set via secret
     route:
-      group_by: ['alertname', 'severity']
+      group_by: ["alertname", "severity"]
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 4h
-      receiver: 'default'
+      receiver: "default"
       routes:
-      - match:
-          severity: critical
-        receiver: 'critical-alerts'
-        group_wait: 10s
-        repeat_interval: 1h
-      - match:
-          severity: warning
-        receiver: 'warning-alerts'
-        repeat_interval: 24h
+        - match:
+            severity: critical
+          receiver: "critical-alerts"
+          group_wait: 10s
+          repeat_interval: 1h
+        - match:
+            severity: warning
+          receiver: "warning-alerts"
+          repeat_interval: 24h
     receivers:
-    - name: 'default'
-      slack_configs:
-      - api_url: 'SLACK_WEBHOOK_URL'  # Should be set via secret
-        channel: '#alerts'
-        title: 'MLOps Alert - {{ .GroupLabels.alertname }}'
-        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
-    - name: 'critical-alerts'
-      slack_configs:
-      - api_url: 'SLACK_WEBHOOK_URL'
-        channel: '#critical-alerts'
-        title: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
-        text: '{{ range .Alerts }}{{ .Annotations.summary }}\nDescription: {{ .Annotations.description }}{{ end }}'
-      email_configs:
-      - to: 'oncall@company.com'
-        subject: 'CRITICAL Alert: {{ .GroupLabels.alertname }}'
-        body: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
-    - name: 'warning-alerts'
-      slack_configs:
-      - api_url: 'SLACK_WEBHOOK_URL'
-        channel: '#alerts'
-        title: '⚠️ Warning: {{ .GroupLabels.alertname }}'
-        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+      - name: "default"
+        slack_configs:
+          - api_url: "SLACK_WEBHOOK_URL" # Should be set via secret
+            channel: "#alerts"
+            title: "MLOps Alert - {{ .GroupLabels.alertname }}"
+            text: "{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}"
+      - name: "critical-alerts"
+        slack_configs:
+          - api_url: "SLACK_WEBHOOK_URL"
+            channel: "#critical-alerts"
+            title: "🚨 CRITICAL: {{ .GroupLabels.alertname }}"
+            text: '{{ range .Alerts }}{{ .Annotations.summary }}\nDescription: {{ .Annotations.description }}{{ end }}'
+        email_configs:
+          - to: "oncall@company.com"
+            subject: "CRITICAL Alert: {{ .GroupLabels.alertname }}"
+            body: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
+      - name: "warning-alerts"
+        slack_configs:
+          - api_url: "SLACK_WEBHOOK_URL"
+            channel: "#alerts"
+            title: "⚠️ Warning: {{ .GroupLabels.alertname }}"
+            text: "{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}"
 
 # Strict network policy for production
 networkPolicy:
@@ -143,43 +143,43 @@ networkPolicy:
   ingress:
     # Only allow traffic from ingress controller
     - from:
-      - namespaceSelector:
-          matchLabels:
-            name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
       ports:
-      - protocol: TCP
-        port: 8000
+        - protocol: TCP
+          port: 8000
     # Allow monitoring
     - from:
-      - namespaceSelector:
-          matchLabels:
-            name: monitoring
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
       ports:
-      - protocol: TCP
-        port: 8000
+        - protocol: TCP
+          port: 8000
   egress:
     # DNS only
     - to: []
       ports:
-      - protocol: UDP
-        port: 53
+        - protocol: UDP
+          port: 53
     # HTTPS for model downloads (specific to Hugging Face)
     - to:
-      - namespaceSelector: {}
-        podSelector: {}
+        - namespaceSelector: {}
+          podSelector: {}
       ports:
-      - protocol: TCP
-        port: 443
+        - protocol: TCP
+          port: 443
     # Monitoring communication
     - to:
-      - namespaceSelector:
-          matchLabels:
-            name: monitoring
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
       ports:
-      - protocol: TCP
-        port: 9090
-      - protocol: TCP
-        port: 9093
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 9093
 
 # Security context for production
 podSecurityContext:
@@ -193,7 +193,7 @@ securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop:
-    - ALL
+      - ALL
   readOnlyRootFilesystem: true
   runAsNonRoot: true
   runAsUser: 1000
@@ -205,15 +205,15 @@ affinity:
   nodeAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
-      - matchExpressions:
-        - key: node-role.kubernetes.io/worker
-          operator: Exists
+        - matchExpressions:
+            - key: node-role.kubernetes.io/worker
+              operator: Exists
   podAntiAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
-    - labelSelector:
-        matchExpressions:
-        - key: app.kubernetes.io/name
-          operator: In
-          values:
-          - mlops-sentiment
-      topologyKey: kubernetes.io/hostname
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - mlops-sentiment
+        topologyKey: kubernetes.io/hostname
