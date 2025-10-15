@@ -1,0 +1,20 @@
+# Линтеры и форматтеры
+black==23.12.1
+flake8==7.0.0
+flake8-bugbear==23.12.2
+flake8-comprehensions==3.14.0
+flake8-simplify==0.21.0
+isort==5.13.2
+
+# Анализ типов
+mypy==1.7.1
+types-requests==2.31.0.10
+
+# Инструменты для разработки
+pre-commit==3.6.0
+bandit==1.7.6
+
+# Документация
+interrogate==1.5.0
+
+

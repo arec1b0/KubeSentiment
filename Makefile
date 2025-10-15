@@ -11,18 +11,32 @@ help: ## Show this help message
 install: ## Install Python dependencies
 	pip install -r requirements.txt
 
+install-dev: ## Install development dependencies
+	pip install -r requirements.txt
+	pip install -r requirements-dev.txt
+
 test: ## Run tests with coverage
 	pytest tests/ -v --cov=app --cov-report=term-missing
 
 lint: ## Run code quality checks
-	black --check app/ tests/
-	isort --check-only app/ tests/
-	flake8 app/ tests/ --max-line-length=88 --extend-ignore=E203,W503
+	@echo "Running black check..."
+	black --check app/ tests/ scripts/ run.py
+	@echo "Running isort check..."
+	isort --check-only app/ tests/ scripts/ run.py
+	@echo "Running flake8..."
+	flake8 app/ tests/ scripts/ run.py
+	@echo "Running mypy..."
 	mypy app/ --ignore-missing-imports
 
+lint-fix: ## Auto-fix linting issues
+	black app/ tests/ scripts/ run.py
+	isort app/ tests/ scripts/ run.py
+
 format: ## Format code
-	black app/ tests/
-	isort app/ tests/
+	@echo "Formatting with black..."
+	black app/ tests/ scripts/ run.py
+	@echo "Sorting imports with isort..."
+	isort app/ tests/ scripts/ run.py
 
 clean: ## Clean up cache files and build artifacts
 	find . -type d -name __pycache__ -exec rm -rf {} +
