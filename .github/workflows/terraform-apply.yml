@@ -1,17 +1,40 @@
-name: Terraform Apply
+name: Terraform Infrastructure
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+      action:
+        description: "Terraform action"
+        required: true
+        type: choice
+        default: "plan"
+        options:
+          - plan
+          - apply
+          - destroy
   push:
     paths:
-      - 'infrastructure/**'
-      - '.github/workflows/terraform-apply.yml'
+      - "infrastructure/**"
+      - ".github/workflows/terraform-apply.yml"
+    branches:
+      - main
 
 jobs:
   terraform:
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+
     env:
-      TF_WORKING_DIR: infrastructure/environments/dev
+      TF_WORKING_DIR: infrastructure/environments/${{ github.event.inputs.environment || 'dev' }}
+      TF_VERSION: "1.6.6"
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,28 +42,103 @@ jobs:
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.6.6
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS/Azure/GCP Credentials
+        run: |
+          # Configure cloud provider credentials here
+          # Example for AWS:
+          # aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          # aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          echo "Configure cloud credentials based on your provider"
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        continue-on-error: true
 
       - name: Terraform Init
-        run: terraform init
+        id: init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=${{ github.event.inputs.environment || 'dev' }}/terraform.tfstate"
         working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform Validate
-        run: terraform validate
+        id: validate
+        run: terraform validate -no-color
         working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform Plan
-        run: terraform plan -out=tfplan
+        id: plan
+        run: |
+          terraform plan -no-color -out=tfplan \
+            -var="environment=${{ github.event.inputs.environment || 'dev' }}" \
+            -var="cluster_name=mlops-${{ github.event.inputs.environment || 'dev' }}-cluster"
         working-directory: ${{ env.TF_WORKING_DIR }}
+        continue-on-error: true
+
+      - name: Update PR with Terraform Plan
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+            #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+            #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
+            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`terraform
+            ${{ steps.plan.outputs.stdout }}
+            \`\`\`
+
+            </details>
+
+            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
 
       - name: Terraform Apply
+        if: |
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply') ||
+          (github.event_name == 'push' && github.ref == 'refs/heads/main')
         run: terraform apply -auto-approve tfplan
         working-directory: ${{ env.TF_WORKING_DIR }}
-        env:
-          TF_VAR_cluster_name: mlops-dev-cluster
 
-      - name: Upload Terraform State
+      - name: Terraform Destroy
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+        run: |
+          terraform destroy -auto-approve \
+            -var="environment=${{ github.event.inputs.environment }}" \
+            -var="cluster_name=mlops-${{ github.event.inputs.environment }}-cluster"
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Upload Terraform Plan
         uses: actions/upload-artifact@v4
+        if: steps.plan.outcome == 'success'
         with:
-          name: terraform-state
-          path: ${{ env.TF_WORKING_DIR }}/terraform.tfstate
+          name: terraform-plan-${{ github.event.inputs.environment || 'dev' }}
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+          retention-days: 7
+
+      - name: Terraform Output
+        if: steps.apply.outcome == 'success' || github.event_name == 'workflow_dispatch'
+        run: |
+          echo "## Terraform Outputs" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          terraform output -no-color >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        working-directory: ${{ env.TF_WORKING_DIR }}

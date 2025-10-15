@@ -1,0 +1,158 @@
+# Staging environment values
+# Overrides for staging environment
+
+# Application settings
+deployment:
+  replicaCount: 2
+
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+  env:
+    MLOPS_DEBUG: "false"
+    MLOPS_LOG_LEVEL: "INFO"
+    MLOPS_ENABLE_METRICS: "true"
+
+# Service configuration
+service:
+  type: ClusterIP
+
+# Ingress with staging domain
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rate-limit: "50"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+  hosts:
+    - host: staging.mlops-sentiment.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: mlops-sentiment-staging-tls
+      hosts:
+        - staging.mlops-sentiment.com
+
+# HPA for staging
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 75
+
+# PDB for availability
+pdb:
+  enabled: true
+  minAvailable: 1
+
+# Monitoring with moderate retention
+prometheus:
+  enabled: true
+  server:
+    retention: "15d"
+    persistentVolume:
+      size: 20Gi
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
+
+grafana:
+  enabled: true
+  adminPassword: "stagingpassword" # Should be set via secret in production
+  persistence:
+    size: 10Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+alertmanager:
+  enabled: true
+  config:
+    global:
+      smtp_smarthost: "smtp.company.com:587"
+      smtp_from: "alerts-staging@company.com"
+    route:
+      group_by: ["alertname", "severity"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      receiver: "default"
+    receivers:
+      - name: "default"
+        slack_configs:
+          - api_url: "SLACK_WEBHOOK_URL" # Should be set via secret
+            channel: "#staging-alerts"
+            title: "Staging Alert: {{ .GroupLabels.alertname }}"
+            text: "{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}"
+
+# Network policy for staging
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+    - to:
+        - namespaceSelector: {}
+          podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+
+# Security context
+podSecurityContext:
+  fsGroup: 1000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000

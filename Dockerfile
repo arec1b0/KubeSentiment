@@ -1,5 +1,5 @@
 # Multi-stage build for production-ready ML service
-FROM python:3.9-slim as base
+FROM python:3.11-slim as base
 
 # Build arguments for CI/CD integration
 ARG BUILDTIME
@@ -76,8 +76,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 # Production command with proper signal handling
 CMD ["python", "-m", "uvicorn", "app.main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8000", \
-     "--workers", "1", \
-     "--access-log", \
-     "--log-config", "/dev/null"]
+    "--host", "0.0.0.0", \
+    "--port", "8000", \
+    "--workers", "1", \
+    "--access-log", \
+    "--log-config", "/dev/null"]
