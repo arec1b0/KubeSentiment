@@ -5,68 +5,27 @@ This module serves as the main application factory and lifecycle manager,
 handling FastAPI app creation, middleware setup, and graceful shutdown.
 """
 
-import logging
 import time
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 
-from .config import get_settings
-from .api import router
-from .ml.sentiment import get_sentiment_analyzer
-from .logging_config import setup_structured_logging, get_logger
-from .exceptions import ServiceError
-from .middleware import APIKeyAuthMiddleware
-from .correlation_middleware import CorrelationIdMiddleware, RequestLoggingMiddleware
+from app.api import router
+from app.api.middleware import (
+    APIKeyAuthMiddleware,
+    CorrelationIdMiddleware,
+    MetricsMiddleware,
+    RequestLoggingMiddleware,
+)
+from app.core.config import get_settings
+from app.core.events import lifespan
+from app.core.logging import get_logger, setup_logging
+from app.utils.exceptions import ServiceError
 
 # Setup structured logging
-setup_structured_logging()
+setup_logging()
 logger = get_logger(__name__)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """
-    Application lifespan manager.
-
-    Handles startup and shutdown events for proper resource management.
-
-    Args:
-        app: The FastAPI application instance
-
-    Yields:
-        None: Control during the application lifetime
-    """
-    settings = get_settings()
-
-    # Startup
-    logger.info(f"Starting {settings.app_name} v{settings.app_version}")
-    logger.info(f"Debug mode: {settings.debug}")
-
-    # Initialize the sentiment analyzer (loads the model)
-    analyzer = get_sentiment_analyzer()
-    if analyzer.is_ready():
-        logger.info("Sentiment analysis model loaded successfully")
-    else:
-        logger.warning(
-            "Sentiment analysis model failed to load - running in degraded mode"
-        )
-
-    # Application is ready
-    logger.info(
-        f"Application startup complete. Listening on {settings.host}:{settings.port}"
-    )
-
-    yield
-
-    # Shutdown
-    logger.info("Application shutdown initiated")
-    # Add any cleanup logic here if needed
-    logger.info("Application shutdown complete")
 
 
 def create_app() -> FastAPI:
@@ -107,15 +66,26 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Add API key auth middleware
+    app.add_middleware(APIKeyAuthMiddleware)
+
+    # Add metrics middleware
+    try:
+        app.add_middleware(MetricsMiddleware)
+        logger.info("Prometheus metrics middleware enabled")
+    except Exception as e:
+        logger.warning(f"Prometheus metrics not available: {e}")
+
     # Global exception handler for unhandled errors
     @app.exception_handler(Exception)
-    async def global_exception_handler(exc: Exception) -> JSONResponse:
+    async def global_exception_handler(request, exc: Exception) -> JSONResponse:
         """
         Global exception handler for unhandled errors.
 
         Logs the error and returns a generic error response.
 
         Args:
+            request: The request that caused the exception
             exc: The exception that was raised
 
         Returns:
@@ -161,20 +131,6 @@ def create_app() -> FastAPI:
             "docs_url": "/docs" if settings.debug else "disabled",
             "health_url": "/health" if settings.debug else "/api/v1/health",
         }
-
-    # Note: Correlation ID handling is now managed via contextvars in the logging system
-
-    # Add API key auth middleware (no-op if api_key not configured)
-    app.add_middleware(APIKeyAuthMiddleware)
-
-    # Add metrics middleware
-    try:
-        from .monitoring import MetricsMiddleware
-
-        app.add_middleware(MetricsMiddleware)
-        logger.info("Prometheus metrics middleware enabled")
-    except ImportError as e:
-        logger.warning(f"Prometheus metrics not available: {e}")
 
     return app
 
