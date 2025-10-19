@@ -4,11 +4,17 @@ Tests for refactored predict() method in sentiment analyzer.
 Tests verify that the broken-down helper methods work correctly.
 """
 
-import pytest
 from unittest.mock import Mock, patch
-from app.ml.sentiment import SentimentAnalyzer
-from app.exceptions import ModelNotLoadedError, TextEmptyError, ModelInferenceError
-from app.config import Settings
+
+import pytest
+
+from app.core.config import Settings
+from app.models.pytorch_sentiment import SentimentAnalyzer
+from app.utils.exceptions import (
+    ModelInferenceError,
+    ModelNotLoadedError,
+    TextEmptyError,
+)
 
 
 @pytest.fixture
@@ -134,9 +140,7 @@ class TestPreprocessText:
         # Create text longer than max_text_length (512)
         long_text = "a" * 600
 
-        processed, original, truncated = analyzer._preprocess_text(
-            long_text, mock_logger
-        )
+        processed, original, truncated = analyzer._preprocess_text(long_text, mock_logger)
 
         assert len(processed) == 512
         assert len(original) == 600
@@ -184,9 +188,7 @@ class TestRunModelInference:
 class TestRecordPredictionMetrics:
     """Test _record_prediction_metrics method."""
 
-    def test_metrics_recorded_when_available(
-        self, analyzer_with_mock_pipeline, monkeypatch
-    ):
+    def test_metrics_recorded_when_available(self, analyzer_with_mock_pipeline, monkeypatch):
         """Test metrics are recorded when monitoring is available."""
         analyzer = analyzer_with_mock_pipeline
 
@@ -200,9 +202,7 @@ class TestRecordPredictionMetrics:
         mock_metrics.record_inference_duration.assert_called_once()
         mock_metrics.record_prediction_metrics.assert_called_once_with(0.95, 100)
 
-    def test_metrics_skipped_when_unavailable(
-        self, analyzer_with_mock_pipeline, monkeypatch
-    ):
+    def test_metrics_skipped_when_unavailable(self, analyzer_with_mock_pipeline, monkeypatch):
         """Test no error when monitoring unavailable."""
         analyzer = analyzer_with_mock_pipeline
 
@@ -230,9 +230,7 @@ class TestPredictOrchestration:
         assert result["cached"] is False
         assert result["inference_time_ms"] > 0
 
-    def test_predict_uses_cache_on_second_call(
-        self, analyzer_with_mock_pipeline, monkeypatch
-    ):
+    def test_predict_uses_cache_on_second_call(self, analyzer_with_mock_pipeline, monkeypatch):
         """Test that second prediction uses cache."""
         analyzer = analyzer_with_mock_pipeline
         monkeypatch.setattr("app.ml.sentiment.MONITORING_AVAILABLE", False)
@@ -246,9 +244,7 @@ class TestPredictOrchestration:
         assert result2["cached"] is True
         assert result2["label"] == result1["label"]
 
-    def test_predict_handles_whitespace_stripping(
-        self, analyzer_with_mock_pipeline, monkeypatch
-    ):
+    def test_predict_handles_whitespace_stripping(self, analyzer_with_mock_pipeline, monkeypatch):
         """Test that whitespace is properly stripped."""
         analyzer = analyzer_with_mock_pipeline
         monkeypatch.setattr("app.ml.sentiment.MONITORING_AVAILABLE", False)

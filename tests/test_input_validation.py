@@ -5,20 +5,21 @@ Tests cover text input validation, model validation, and edge cases
 to ensure proper error handling and security.
 """
 
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
 from fastapi.testclient import TestClient
 
+from app.api.schemas.requests import TextInput
+from app.core.config import Settings
 from app.main import create_app
-from app.exceptions import (
+from app.utils.exceptions import (
+    InvalidModelError,
+    ModelInferenceError,
+    ModelNotLoadedError,
     TextEmptyError,
     TextTooLongError,
-    InvalidModelError,
-    ModelNotLoadedError,
-    ModelInferenceError,
 )
-from app.api import TextInput
-from app.config import Settings
 
 
 class TestTextInputValidation:
@@ -26,9 +27,7 @@ class TestTextInputValidation:
 
     def test_valid_text_input(self):
         """Test that valid text input passes validation."""
-        valid_input = TextInput(
-            text="This is a valid text input for sentiment analysis."
-        )
+        valid_input = TextInput(text="This is a valid text input for sentiment analysis.")
         assert valid_input.text == "This is a valid text input for sentiment analysis."
 
     def test_empty_string_raises_error(self):
@@ -69,9 +68,7 @@ class TestTextInputValidation:
 
     def test_text_with_special_characters(self):
         """Test that text with special characters is handled properly."""
-        special_text = (
-            "Hello! 🎉 This has émojis & special chars: <script>alert('xss')</script>"
-        )
+        special_text = "Hello! 🎉 This has émojis & special chars: <script>alert('xss')</script>"
         valid_input = TextInput(text=special_text)
 
         # Text should be stripped but special characters preserved
@@ -100,10 +97,10 @@ class TestTextInputValidation:
 class TestModelValidation:
     """Test model name validation and security checks."""
 
-    @patch("app.ml.sentiment.get_settings")
+    @patch("app.models.pytorch_sentiment.get_settings")
     def test_invalid_model_name_raises_error(self, mock_get_settings):
         """Test that unauthorized model names raise InvalidModelError."""
-        from app.ml.sentiment import SentimentAnalyzer
+        from app.models.pytorch_sentiment import SentimentAnalyzer
 
         mock_settings = Mock()
         mock_settings.allowed_models = ["model1", "model2"]
@@ -118,11 +115,11 @@ class TestModelValidation:
         assert "unauthorized-model" in str(exc_info.value)
         assert "not allowed" in str(exc_info.value)
 
-    @patch("app.ml.sentiment.get_settings")
-    @patch("app.ml.sentiment.pipeline")
+    @patch("app.models.pytorch_sentiment.get_settings")
+    @patch("app.models.pytorch_sentiment.pipeline")
     def test_valid_model_name_passes(self, mock_pipeline, mock_get_settings):
         """Test that valid model names pass validation."""
-        from app.ml.sentiment import SentimentAnalyzer
+        from app.models.pytorch_sentiment import SentimentAnalyzer
 
         mock_settings = Mock()
         mock_settings.allowed_models = ["valid-model"]
@@ -179,9 +176,7 @@ class TestAPIEndpointValidation:
     @patch("app.config.Settings.max_text_length", 20)
     def test_predict_endpoint_text_too_long(self, client, mock_analyzer):
         """Test prediction endpoint with text that's too long."""
-        long_text = (
-            "This text is definitely much longer than 20 characters and should fail"
-        )
+        long_text = "This text is definitely much longer than 20 characters and should fail"
         response = client.post("/predict", json={"text": long_text})
 
         assert response.status_code == 400

@@ -4,12 +4,13 @@ Unit tests for the MLOps sentiment analysis service.
 This module contains unit tests for API endpoints and core functionality.
 """
 
-import pytest
 from unittest.mock import Mock, patch
-from fastapi.testclient import TestClient
-from fastapi import FastAPI
 
-from app.ml.sentiment import SentimentAnalyzer
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from app.models.pytorch_sentiment import SentimentAnalyzer
 
 
 @pytest.fixture
@@ -56,15 +57,21 @@ def mock_settings():
 @pytest.fixture
 def app(mock_analyzer, mock_settings):
     """Create a test FastAPI app with mocked dependencies."""
-    from app.api import router
+    from app.api.routes.health import router as health_router
+    from app.api.routes.metrics import router as metrics_router
+    from app.api.routes.model_info import router as model_info_router
+    from app.api.routes.predictions import router as predictions_router
 
     app = FastAPI()
-    app.include_router(router)
+    app.include_router(predictions_router)
+    app.include_router(health_router)
+    app.include_router(metrics_router)
+    app.include_router(model_info_router)
 
     # Mock the dependencies
     with (
-        patch("app.api.get_sentiment_analyzer", return_value=mock_analyzer),
-        patch("app.api.get_settings", return_value=mock_settings),
+        patch("app.models.pytorch_sentiment.get_sentiment_analyzer", return_value=mock_analyzer),
+        patch("app.core.config.get_settings", return_value=mock_settings),
     ):
         yield app
 
@@ -95,8 +102,10 @@ class TestPredictEndpoint:
     def test_predict_empty_text(self, client, mock_analyzer, mock_settings):
         """Test prediction with empty text."""
         with (
-            patch("app.api.get_sentiment_analyzer", return_value=mock_analyzer),
-            patch("app.api.get_settings", return_value=mock_settings),
+            patch(
+                "app.models.pytorch_sentiment.get_sentiment_analyzer", return_value=mock_analyzer
+            ),
+            patch("app.core.config.get_settings", return_value=mock_settings),
         ):
             response = client.post("/predict", json={"text": ""})
 
@@ -124,8 +133,10 @@ class TestHealthEndpoint:
     def test_health_success(self, client, mock_analyzer, mock_settings):
         """Test successful health check."""
         with (
-            patch("app.api.get_sentiment_analyzer", return_value=mock_analyzer),
-            patch("app.api.get_settings", return_value=mock_settings),
+            patch(
+                "app.models.pytorch_sentiment.get_sentiment_analyzer", return_value=mock_analyzer
+            ),
+            patch("app.core.config.get_settings", return_value=mock_settings),
         ):
             response = client.get("/health")
 
@@ -156,8 +167,10 @@ class TestMetricsEndpoint:
     def test_metrics_json_success(self, client, mock_analyzer, mock_settings):
         """Test successful JSON metrics retrieval."""
         with (
-            patch("app.api.get_sentiment_analyzer", return_value=mock_analyzer),
-            patch("app.api.get_settings", return_value=mock_settings),
+            patch(
+                "app.models.pytorch_sentiment.get_sentiment_analyzer", return_value=mock_analyzer
+            ),
+            patch("app.core.config.get_settings", return_value=mock_settings),
         ):
             response = client.get("/metrics-json")
 

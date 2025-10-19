@@ -5,22 +5,24 @@ These tests verify that correlation IDs are properly propagated through
 the application and that structured logging works as expected.
 """
 
-import pytest
 import json
 import uuid
-from unittest.mock import Mock, patch, MagicMock
-from fastapi.testclient import TestClient
 from io import StringIO
+from unittest.mock import MagicMock, Mock, patch
 
-from app.main import create_app
-from app.logging_config import (
-    set_correlation_id,
-    get_correlation_id,
-    generate_correlation_id,
+import pytest
+from fastapi.testclient import TestClient
+
+from app.api.middleware.correlation import CorrelationIdMiddleware
+from app.core.config import Settings
+from app.core.logging import (
     clear_correlation_id,
+    generate_correlation_id,
     get_contextual_logger,
+    get_correlation_id,
+    set_correlation_id,
 )
-from app.config import Settings
+from app.main import create_app
 
 
 class TestCorrelationIdManagement:
@@ -106,9 +108,7 @@ class TestCorrelationIdMiddleware:
         """Test that provided correlation ID is preserved."""
         test_correlation_id = "custom-correlation-id-123"
 
-        response = client.get(
-            "/health", headers={"X-Correlation-ID": test_correlation_id}
-        )
+        response = client.get("/health", headers={"X-Correlation-ID": test_correlation_id})
 
         assert response.status_code == 200
         assert response.headers["X-Correlation-ID"] == test_correlation_id
@@ -147,7 +147,8 @@ class TestStructuredLogging:
     def test_log_structure_contains_required_fields(self):
         """Test that log entries contain required structured fields."""
         import logging
-        from app.logging_config import setup_structured_logging, get_logger
+
+        from app.core.logging import get_logger, setup_structured_logging
 
         # Capture log output
         log_capture = StringIO()
@@ -196,7 +197,7 @@ class TestStructuredLogging:
     @patch("sys.stdout", new_callable=StringIO)
     def test_contextual_logger_binding(self, mock_stdout):
         """Test that contextual logger properly binds context."""
-        from app.logging_config import setup_structured_logging
+        from app.core.logging import setup_structured_logging
 
         setup_structured_logging()
 
@@ -289,9 +290,7 @@ class TestLoggingIntegration:
             except json.JSONDecodeError:
                 continue  # Skip non-JSON log lines
 
-        assert correlation_found, (
-            f"Correlation ID {test_correlation_id} not found in logs"
-        )
+        assert correlation_found, f"Correlation ID {test_correlation_id} not found in logs"
 
     def test_error_logging_with_correlation_id(self, client_with_logging_capture):
         """Test error logging includes correlation ID."""
@@ -316,9 +315,9 @@ class TestLoggingIntegration:
         for line in log_lines:
             try:
                 log_entry = json.loads(line)
-                if log_entry.get(
-                    "correlation_id"
-                ) == test_correlation_id and log_entry.get("level") in [
+                if log_entry.get("correlation_id") == test_correlation_id and log_entry.get(
+                    "level"
+                ) in [
                     "ERROR",
                     "WARNING",
                 ]:

@@ -1,5 +1,5 @@
-from app.monitoring import PrometheusMetrics
-from app.config import Settings
+from app.core.config import Settings
+from app.monitoring.prometheus import PrometheusMetrics
 
 
 def test_metrics_cache_ttl_respected():

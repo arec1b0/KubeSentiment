@@ -6,7 +6,8 @@ Tests verify individual validator methods work correctly.
 
 import pytest
 from pydantic import ValidationError
-from app.config import Settings
+
+from app.core.config import Settings
 
 
 @pytest.mark.unit

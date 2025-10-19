@@ -1,8 +1,9 @@
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from app.middleware import APIKeyAuthMiddleware
-from app.config import Settings
+
+from app.api.middleware.auth import APIKeyAuthMiddleware
+from app.core.config import Settings
 
 
 def test_middleware_allows_when_no_api_key():
@@ -26,7 +27,7 @@ def test_middleware_rejects_bad_key():
     # Use a settings instance with an api_key via environment or patching would be better
     # We'll set via monkeypatch approach by setting env var
     # But the middleware reads get_settings(); easiest approach is to instantiate and patch attribute
-    from app.config import settings as global_settings
+    from app.core.config import settings as global_settings
 
     original = global_settings.api_key
     try:

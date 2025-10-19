@@ -5,25 +5,24 @@ These tests verify that the new service-based approach works correctly
 and provides better testability than the global singleton pattern.
 """
 
-import pytest
 from unittest.mock import Mock, patch
 
-from app.ml.sentiment import (
+import pytest
+
+from app.models.pytorch_sentiment import (
     SentimentAnalyzer,
     SentimentAnalyzerService,
-    get_sentiment_analyzer,
     get_analyzer_service,
+    get_sentiment_analyzer,
 )
 
 
 class TestSentimentAnalyzerService:
     """Test the new service-based dependency injection approach."""
 
-    @patch("app.ml.sentiment.get_settings")
-    @patch("app.ml.sentiment.pipeline")
-    def test_service_creates_analyzer_on_first_call(
-        self, mock_pipeline, mock_get_settings
-    ):
+    @patch("app.models.pytorch_sentiment.get_settings")
+    @patch("app.models.pytorch_sentiment.pipeline")
+    def test_service_creates_analyzer_on_first_call(self, mock_pipeline, mock_get_settings):
         """Test that service creates analyzer on first call."""
         # Setup mocks
         mock_settings = Mock()
@@ -45,8 +44,8 @@ class TestSentimentAnalyzerService:
         analyzer2 = service.get_analyzer()
         assert analyzer1 is analyzer2
 
-    @patch("app.ml.sentiment.get_settings")
-    @patch("app.ml.sentiment.pipeline")
+    @patch("app.models.pytorch_sentiment.get_settings")
+    @patch("app.models.pytorch_sentiment.pipeline")
     def test_service_reset_clears_analyzer(self, mock_pipeline, mock_get_settings):
         """Test that service reset clears the analyzer."""
         # Setup mocks
@@ -81,12 +80,10 @@ class TestSentimentAnalyzerService:
 class TestDependencyInjectionFunctions:
     """Test the dependency injection functions."""
 
-    @patch("app.ml.sentiment._analyzer_service", None)
-    @patch("app.ml.sentiment.get_settings")
-    @patch("app.ml.sentiment.pipeline")
-    def test_get_sentiment_analyzer_creates_service(
-        self, mock_pipeline, mock_get_settings
-    ):
+    @patch("app.models.pytorch_sentiment._analyzer_service", None)
+    @patch("app.models.pytorch_sentiment.get_settings")
+    @patch("app.models.pytorch_sentiment.pipeline")
+    def test_get_sentiment_analyzer_creates_service(self, mock_pipeline, mock_get_settings):
         """Test that get_sentiment_analyzer creates service if needed."""
         # Setup mocks
         mock_settings = Mock()
@@ -102,19 +99,17 @@ class TestDependencyInjectionFunctions:
         assert analyzer is not None
         assert isinstance(analyzer, SentimentAnalyzer)
 
-    @patch("app.ml.sentiment._analyzer_service", None)
+    @patch("app.models.pytorch_sentiment._analyzer_service", None)
     def test_get_analyzer_service_creates_service(self):
         """Test that get_analyzer_service creates service if needed."""
         service = get_analyzer_service()
         assert service is not None
         assert isinstance(service, SentimentAnalyzerService)
 
-    @patch("app.ml.sentiment._analyzer_service", None)
-    @patch("app.ml.sentiment.get_settings")
-    @patch("app.ml.sentiment.pipeline")
-    def test_multiple_calls_return_same_analyzer(
-        self, mock_pipeline, mock_get_settings
-    ):
+    @patch("app.models.pytorch_sentiment._analyzer_service", None)
+    @patch("app.models.pytorch_sentiment.get_settings")
+    @patch("app.models.pytorch_sentiment.pipeline")
+    def test_multiple_calls_return_same_analyzer(self, mock_pipeline, mock_get_settings):
         """Test that multiple calls return the same analyzer instance."""
         # Setup mocks
         mock_settings = Mock()
@@ -135,8 +130,8 @@ class TestDependencyInjectionFunctions:
 class TestTestingCapabilities:
     """Test that the new approach improves testability."""
 
-    @patch("app.ml.sentiment.get_settings")
-    @patch("app.ml.sentiment.pipeline")
+    @patch("app.models.pytorch_sentiment.get_settings")
+    @patch("app.models.pytorch_sentiment.pipeline")
     def test_can_mock_analyzer_in_service(self, mock_pipeline, mock_get_settings):
         """Test that we can easily mock the analyzer for testing."""
         service = SentimentAnalyzerService()
@@ -155,8 +150,8 @@ class TestTestingCapabilities:
         assert analyzer is mock_analyzer
         assert analyzer.is_ready() is True
 
-    @patch("app.ml.sentiment.get_settings")
-    @patch("app.ml.sentiment.pipeline")
+    @patch("app.models.pytorch_sentiment.get_settings")
+    @patch("app.models.pytorch_sentiment.pipeline")
     def test_service_isolation_between_tests(self, mock_pipeline, mock_get_settings):
         """Test that services can be isolated between tests."""
         # Setup mocks
@@ -182,12 +177,10 @@ class TestTestingCapabilities:
 class TestBackwardCompatibility:
     """Test that existing code continues to work."""
 
-    @patch("app.ml.sentiment._analyzer_service", None)
-    @patch("app.ml.sentiment.get_settings")
-    @patch("app.ml.sentiment.pipeline")
-    def test_existing_get_sentiment_analyzer_still_works(
-        self, mock_pipeline, mock_get_settings
-    ):
+    @patch("app.models.pytorch_sentiment._analyzer_service", None)
+    @patch("app.models.pytorch_sentiment.get_settings")
+    @patch("app.models.pytorch_sentiment.pipeline")
+    def test_existing_get_sentiment_analyzer_still_works(self, mock_pipeline, mock_get_settings):
         """Test that existing usage of get_sentiment_analyzer still works."""
         # Setup mocks
         mock_settings = Mock()
@@ -206,9 +199,9 @@ class TestBackwardCompatibility:
         assert hasattr(analyzer, "predict")
         assert hasattr(analyzer, "is_ready")
 
-    @patch("app.ml.sentiment._analyzer_service", None)
-    @patch("app.ml.sentiment.get_settings")
-    @patch("app.ml.sentiment.pipeline")
+    @patch("app.models.pytorch_sentiment._analyzer_service", None)
+    @patch("app.models.pytorch_sentiment.get_settings")
+    @patch("app.models.pytorch_sentiment.pipeline")
     def test_singleton_behavior_preserved(self, mock_pipeline, mock_get_settings):
         """Test that singleton behavior is preserved."""
         # Setup mocks

@@ -5,9 +5,18 @@ Tests verify proper LRU eviction behavior and cache hit/miss patterns.
 """
 
 import pytest
-from app.ml.sentiment import SentimentAnalyzer
-from app.ml.onnx_optimizer import ONNXSentimentAnalyzer
-from app.config import Settings
+
+from app.core.config import Settings
+from app.models.pytorch_sentiment import SentimentAnalyzer
+
+# Make ONNX import optional
+try:
+    from app.models.onnx_sentiment import ONNXSentimentAnalyzer
+
+    ONNX_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    ONNXSentimentAnalyzer = None  # type: ignore
+    ONNX_AVAILABLE = False
 
 
 @pytest.fixture

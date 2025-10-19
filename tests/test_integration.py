@@ -5,17 +5,18 @@ These tests verify end-to-end functionality including API endpoints,
 model loading, caching, monitoring, and error handling across the full stack.
 """
 
-import pytest
 import asyncio
-import time
 import json
-from unittest.mock import Mock, patch, AsyncMock
-from fastapi.testclient import TestClient
+import time
 from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+from fastapi.testclient import TestClient
+
+from app.core.config import Settings
 from app.main import create_app
-from app.config import Settings
-from app.ml.sentiment import get_analyzer_service
+from app.models.pytorch_sentiment import get_analyzer_service
 
 
 class TestFullRequestFlow:
@@ -219,9 +220,7 @@ class TestErrorHandlingFlow:
         )
 
         with patch("app.config.get_settings", return_value=test_settings):
-            with patch(
-                "app.ml.sentiment.pipeline", side_effect=Exception("Model load failed")
-            ):
+            with patch("app.ml.sentiment.pipeline", side_effect=Exception("Model load failed")):
                 app = create_app()
                 yield TestClient(app)
 
@@ -262,9 +261,7 @@ class TestConcurrencyAndPerformance:
     @pytest.fixture
     def client(self):
         """Create client for performance testing."""
-        test_settings = Settings(
-            debug=False, prediction_cache_max_size=100, api_key=None
-        )
+        test_settings = Settings(debug=False, prediction_cache_max_size=100, api_key=None)
 
         with patch("app.config.get_settings", return_value=test_settings):
             with patch("app.ml.sentiment.pipeline") as mock_pipeline:
@@ -281,16 +278,14 @@ class TestConcurrencyAndPerformance:
 
     def test_concurrent_requests(self, client):
         """Test handling of concurrent requests."""
-        import threading
         import queue
+        import threading
 
         results = queue.Queue()
 
         def make_request(text):
             try:
-                response = client.post(
-                    "/predict", json={"text": f"Test message {text}"}
-                )
+                response = client.post("/predict", json={"text": f"Test message {text}"})
                 results.put(("success", response.status_code, response.json()))
             except Exception as e:
                 results.put(("error", str(e), None))
@@ -365,17 +360,13 @@ class TestConfigurationIntegration:
         import os
 
         # Test valid configuration
-        os.environ["MLOPS_MODEL_NAME"] = (
-            "distilbert-base-uncased-finetuned-sst-2-english"
-        )
+        os.environ["MLOPS_MODEL_NAME"] = "distilbert-base-uncased-finetuned-sst-2-english"
         os.environ["MLOPS_PORT"] = "8080"
         os.environ["MLOPS_DEBUG"] = "true"
 
         try:
             settings = Settings()
-            assert (
-                settings.model_name == "distilbert-base-uncased-finetuned-sst-2-english"
-            )
+            assert settings.model_name == "distilbert-base-uncased-finetuned-sst-2-english"
             assert settings.port == 8080
             assert settings.debug is True
         finally:

@@ -20,11 +20,11 @@ from app.api.middleware import (
 )
 from app.core.config import get_settings
 from app.core.events import lifespan
-from app.core.logging import get_logger, setup_logging
+from app.core.logging import get_logger, setup_structured_logging
 from app.utils.exceptions import ServiceError
 
 # Setup structured logging
-setup_logging()
+setup_structured_logging()
 logger = get_logger(__name__)
 
 
