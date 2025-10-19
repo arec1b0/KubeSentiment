@@ -15,8 +15,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings
+from app.core.dependencies import get_prediction_service
 from app.main import create_app
-from app.models.pytorch_sentiment import get_analyzer_service
 
 
 class TestFullRequestFlow:
@@ -46,9 +46,10 @@ class TestFullRequestFlow:
                 mock_model.return_value = [{"label": "POSITIVE", "score": 0.95}]
                 mock_pipeline.return_value = mock_model
 
-                # Reset analyzer service for clean test state
-                service = get_analyzer_service()
-                service.reset_analyzer()
+                # Reset model caches for clean test state
+                from app.models.factory import ModelFactory
+
+                ModelFactory.reset_models()
 
                 app = create_app()
                 yield TestClient(app)
