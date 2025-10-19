@@ -239,3 +239,146 @@ spec:
         summary: "Memory exhaustion predicted"
         description: "Pod {{ $labels.pod }} is predicted to exceed memory limit in 2 hours"
         runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#memory-prediction"
+
+  # Vault secrets management alerting rules
+  - name: vault.secrets.rules
+    interval: 30s
+    rules:
+    # Vault health and availability
+    - alert: VaultDown
+      expr: up{job="vault"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        service: vault
+        component: availability
+      annotations:
+        summary: "Vault server is down"
+        description: "Vault server {{ $labels.instance }} has been down for more than 2 minutes"
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-down"
+
+    - alert: VaultSealed
+      expr: vault_core_unsealed == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: vault
+        component: security
+      annotations:
+        summary: "Vault is sealed"
+        description: "Vault server {{ $labels.instance }} is sealed and cannot serve requests"
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-sealed"
+
+    # Authentication and authorization
+    - alert: VaultAuthenticationFailures
+      expr: increase(vault_authentication_failures_total[5m]) > 5
+      for: 1m
+      labels:
+        severity: critical
+        service: vault
+        component: security
+      annotations:
+        summary: "High number of Vault authentication failures"
+        description: "{{ $value }} authentication failures detected in the last 5 minutes"
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-auth-failures"
+
+    - alert: VaultPolicyViolations
+      expr: increase(vault_policy_violations_total[5m]) > 0
+      for: 1m
+      labels:
+        severity: warning
+        service: vault
+        component: security
+      annotations:
+        summary: "Vault policy violations detected"
+        description: "Policy violations detected for policy {{ $labels.policy_name }}"
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-policy-violations"
+
+    # Secret access patterns
+    - alert: VaultUnusualSecretAccess
+      expr: increase(vault_secret_access_total{status="success"}[1h]) > 1000
+      for: 5m
+      labels:
+        severity: warning
+        service: vault
+        component: security
+      annotations:
+        summary: "Unusual spike in secret access"
+        description: "{{ $value }} secret accesses detected in the last hour for {{ $labels.secret_key }}"
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-secret-access"
+
+    - alert: VaultSecretAccessErrors
+      expr: increase(vault_secret_access_total{status="failure"}[5m]) > 10
+      for: 2m
+      labels:
+        severity: warning
+        service: vault
+        component: availability
+      annotations:
+        summary: "High number of secret access errors"
+        description: "{{ $value }} secret access errors detected in the last 5 minutes"
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-secret-errors"
+
+    # Token management
+    - alert: VaultTokenRenewalFailures
+      expr: increase(vault_token_renewals_total[5m]) > 5
+      for: 2m
+      labels:
+        severity: warning
+        service: vault
+        component: security
+      annotations:
+        summary: "Vault token renewal issues"
+        description: "Multiple token renewal failures detected"
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-token-renewal"
+
+    # Secret rotation monitoring
+    - alert: VaultSecretsExpiringSoon
+      expr: vault_secret_expiration_seconds < 7 * 24 * 3600  # 7 days
+      for: 1h
+      labels:
+        severity: warning
+        service: vault
+        component: lifecycle
+      annotations:
+        summary: "Secrets expiring within 7 days"
+        description: "Secret {{ $labels.secret_key }} expires in {{ $value | humanizeDuration }}"
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-secret-expiry"
+
+    - alert: VaultSecretRotationWarnings
+      expr: increase(vault_secret_rotation_warnings_total[1h]) > 0
+      for: 1m
+      labels:
+        severity: info
+        service: vault
+        component: lifecycle
+      annotations:
+        summary: "Secret rotation warnings generated"
+        description: "Secret rotation warnings detected for secrets approaching expiry"
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-rotation-warnings"
+
+    # Performance monitoring
+    - alert: VaultHighLatency
+      expr: histogram_quantile(0.95, rate(vault_secret_access_duration_seconds_bucket[5m])) > 2
+      for: 5m
+      labels:
+        severity: warning
+        service: vault
+        component: performance
+      annotations:
+        summary: "Vault experiencing high latency"
+        description: "95th percentile secret access latency is {{ $value }}s"
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-latency"
+
+    # Cache performance
+    - alert: VaultCacheInefficiency
+      expr: rate(vault_secret_cache_misses_total[5m]) / rate(vault_secret_access_total[5m]) > 0.8
+      for: 10m
+      labels:
+        severity: info
+        service: vault
+        component: performance
+      annotations:
+        summary: "High cache miss rate"
+        description: "Cache miss rate is {{ $value | percent }}, consider adjusting cache TTL"
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-cache"

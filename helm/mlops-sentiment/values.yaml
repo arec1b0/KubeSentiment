@@ -11,7 +11,67 @@ global:
 app:
   name: mlops-sentiment
   version: "1.0.0"
-  
+
+# HashiCorp Vault integration
+vault:
+  enabled: false
+  address: "http://vault.vault-system:8200"
+  role: "mlops-sentiment"
+  namespace: "mlops"
+  secretsPath: "mlops-sentiment"
+  auth:
+    method: kubernetes
+    path: "kubernetes"
+  serviceAccount:
+    create: true
+    annotations: {}
+  agent:
+    enabled: true
+    image: "hashicorp/vault:1.15.0"
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  # Secret rotation settings
+  rotation:
+    enabled: true
+    schedule: "0 0 * * 0"  # Weekly on Sunday at midnight
+    warningThresholdDays: 7  # Warn when secrets expire within 7 days
+    autoRotate: false  # Set to true for automatic rotation
+
+  # Enhanced secret management
+  secrets:
+    # KV v2 secrets engine paths
+    kv:
+      apiKey: "mlops-sentiment/api_key"
+      apiKeys: "mlops-sentiment/api-keys"
+      database: "mlops-sentiment/database"
+      mlflow: "mlops-sentiment/mlflow"
+      monitoring: "mlops-sentiment/monitoring"
+      cloud: "mlops-sentiment/cloud"
+
+    # Dynamic secrets engines
+    dynamic:
+      database:
+        enabled: false
+        mountPath: "database"
+        role: "readonly"
+      aws:
+        enabled: false
+        mountPath: "aws"
+        role: "readonly"
+      azure:
+        enabled: false
+        mountPath: "azure"
+        role: "readonly"
+      gcp:
+        enabled: false
+        mountPath: "gcp"
+        role: "readonly"
+
 image:
   registry: ghcr.io
   repository: arec1b0/mlops-sentiment
@@ -27,7 +87,7 @@ deployment:
     rollingUpdate:
       maxUnavailable: 1
       maxSurge: 1
-  
+
   # Resource limits and requests
   resources:
     limits:
@@ -36,7 +96,7 @@ deployment:
     requests:
       cpu: 500m
       memory: 512Mi
-  
+
   # Health checks
   livenessProbe:
     httpGet:
@@ -46,7 +106,7 @@ deployment:
     periodSeconds: 10
     timeoutSeconds: 5
     failureThreshold: 3
-  
+
   readinessProbe:
     httpGet:
       path: /health

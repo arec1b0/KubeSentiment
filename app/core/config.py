@@ -5,11 +5,13 @@ This module handles all configuration settings, environment variables,
 and application parameters in a centralized manner with comprehensive validation.
 """
 
-from typing import Optional, List
+import os
+import re
+from functools import cached_property
+from typing import List, Optional
+
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
-import re
-import os
 
 
 class Settings(BaseSettings):
@@ -41,9 +43,7 @@ class Settings(BaseSettings):
         pattern=r"^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|localhost|0\.0\.0\.0)$",
     )
     port: int = Field(default=8000, description="Server port", ge=1024, le=65535)
-    workers: int = Field(
-        default=1, description="Number of worker processes", ge=1, le=16
-    )
+    workers: int = Field(default=1, description="Number of worker processes", ge=1, le=16)
 
     # Model settings
     model_name: str = Field(
@@ -119,6 +119,31 @@ class Settings(BaseSettings):
         description="List of allowed origins for CORS",
     )
 
+    # Vault integration settings
+    vault_enabled: bool = Field(
+        default=False, description="Enable HashiCorp Vault for secrets management"
+    )
+    vault_addr: Optional[str] = Field(
+        default=None, description="Vault server address (e.g., http://vault:8200)"
+    )
+    vault_namespace: Optional[str] = Field(
+        default="mlops", description="Vault namespace for multi-tenancy (Enterprise feature)"
+    )
+    vault_role: Optional[str] = Field(
+        default=None, description="Kubernetes service account role for Vault authentication"
+    )
+    vault_mount_point: str = Field(
+        default="mlops-sentiment", description="KV v2 secrets engine mount point in Vault"
+    )
+    vault_secrets_path: str = Field(
+        default="mlops-sentiment", description="Base path for secrets in Vault"
+    )
+    vault_token: Optional[str] = Field(
+        default=None,
+        description="Vault token for direct authentication (not recommended for production)",
+        exclude=True,  # Don't include in API responses
+    )
+
     @field_validator("allowed_models")
     @classmethod
     def validate_model_names(cls, v):
@@ -182,11 +207,7 @@ class Settings(BaseSettings):
 
     def _validate_model_in_allowed_list(self) -> None:
         """Ensure model_name is in allowed_models list."""
-        if (
-            self.model_name
-            and self.allowed_models
-            and self.model_name not in self.allowed_models
-        ):
+        if self.model_name and self.allowed_models and self.model_name not in self.allowed_models:
             raise ValueError(
                 f"Model '{self.model_name}' must be in allowed_models list: {self.allowed_models}"
             )
@@ -199,9 +220,7 @@ class Settings(BaseSettings):
     def _validate_cache_memory_usage(self) -> None:
         """Validate cache settings to prevent excessive memory usage."""
         # Rough estimate: each cache entry might be ~1KB per 100 chars
-        estimated_memory_mb = (
-            self.prediction_cache_max_size * self.max_text_length
-        ) / 100000
+        estimated_memory_mb = (self.prediction_cache_max_size * self.max_text_length) / 100000
         if estimated_memory_mb > 1000:  # 1GB limit
             raise ValueError(
                 f"Cache configuration may use too much memory (~{estimated_memory_mb:.0f}MB). "
@@ -215,6 +234,39 @@ class Settings(BaseSettings):
         self._validate_worker_count_consistency()
         self._validate_cache_memory_usage()
         return self
+
+    @cached_property
+    def secret_manager(self):
+        """
+        Get the secret manager instance for this configuration.
+
+        Returns:
+            SecretManager: Configured secret manager (Vault or Environment)
+        """
+        from app.core.secrets import get_secret_manager
+
+        return get_secret_manager(
+            vault_enabled=self.vault_enabled,
+            vault_addr=self.vault_addr,
+            vault_namespace=self.vault_namespace,
+            vault_role=self.vault_role,
+            vault_mount_point=self.vault_mount_point,
+            vault_secrets_path=self.vault_secrets_path,
+            env_prefix="MLOPS_",
+        )
+
+    def get_secret(self, key: str, default: Optional[str] = None) -> Optional[str]:
+        """
+        Get a secret from the configured secret manager.
+
+        Args:
+            key: Secret key
+            default: Default value if not found
+
+        Returns:
+            Secret value or default
+        """
+        return self.secret_manager.get_secret(key, default)
 
     class Config:
         env_prefix = "MLOPS_"

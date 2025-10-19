@@ -1,0 +1,353 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "HashiCorp Vault - Secrets Management",
+    "tags": ["vault", "security", "secrets"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Vault Cluster Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "vault_core_unsealed",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {
+                "type": "value",
+                "options": {
+                  "0": {
+                    "text": "SEALED",
+                    "color": "red"
+                  },
+                  "1": {
+                    "text": "UNSEALED",
+                    "color": "green"
+                  }
+                }
+              }
+            ],
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "green",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Active Tokens",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "vault_token_count",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Secret Access Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(vault_secret_access_total[5m])",
+            "legendFormat": "{{status}} - {{secret_key}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "format": "reqps"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 18,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 4,
+        "title": "Secret Access Duration",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(vault_secret_access_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(vault_secret_access_duration_seconds_bucket[5m]))",
+            "legendFormat": "50th percentile",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "format": "s",
+            "min": "0"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 18,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 5,
+        "title": "Cache Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(vault_secret_cache_hits_total[5m])",
+            "legendFormat": "Cache Hits",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(vault_secret_cache_misses_total[5m])",
+            "legendFormat": "Cache Misses",
+            "refId": "B"
+          }
+        ],
+        "yAxes": [
+          {
+            "format": "reqps"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 24
+        }
+      },
+      {
+        "id": 6,
+        "title": "Cache Hit Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(vault_secret_cache_hits_total[5m]) / (rate(vault_secret_cache_hits_total[5m]) + rate(vault_secret_cache_misses_total[5m]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "max": 1,
+            "min": 0,
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "red",
+                  "value": 0
+                },
+                {
+                  "color": "yellow",
+                  "value": 0.7
+                },
+                {
+                  "color": "green",
+                  "value": 0.9
+                }
+              ]
+            }
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 12,
+          "y": 24
+        }
+      },
+      {
+        "id": 7,
+        "title": "Authentication Failures",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "increase(vault_authentication_failures_total[1h])",
+            "legendFormat": "Authentication Failures",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "format": "short"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 32
+        }
+      },
+      {
+        "id": 8,
+        "title": "Secret Expiration Timeline",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "vault_secret_expiration_seconds",
+            "legendFormat": "{{secret_key}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "format": "s",
+            "label": "Seconds until expiration"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 18,
+          "x": 0,
+          "y": 40
+        }
+      },
+      {
+        "id": 9,
+        "title": "Policy Violations",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "increase(vault_policy_violations_total[1h])",
+            "legendFormat": "{{policy_name}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "format": "short"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 48
+        }
+      },
+      {
+        "id": 10,
+        "title": "Token Renewals",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "increase(vault_token_renewals_total[1h])",
+            "legendFormat": "Token Renewals",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "format": "short"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 48
+        }
+      },
+      {
+        "id": 11,
+        "title": "Mount Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "vault_mount_status",
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "__name__": true,
+                "job": true,
+                "instance": true
+              }
+            }
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 56
+        }
+      },
+      {
+        "id": 12,
+        "title": "Recent Alerts",
+        "type": "alertlist",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 64
+        }
+      }
+    ],
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 1,
+    "links": [
+      {
+        "title": "Vault UI",
+        "url": "http://vault:8200",
+        "type": "link",
+        "icon": "external link",
+        "tooltip": "Open Vault web interface"
+      },
+      {
+        "title": "Vault Documentation",
+        "url": "https://www.vaultproject.io/docs",
+        "type": "link",
+        "icon": "doc",
+        "tooltip": "Official Vault documentation"
+      }
+    ]
+  },
+  "folderId": 0,
+  "overwrite": true
+}
