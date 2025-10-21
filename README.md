@@ -13,13 +13,27 @@
 
 ## 📚 Documentation
 
-- [Quick Start](docs/setup/QUICKSTART.md) - Get started in 5 minutes
-- [Development Setup](docs/setup/DEVELOPMENT.md) - Local development environment
-- [Deployment Guide](docs/setup/deployment-guide.md) - Production deployment
-- [API Documentation](openapi-specs/sentiment-api.yaml) - OpenAPI specification
-- [Benchmarking Guide](docs/BENCHMARKING.md) - Performance testing
-- [Troubleshooting Guide](docs/troubleshooting/index.md) - Common issues
-- [Architecture](docs/architecture.md) - System design overview
+### Core Guides
+
+- 📖 **[Architecture](ARCHITECTURE.md)** - Complete system architecture and design
+- 🚀 **[Quick Start](docs/setup/QUICKSTART.md)** - Get started in 5 minutes
+- 💻 **[Development Guide](DEVELOPMENT.md)** - Local development environment and workflows
+- 🔧 **[Deployment Guide](DEPLOYMENT.md)** - Production deployment (Docker, K8s, Serverless)
+
+### Operational Documentation
+
+- ☸️ **[Kubernetes Guide](docs/KUBERNETES.md)** - Kubernetes deployment details
+- 🔄 **[CI/CD Guide](CICD.md)** - Continuous integration and deployment
+- 📊 **[Monitoring Guide](docs/MONITORING.md)** - Observability and monitoring setup
+- ⚡ **[Benchmarking Guide](docs/BENCHMARKING.md)** - Performance testing
+- 🔒 **[Security & Secrets](github/SECRETS.md)** - Secret management with Vault
+
+### Reference
+
+- 📡 **[API Documentation](openapi-specs/sentiment-api.yaml)** - OpenAPI 3.0 specification
+- 🐛 **[Troubleshooting](docs/troubleshooting/index.md)** - Common issues and solutions
+- 📚 **[Documentation Index](docs/INDEX.md)** - Complete documentation catalog
+- 🧪 **[Testing Guide](tests/README.md)** - Testing standards and guidelines
 
 ## 🎬 Demo
 
