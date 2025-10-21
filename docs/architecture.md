@@ -1,264 +1,151 @@
-# System Architecture
+# KubeSentiment Architecture
 
-This document provides a comprehensive overview of the MLOps Sentiment Analysis Microservice architecture, including its components, data flow, and deployment topology.
+This document provides a comprehensive overview of the KubeSentiment project's architecture, from the application code to the infrastructure and deployment strategy.
 
-## Table of Contents
-- [Architecture Overview](#architecture-overview)
-- [Component Details](#component-details)
-- [Data Flow](#data-flow)
-- [Deployment Topology](#deployment-topology)
-- [Scaling Strategy](#scaling-strategy)
-- [Security Considerations](#security-considerations)
-- [High Availability](#high-availability)
-- [Disaster Recovery](#disaster-recovery)
+## 1. Guiding Principles
 
-## Architecture Overview
+The architecture is designed with the following MLOps principles in mind:
+
+- **Modularity and Separation of Concerns**: Each component has a single, well-defined responsibility.
+- **Automation**: CI/CD pipelines automate testing, building, and deployment.
+- **Infrastructure as Code (IaC)**: Infrastructure is managed declaratively using Terraform.
+- **Observability**: Comprehensive monitoring, logging, and tracing are built-in.
+- **Reproducibility**: Environments are containerized with Docker for consistency.
+- **Security**: Security is integrated into every layer of the stack.
+
+## 2. System Architecture Overview
+
+KubeSentiment is a cloud-native microservice designed for sentiment analysis. It's built to be scalable, resilient, and maintainable.
 
 ```mermaid
 graph TD
-    subgraph "Client Layer"
-        A[Web Applications]
-        B[Mobile Apps]
-        C[Batch Processes]
-        D[CLI Tools]
+    subgraph "Clients"
+        A[Web/Mobile Apps]
+        B[Batch Jobs]
+        C[CLI / API Consumers]
     end
 
-    subgraph "API Gateway Layer"
-        E[API Gateway / Ingress]
-        F[Load Balancer]
-        G[Authentication]
-        H[Rate Limiting]
+    subgraph "Infrastructure Layer (Kubernetes Cluster)"
+        D[Ingress Controller] --> E{Sentiment Service};
+        E --> F[Pod 1];
+        E --> G[Pod 2];
+        E --> H[...];
+
+        subgraph "Sentiment Analysis Pod"
+            direction LR
+            I[FastAPI App] --> J[Sentiment Model];
+        end
+
+        F ----> I;
+
+        subgraph "Observability Stack"
+            K[Prometheus] -- Scrapes --> E;
+            L[Grafana] -- Queries --> K;
+            M[Alertmanager] -- Alerts from --> K;
+            M --> N[Notifications];
+        end
+
+        subgraph "Security"
+            O[HashiCorp Vault] <--> F;
+        end
     end
 
-    subgraph "Service Layer"
-        I[Sentiment Service 1]
-        J[Sentiment Service 2]
-        K[Sentiment Service N]
-    end
+    A --> D;
+    B --> D;
+    C --> D;
 
-    subgraph "Data Layer"
-        L[Model Cache]
-        M[Redis Cache]
-        N[Persistent Volume]
-    end
-
-    subgraph "Monitoring & Observability"
-        O[Prometheus]
-        P[Grafana]
-        Q[ELK Stack]
-        R[Jaeger]
-    end
-
-    A --> E
-    B --> E
-    C --> E
-    D --> E
-    E --> F
-    F --> I
-    F --> J
-    F --> K
-    I --> L
-    J --> L
-    K --> L
-    I --> M
-    J --> M
-    K --> M
-    I --> N
-    J --> N
-    K --> N
-    I --> O
-    J --> O
-    K --> O
-    O --> P
-    O --> Q
-    O --> R
+    style F fill:#lightgreen
+    style G fill:#lightgreen
+    style H fill:#lightgreen
 ```
 
-## Component Details
+## 3. Application Architecture (`app/`)
 
-### 1. Client Layer
-- **Web Applications**: React/Angular/Vue.js applications consuming the API
-- **Mobile Apps**: iOS/Android applications making API calls
-- **Batch Processes**: Scheduled jobs for bulk sentiment analysis
-- **CLI Tools**: Command-line interfaces for testing and administration
+The application is a FastAPI service with a modular, domain-oriented structure. This design enhances maintainability and testability.
 
-### 2. API Gateway Layer
-- **API Gateway**: Entry point for all client requests
-- **Load Balancer**: Distributes traffic across service instances
-- **Authentication**: JWT-based authentication and authorization
-- **Rate Limiting**: Protects against abuse and ensures fair usage
+- **`app/core`**: Contains the application's core logic, including configuration (`config.py`), structured logging (`logging.py`), and dependency injection setup.
+- **`app/api`**: Defines the API layer, with sub-modules for routes, request/response schemas (Pydantic), and middleware (correlation IDs, logging, authentication).
+- **`app/models`**: Manages the machine learning models. It uses a **Factory and Strategy pattern** (`factory.py`, `base.py`) to allow for interchangeable model backends (e.g., `pytorch_sentiment.py`, `onnx_sentiment.py`).
+- **`app/services`**: Implements the business logic, acting as an intermediary between the API routes and the models.
+- **`app/monitoring`**: Handles observability, exposing Prometheus metrics and health check endpoints.
+- **`app/utils`**: Contains shared utilities like custom exception classes and error handlers.
 
-### 3. Service Layer
-- **Stateless Services**: Horizontally scalable service instances
-- **Health Checks**: Regular health monitoring and reporting
-- **Circuit Breakers**: Prevents cascading failures
-- **Request Tracing**: End-to-end request tracking
+## 4. Containerization (`Dockerfile` & `docker-compose.yml`)
 
-### 4. Data Layer
-- **Model Cache**: Cached ML models for fast inference
-- **Redis Cache**: Session and temporary data storage
-- **Persistent Volume**: Long-term storage for logs and metrics
+The application is containerized using Docker for consistent environments across development and production.
 
-### 5. Monitoring & Observability
-- **Prometheus**: Metrics collection and alerting
-- **Grafana**: Visualization and dashboards
-- **ELK Stack**: Centralized logging
-- **Jaeger**: Distributed tracing
+- **`Dockerfile`**: A multi-stage `Dockerfile` is used to create an optimized and secure production image. It builds the application in one stage and copies the necessary artifacts to a smaller, hardened final image. This reduces the attack surface and image size.
+- **`docker-compose.yml`**: Provides a simple way to run the application locally for development and testing.
 
-## Data Flow
+## 5. Infrastructure as Code (`infrastructure/`)
 
-### Request Flow
-1. Client sends an HTTP request to the API Gateway
-2. Request is authenticated and rate-limited
-3. Load balancer routes the request to an available service instance
-4. Service processes the request (model inference)
-5. Response is returned to the client
-6. Metrics and logs are collected
+Infrastructure is managed using Terraform, allowing for reproducible and version-controlled environments.
 
-### Model Loading Flow
-1. Service starts up
-2. Checks for cached model
-3. If not cached, downloads model from registry
-4. Loads model into memory
-5. Warms up the model with sample input
-6. Starts serving requests
+- **`infrastructure/modules`**: Contains reusable Terraform modules for creating resources like Kubernetes clusters (EKS, GKE, AKS, or local `kind` clusters) and integrating with services like HashiCorp Vault.
+- **`infrastructure/environments`**: Defines the configuration for different environments (e.g., `dev`, `staging`, `prod`), which consume the shared modules.
 
-## Deployment Topology
+This approach ensures that all environments are provisioned consistently.
 
-### Development Environment
-```mermaid
-graph TD
-    A[Developer Machine] -->|Docker Compose| B[Local Services]
-    B --> C[Sentiment Service]
-    B --> D[Redis]
-    B --> E[Prometheus]
-    C --> F[Local Model Cache]
-```
+## 6. Deployment (`helm/`)
 
-### Staging Environment
-```mermaid
-graph TD
-    A[CI/CD Pipeline] -->|Deploy| B[Kubernetes Cluster]
-    B --> C[Namespace: staging]
-    C --> D[Deployment: 2 Replicas]
-    C --> E[Service: ClusterIP]
-    C --> F[Ingress]
-    D --> G[Monitoring Stack]
-```
+Kubernetes is the target deployment platform, and Helm is used for packaging and managing the application deployment.
 
-### Production Environment
-```mermaid
-graph TD
-    A[CD Pipeline] -->|Blue/Green| B[Production Cluster]
-    B --> C[Namespace: blue]
-    B --> D[Namespace: green]
-    C --> E[Deployment: N Replicas]
-    D --> F[Deployment: N Replicas]
-    E --> G[Service: LoadBalancer]
-    F --> G
-    G --> H[External Load Balancer]
-    I[Monitoring] --> J[Alerting]
-    K[Backup] --> L[Disaster Recovery]
-```
+- **`helm/mlops-sentiment`**: A Helm chart defines all the necessary Kubernetes resources:
+    - `Deployment`: Manages the application pods.
+    - `Service`: Exposes the application within the cluster.
+    - `Ingress`: Manages external access to the service.
+    - `ConfigMap`: Manages application configuration.
+    - `HorizontalPodAutoscaler` (HPA): Automatically scales the number of pods based on load.
+    - `ServiceMonitor`: For Prometheus integration.
+    - `NetworkPolicy`: To secure pod-to-pod communication.
 
-## Scaling Strategy
+- **`values.yaml` files**: Environment-specific configurations are managed through different `values-*.yaml` files (`values-dev.yaml`, `values-staging.yaml`, `values-prod.yaml`), allowing for different resource allocations, replica counts, and feature flags per environment.
 
-### Horizontal Pod Autoscaling (HPA)
-```yaml
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: sentiment-service
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: sentiment-service
-  minReplicas: 2
-  maxReplicas: 10
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-  - type: Resource
-    resource:
-      name: memory
-      target:
-        type: Utilization
-        averageUtilization: 80
-```
+## 7. Configuration Management (`config/` and `app/core/config.py`)
 
-### Cluster Autoscaling
-- Node auto-provisioning based on resource demands
-- Multiple availability zones for high availability
-- Spot instances for cost optimization
+- **Application Configuration**: Managed via `app/core/config.py` using Pydantic's `BaseSettings`, which reads from environment variables. This provides type-safe and validated configuration.
+- **Monitoring Configuration**: The `config/` directory contains configuration files for the monitoring stack, such as Prometheus alerting rules (`prometheus-rules.yaml`) and Grafana dashboards (`grafana-*.json`). These are deployed via the Helm chart.
 
-## Security Considerations
+## 8. Security
 
-### Network Security
-- All internal traffic encrypted with mTLS
-- Network policies to restrict pod-to-pod communication
-- Private subnets for worker nodes
+Security is a core consideration at every layer of the architecture.
 
-### Data Protection
-- Encryption at rest for sensitive data
-- Regular security audits and vulnerability scanning
-- Secrets management with Vault
+- **Secrets Management**: [HashiCorp Vault](docs/setup/VAULT_SETUP.md) is the primary secrets management tool for runtime secrets. The application integrates with Vault using the Kubernetes auth method for secure secret retrieval. For CI/CD, GitHub Secrets are used to store bootstrap credentials.
+- **Container Security**: The `Dockerfile` uses a non-root user, and the image is scanned for vulnerabilities using Trivy in the CI/CD pipeline.
+- **Network Security**: Kubernetes `NetworkPolicy` resources are used to restrict traffic between pods, following a principle of least privilege.
+- **API Security**: API keys can be required for authentication, and input validation is handled by Pydantic schemas.
 
-### API Security
-- Rate limiting and throttling
-- Request validation and sanitization
-- CORS and CSRF protection
+## 9. Monitoring and Observability
 
-## High Availability
+The project has a comprehensive observability stack, typically deployed via the Helm chart as sub-charts.
 
-### Multi-AZ Deployment
-- Services deployed across multiple availability zones
-- Automatic failover between zones
-- Load balancing across zones
+- **Metrics**: The application exposes Prometheus metrics at the `/metrics` endpoint. Key metrics include request latency, error rates, and model performance.
+- **Logging**: Structured JSON logging is used throughout the application, with correlation IDs to trace requests across services.
+- **Dashboards**: Pre-configured Grafana dashboards are provided in the `config/` directory for visualizing key application and system metrics.
+- **Alerting**: Prometheus `AlertManager` is configured with rules (`prometheus-rules.yaml`) to send alerts for critical issues (e.g., high latency, high error rate, service downtime).
 
-### State Management
-- Stateless services for horizontal scaling
-- Externalized session management
-- Distributed caching layer
+For more details, refer to the [Monitoring Setup Guide](docs/setup/MONITORING_SETUP.md).
 
-## Disaster Recovery
+## 10. Testing (`tests/`)
 
-### Backup Strategy
-- Regular backups of persistent data
-- Point-in-time recovery capability
-- Geo-redundant storage
+The project has a robust testing strategy covering different levels of the testing pyramid.
 
-### Recovery Objectives
-- **RPO (Recovery Point Objective)**: 5 minutes
-- **RTO (Recovery Time Objective)**: 15 minutes
-- Automated recovery procedures
+- **Unit Tests**: Test individual functions and classes in isolation.
+- **Integration Tests**: Test the interaction between different components of the application.
+- **API/E2E Tests**: Test the full request/response flow through the deployed API.
 
-## Performance Considerations
+`pytest` is the testing framework, and tests are organized to mirror the application structure. Test coverage is tracked and enforced in the CI/CD pipeline.
 
-### Caching Strategy
-- Multi-level caching (in-memory, distributed, CDN)
-- Cache invalidation policies
-- Cache warming on startup
+## 11. CI/CD (`.github/workflows/`)
 
-### Database Optimization
-- Read replicas for read-heavy workloads
-- Connection pooling
-- Query optimization and indexing
+Automation is managed via GitHub Actions. The CI/CD pipeline is responsible for:
 
-## Monitoring and Alerting
+- **Linting and Code Quality Checks**: Running tools like Black, Flake8, and mypy.
+- **Running Tests**: Executing the full test suite.
+- **Building Docker Images**: Building and pushing images to a container registry.
+- **Security Scanning**: Scanning container images for vulnerabilities.
+- **Deployment**: Deploying the application to different environments (dev, staging, prod) based on the Git branch or tag.
 
-### Key Metrics
-- Request rate and latency
-- Error rates and types
-- Resource utilization
-- Model performance metrics
+## 12. Benchmarking (`benchmarking/`)
 
-### Alerting Rules
-- P99 latency > 500ms
-- Error rate > 1%
-- CPU utilization > 80% for 5 minutes
-- Memory pressure > 90%
+A dedicated benchmarking suite is available in the `benchmarking/` directory to measure and compare the performance of the application on different infrastructure configurations (e.g., various CPU/GPU instance types). This helps in making cost-effective decisions for production infrastructure.
