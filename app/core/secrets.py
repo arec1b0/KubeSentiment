@@ -19,76 +19,90 @@ logger = get_logger(__name__)
 
 
 class SecretManager(ABC):
-    """Abstract base class for secret management implementations."""
+    """Defines the interface for a secret management system.
+
+    This abstract base class specifies the contract that all secret manager
+    implementations must follow. It provides a consistent way to interact with
+    different secret backends, such as environment variables or HashiCorp Vault.
+    """
 
     @abstractmethod
     def get_secret(self, key: str, default: Optional[str] = None) -> Optional[str]:
-        """
-        Retrieve a secret by key.
+        """Retrieves a secret by its key.
 
         Args:
-            key: Secret key/path
-            default: Default value if secret not found
+            key: The key or path identifying the secret.
+            default: The value to return if the secret is not found.
 
         Returns:
-            Secret value or default
+            The value of the secret, or the default value if not found.
         """
         pass
 
     @abstractmethod
     def list_secrets(self, prefix: str = "") -> list[str]:
-        """
-        List all available secret keys with optional prefix filter.
+        """Lists available secret keys, optionally filtered by a prefix.
 
         Args:
-            prefix: Optional prefix to filter secrets
+            prefix: An optional prefix to filter the secret keys.
 
         Returns:
-            List of secret keys
+            A list of secret keys.
         """
         pass
 
     @abstractmethod
     def is_healthy(self) -> bool:
-        """
-        Check if the secret manager backend is healthy.
+        """Checks the health of the secret manager's backend.
 
         Returns:
-            True if healthy, False otherwise
+            `True` if the backend is healthy and accessible, `False` otherwise.
         """
         pass
 
     @abstractmethod
     def get_health_info(self) -> Dict[str, Any]:
-        """
-        Get detailed health information about the secret backend.
+        """Retrieves detailed health information about the secret backend.
 
         Returns:
-            Dictionary with health metrics
+            A dictionary containing health metrics and status information.
         """
         pass
 
 
 class EnvSecretManager(SecretManager):
-    """
-    Environment variable based secret manager.
+    """A secret manager that retrieves secrets from environment variables.
 
-    This implementation reads secrets from environment variables,
-    suitable for local development and simple deployments.
+    This implementation is suitable for local development or simple deployment
+    scenarios where secrets are passed to the application through its
+    environment.
+
+    Attributes:
+        prefix: The prefix used to identify relevant environment variables.
     """
 
     def __init__(self, prefix: str = "MLOPS_"):
-        """
-        Initialize environment variable secret manager.
+        """Initializes the environment variable secret manager.
 
         Args:
-            prefix: Prefix for environment variables
+            prefix: The prefix to look for on environment variables.
         """
         self.prefix = prefix
         logger.info("Initialized environment variable secret manager", prefix=prefix)
 
     def get_secret(self, key: str, default: Optional[str] = None) -> Optional[str]:
-        """Get secret from environment variable."""
+        """Retrieves a secret from an environment variable.
+
+        The key is converted to uppercase and prefixed with the configured
+        `prefix` to form the environment variable name.
+
+        Args:
+            key: The key of the secret to retrieve.
+            default: The default value to return if the variable is not set.
+
+        Returns:
+            The value of the environment variable, or the default value.
+        """
         env_key = f"{self.prefix}{key.upper()}"
         value = os.getenv(env_key, default)
 
@@ -98,7 +112,14 @@ class EnvSecretManager(SecretManager):
         return value
 
     def list_secrets(self, prefix: str = "") -> list[str]:
-        """List all environment variables with the manager's prefix."""
+        """Lists environment variables that match the configured prefix.
+
+        Args:
+            prefix: An additional prefix to filter the variables.
+
+        Returns:
+            A list of secret keys (without the main prefix).
+        """
         full_prefix = f"{self.prefix}{prefix.upper()}"
         return [
             key.replace(self.prefix, "").lower()
@@ -107,11 +128,26 @@ class EnvSecretManager(SecretManager):
         ]
 
     def is_healthy(self) -> bool:
-        """Environment variables are always available."""
+        """Checks the health of the secret manager.
+
+        For environment variables, this always returns `True` as they are
+        inherently available to the process.
+
+        Returns:
+            Always returns `True`.
+        """
         return True
 
     def get_health_info(self) -> Dict[str, Any]:
-        """Get health information."""
+        """Provides health information about the environment secret manager.
+
+        This method returns a dictionary indicating the backend type, its
+        health status, and the number of secrets found with the configured
+        prefix.
+
+        Returns:
+            A dictionary containing health information.
+        """
         secret_count = len([k for k in os.environ.keys() if k.startswith(self.prefix)])
         return {
             "backend": "environment",
@@ -122,11 +158,20 @@ class EnvSecretManager(SecretManager):
 
 
 class VaultSecretManager(SecretManager):
-    """
-    HashiCorp Vault based secret manager.
+    """A secret manager for interacting with HashiCorp Vault.
 
-    This implementation uses hvac to interact with Vault, supporting
-    Kubernetes authentication, secret caching, and automatic rotation.
+    This implementation connects to a Vault instance to manage secrets. It
+    supports authentication via Kubernetes service accounts or a direct token,
+    and includes features like in-memory caching with a configurable TTL.
+
+    Attributes:
+        vault_addr: The address of the Vault server.
+        namespace: The Vault namespace (for Enterprise versions).
+        role: The Kubernetes authentication role.
+        mount_point: The mount point of the KV v2 secrets engine.
+        secrets_path: The base path for the application's secrets.
+        cache_ttl: The time-to-live for the in-memory secret cache.
+        client: The `hvac` client instance for communicating with Vault.
     """
 
     def __init__(
@@ -139,17 +184,21 @@ class VaultSecretManager(SecretManager):
         token: Optional[str] = None,
         cache_ttl: int = 300,
     ):
-        """
-        Initialize Vault secret manager.
+        """Initializes the Vault secret manager and authenticates with Vault.
 
         Args:
-            vault_addr: Vault server address
-            namespace: Vault namespace (Enterprise)
-            role: Kubernetes auth role
-            mount_point: KV v2 mount point
-            secrets_path: Base path for secrets
-            token: Vault token (if not using Kubernetes auth)
-            cache_ttl: Cache TTL in seconds
+            vault_addr: The address of the Vault server.
+            namespace: The Vault namespace to use (for Enterprise versions).
+            role: The Kubernetes service account role for authentication.
+            mount_point: The mount point for the KV v2 secrets engine.
+            secrets_path: The base path where secrets are stored in Vault.
+            token: A Vault token for direct authentication (not for production).
+            cache_ttl: The time-to-live in seconds for the in-memory cache.
+
+        Raises:
+            ImportError: If the `hvac` library is not installed.
+            ValueError: If neither a token nor a role is provided.
+            RuntimeError: If authentication with Vault fails.
         """
         try:
             import hvac
@@ -193,7 +242,19 @@ class VaultSecretManager(SecretManager):
         )
 
     def _authenticate_kubernetes(self, role: str):
-        """Authenticate using Kubernetes service account token."""
+        """Authenticates with Vault using a Kubernetes service account.
+
+        This method reads the service account's JWT from the pod's filesystem
+        and uses it to authenticate with Vault against a configured Kubernetes
+        authentication role.
+
+        Args:
+            role: The Vault role to authenticate against.
+
+        Raises:
+            RuntimeError: If the service account token is not found or if
+                authentication fails.
+        """
         try:
             # Read service account token
             with open("/var/run/secrets/kubernetes.io/serviceaccount/token", "r") as f:
@@ -214,15 +275,18 @@ class VaultSecretManager(SecretManager):
             raise RuntimeError(f"Kubernetes authentication failed: {e}")
 
     def get_secret(self, key: str, default: Optional[str] = None) -> Optional[str]:
-        """
-        Get secret from Vault with caching.
+        """Retrieves a secret from Vault, using an in-memory cache.
+
+        This method first checks its local cache for the secret. If a valid,
+        non-expired entry is found, it's returned immediately. Otherwise, it
+        fetches the secret from Vault, caches it, and then returns it.
 
         Args:
-            key: Secret key
-            default: Default value if not found
+            key: The key of the secret to retrieve.
+            default: The default value to return if the secret is not found.
 
         Returns:
-            Secret value or default
+            The value of the secret, or the default value.
         """
         # Check cache first
         if key in self._cache:
@@ -256,16 +320,20 @@ class VaultSecretManager(SecretManager):
             return default
 
     def set_secret(self, key: str, value: str, metadata: Optional[Dict[str, Any]] = None) -> bool:
-        """
-        Set a secret in Vault.
+        """Creates or updates a secret in Vault.
+
+        This method writes a secret to the configured path in Vault's KV v2
+        secrets engine. If the secret already exists, it creates a new version.
+        After a successful write, it invalidates the corresponding entry in
+        the local cache.
 
         Args:
-            key: Secret key
-            value: Secret value
-            metadata: Optional metadata
+            key: The key of the secret to set.
+            value: The value of the secret.
+            metadata: Optional metadata to store with the secret.
 
         Returns:
-            True if successful
+            `True` if the secret was set successfully, `False` otherwise.
         """
         try:
             secret_path = f"{self.secrets_path}/{key}"
@@ -290,7 +358,14 @@ class VaultSecretManager(SecretManager):
             return False
 
     def list_secrets(self, prefix: str = "") -> list[str]:
-        """List all secrets with optional prefix filter."""
+        """Lists the keys of secrets stored at a given path in Vault.
+
+        Args:
+            prefix: An optional prefix to narrow down the listing.
+
+        Returns:
+            A list of secret keys.
+        """
         try:
             list_path = f"{self.secrets_path}/{prefix}" if prefix else self.secrets_path
             response = self.client.secrets.kv.v2.list_secrets(
@@ -308,7 +383,16 @@ class VaultSecretManager(SecretManager):
             return []
 
     def is_healthy(self) -> bool:
-        """Check if Vault is healthy and client is authenticated."""
+        """Checks the health of the Vault server and the client's authentication.
+
+        This method checks if the Vault server is unsealed and if the client
+        is still authenticated. To avoid excessive requests, the health check
+        is rate-limited.
+
+        Returns:
+            `True` if Vault is healthy and the client is authenticated, `False`
+            otherwise.
+        """
         now = time.time()
 
         # Rate limit health checks
@@ -334,7 +418,15 @@ class VaultSecretManager(SecretManager):
             return False
 
     def get_health_info(self) -> Dict[str, Any]:
-        """Get detailed Vault health information."""
+        """Retrieves detailed health and status information from Vault.
+
+        This method provides a snapshot of the Vault backend's status,
+        including its authentication status, whether it's sealed, and cache
+        metrics.
+
+        Returns:
+            A dictionary containing detailed health information.
+        """
         try:
             health = self.client.sys.read_health_status(method="GET")
 
@@ -356,7 +448,11 @@ class VaultSecretManager(SecretManager):
             return {"backend": "vault", "healthy": False, "error": str(e)}
 
     def clear_cache(self):
-        """Clear all cached secrets."""
+        """Clears the in-memory secret cache.
+
+        This forces the next call to `get_secret` for any key to fetch the
+        latest version from Vault.
+        """
         self._cache.clear()
         logger.info("Cleared secret cache")
 
@@ -371,20 +467,28 @@ def get_secret_manager(
     vault_secrets_path: str = "mlops-sentiment",
     env_prefix: str = "MLOPS_",
 ) -> SecretManager:
-    """
-    Factory function to get the appropriate secret manager.
+    """A factory function to create and configure a secret manager.
+
+    This function determines which secret manager to instantiate based on the
+    provided configuration. If Vault is enabled and a server address is given,
+    it attempts to create a `VaultSecretManager`. If that fails or if Vault is
+    not enabled, it falls back to an `EnvSecretManager`.
+
+    The `@lru_cache(maxsize=1)` decorator ensures that this function is executed
+    only once, effectively making the secret manager a singleton.
 
     Args:
-        vault_enabled: Whether to use Vault
-        vault_addr: Vault server address
-        vault_namespace: Vault namespace
-        vault_role: Kubernetes auth role
-        vault_mount_point: KV v2 mount point
-        vault_secrets_path: Base path for secrets
-        env_prefix: Environment variable prefix
+        vault_enabled: A flag to enable the Vault secret manager.
+        vault_addr: The address of the Vault server.
+        vault_namespace: The Vault namespace to use.
+        vault_role: The Kubernetes service account role for authentication.
+        vault_mount_point: The mount point for the KV v2 secrets engine.
+        vault_secrets_path: The base path for secrets in Vault.
+        env_prefix: The prefix for environment variables, used by the fallback
+            `EnvSecretManager`.
 
     Returns:
-        SecretManager instance
+        An instance of a `SecretManager` implementation.
     """
     if vault_enabled and vault_addr:
         try:

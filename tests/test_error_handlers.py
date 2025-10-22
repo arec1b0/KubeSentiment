@@ -1,22 +1,27 @@
-"""
-Unit tests for error handling utilities.
+"""Unit tests for the error handling utility functions.
+
+This module contains test cases for the centralized error handlers in
+`app.utils.error_handlers`, ensuring that different exception types are
+correctly mapped to the appropriate `HTTPException` with the right status
+codes and detail messages.
 """
 
 import pytest
 from fastapi import HTTPException
+
 from app.utils.error_handlers import (
-    handle_prediction_error,
     handle_metrics_error,
     handle_model_info_error,
+    handle_prediction_error,
     handle_prometheus_metrics_error,
 )
 
 
 class TestErrorHandlers:
-    """Test cases for error handling utilities."""
+    """A test suite for the error handling utility functions."""
 
     def test_handle_prediction_value_error(self):
-        """Test handling ValueError in prediction."""
+        """Tests that a `ValueError` in prediction is handled as a 422 Unprocessable Entity."""
         with pytest.raises(HTTPException) as exc_info:
             handle_prediction_error(ValueError("Invalid input"), "prediction")
 
@@ -24,7 +29,7 @@ class TestErrorHandlers:
         assert "Invalid input" in exc_info.value.detail
 
     def test_handle_prediction_runtime_error(self):
-        """Test handling RuntimeError in prediction."""
+        """Tests that a `RuntimeError` in prediction is handled as a 500 Internal Server Error."""
         with pytest.raises(HTTPException) as exc_info:
             handle_prediction_error(RuntimeError("Model failed"), "prediction")
 
@@ -32,7 +37,7 @@ class TestErrorHandlers:
         assert "Prediction failed" in exc_info.value.detail
 
     def test_handle_prediction_generic_error(self):
-        """Test handling generic Exception in prediction."""
+        """Tests that a generic `Exception` in prediction is handled as a 500 Internal Server Error."""
         with pytest.raises(HTTPException) as exc_info:
             handle_prediction_error(Exception("Unexpected error"), "prediction")
 
@@ -40,7 +45,7 @@ class TestErrorHandlers:
         assert exc_info.value.detail == "Internal server error"
 
     def test_handle_metrics_error(self):
-        """Test handling errors in metrics retrieval."""
+        """Tests that an exception during metrics retrieval is handled as a 500 error."""
         with pytest.raises(HTTPException) as exc_info:
             handle_metrics_error(Exception("Metrics error"))
 
@@ -48,7 +53,7 @@ class TestErrorHandlers:
         assert exc_info.value.detail == "Failed to retrieve metrics"
 
     def test_handle_model_info_error(self):
-        """Test handling errors in model info retrieval."""
+        """Tests that an exception during model info retrieval is handled as a 500 error."""
         with pytest.raises(HTTPException) as exc_info:
             handle_model_info_error(Exception("Model info error"))
 
@@ -56,9 +61,10 @@ class TestErrorHandlers:
         assert exc_info.value.detail == "Failed to retrieve model information"
 
     def test_handle_prometheus_metrics_error(self):
-        """Test handling errors in Prometheus metrics retrieval."""
+        """Tests that an exception during Prometheus metrics retrieval is handled as a 500 error."""
         with pytest.raises(HTTPException) as exc_info:
             handle_prometheus_metrics_error(Exception("Prometheus error"))
 
         assert exc_info.value.status_code == 500
+        assert exc_info.value.detail == "Failed to retrieve metrics"
         assert exc_info.value.detail == "Failed to retrieve metrics"

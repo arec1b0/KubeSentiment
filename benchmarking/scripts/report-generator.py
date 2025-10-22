@@ -1,383 +1,471 @@
 #!/usr/bin/env python3
-"""
-MLOps Sentiment Analysis - Comprehensive Report Generator
-Генерация комплексных отчетов по результатам бенчмаркинга
+"""A comprehensive report generator for benchmark results.
+
+This script consolidates data from performance, cost, and resource monitoring
+runs to generate a single, interactive HTML report. It uses Plotly for rich,
+interactive visualizations and Jinja2 for templating the final HTML output,
+providing a holistic view of the model's performance characteristics across
+different instance types.
 """
 
-import json
-import yaml
 import argparse
+import base64
+import json
 import logging
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Any, Optional
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import plotly.graph_objects as go
-import plotly.express as px
-from plotly.subplots import make_subplots
-import numpy as np
-from jinja2 import Template
-import base64
 from io import BytesIO
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import seaborn as sns
+import yaml
+from jinja2 import Template
+from plotly.subplots import make_subplots
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+
 class BenchmarkReportGenerator:
-    """Генератор комплексных отчетов по бенчмаркингу"""
-    
+    """Generates a comprehensive HTML report from benchmark data.
+
+    This class loads performance, cost, and resource utilization data,
+    creates various comparison charts, and compiles them into a single,
+    shareable HTML file.
+
+    Attributes:
+        results_dir: The directory containing the benchmark result files.
+        benchmark_data: A list of dictionaries with performance metrics.
+        cost_data: A list of dictionaries with cost analysis results.
+        resource_data: A list of dictionaries with resource usage metrics.
+    """
+
     def __init__(self, results_dir: str):
+        """Initializes the `BenchmarkReportGenerator`.
+
+        Args:
+            results_dir: The path to the directory containing benchmark
+                results.
+        """
         self.results_dir = Path(results_dir)
-        self.benchmark_data = []
-        self.cost_data = []
-        self.resource_data = []
-        
+        self.benchmark_data: List[Dict[str, Any]] = []
+        self.cost_data: List[Dict[str, Any]] = []
+        self.resource_data: List[Dict[str, Any]] = []
+
     def load_data(self):
-        """Загрузка всех данных бенчмарка"""
-        logger.info("Загрузка данных бенчмарка...")
-        
-        # Загружаем результаты бенчмарков
+        """Loads all benchmark data from the results directory.
+
+        This method reads consolidated performance results, cost analysis
+        data, and resource metrics from their respective JSON files.
+        """
+        logger.info("Loading benchmark data...")
+
+        # Load benchmark results
         consolidated_file = self.results_dir / "consolidated_results.json"
         if consolidated_file.exists():
-            with open(consolidated_file, 'r', encoding='utf-8') as f:
+            with open(consolidated_file, "r", encoding="utf-8") as f:
                 self.benchmark_data = json.load(f)
-        
-        # Загружаем данные о стоимости
+
+        # Load cost data
         cost_file = self.results_dir / "cost_analysis.json"
         if cost_file.exists():
-            with open(cost_file, 'r', encoding='utf-8') as f:
+            with open(cost_file, "r", encoding="utf-8") as f:
                 cost_analysis = json.load(f)
-                self.cost_data = cost_analysis.get('analyses', [])
-        
-        # Загружаем данные о ресурсах
+                self.cost_data = cost_analysis.get("analyses", [])
+
+        # Load resource data
         for resource_file in self.results_dir.glob("resource_metrics_*.json"):
-            with open(resource_file, 'r', encoding='utf-8') as f:
+            with open(resource_file, "r", encoding="utf-8") as f:
                 resource_data = json.load(f)
-                instance_name = resource_file.stem.replace('resource_metrics_', '')
-                self.resource_data.append({
-                    'instance': instance_name,
-                    'metrics': resource_data
-                })
-        
-        logger.info(f"Загружено: {len(self.benchmark_data)} бенчмарков, "
-                   f"{len(self.cost_data)} анализов стоимости, "
-                   f"{len(self.resource_data)} наборов метрик ресурсов")
-    
+                instance_name = resource_file.stem.replace("resource_metrics_", "")
+                self.resource_data.append({"instance": instance_name, "metrics": resource_data})
+
+        logger.info(
+            f"Loaded: {len(self.benchmark_data)} benchmarks, "
+            f"{len(self.cost_data)} cost analyses, "
+            f"{len(self.resource_data)} resource metric sets"
+        )
+
     def create_performance_comparison_chart(self) -> str:
-        """Создание графика сравнения производительности"""
+        """Creates an interactive performance comparison chart.
+
+        This method generates a multi-plot figure comparing RPS, latency,
+        and efficiency across different instance types.
+
+        Returns:
+            An HTML string representing the Plotly chart. Returns an empty
+            string if no benchmark data is available.
+        """
         if not self.benchmark_data:
             return ""
-        
+
         df = pd.DataFrame(self.benchmark_data)
-        
-        # Создаем subplot с несколькими графиками
+
+        # Create a subplot with multiple charts
         fig = make_subplots(
-            rows=2, cols=2,
-            subplot_titles=('RPS по инстансам', 'Латентность по инстансам', 
-                          'Процентили латентности', 'Эффективность'),
-            specs=[[{"secondary_y": False}, {"secondary_y": False}],
-                   [{"secondary_y": False}, {"secondary_y": False}]]
+            rows=2,
+            cols=2,
+            subplot_titles=(
+                "RPS by Instance",
+                "Latency by Instance",
+                "Latency Percentiles",
+                "Efficiency",
+            ),
+            specs=[
+                [{"secondary_y": False}, {"secondary_y": False}],
+                [{"secondary_y": False}, {"secondary_y": False}],
+            ],
         )
-        
-        # График 1: RPS
+
+        # Chart 1: RPS
         fig.add_trace(
             go.Bar(
-                x=df['instance_type'],
-                y=df['requests_per_second'],
-                name='RPS',
-                marker_color='lightblue'
+                x=df["instance_type"],
+                y=df["requests_per_second"],
+                name="RPS",
+                marker_color="lightblue",
             ),
-            row=1, col=1
+            row=1,
+            col=1,
         )
-        
-        # График 2: Латентность
+
+        # Chart 2: Latency
         fig.add_trace(
             go.Bar(
-                x=df['instance_type'],
-                y=df['avg_latency'],
-                name='Avg Latency (ms)',
-                marker_color='lightcoral'
+                x=df["instance_type"],
+                y=df["avg_latency"],
+                name="Avg Latency (ms)",
+                marker_color="lightcoral",
             ),
-            row=1, col=2
+            row=1,
+            col=2,
         )
-        
-        # График 3: Процентили латентности
-        latency_percentiles = ['p50_latency', 'p90_latency', 'p95_latency', 'p99_latency']
+
+        # Chart 3: Latency Percentiles
+        latency_percentiles = ["p50_latency", "p90_latency", "p95_latency", "p99_latency"]
         for percentile in latency_percentiles:
             if percentile in df.columns:
                 fig.add_trace(
                     go.Scatter(
-                        x=df['instance_type'],
+                        x=df["instance_type"],
                         y=df[percentile],
-                        mode='lines+markers',
-                        name=percentile.replace('_latency', '').upper(),
-                        line=dict(width=2)
+                        mode="lines+markers",
+                        name=percentile.replace("_latency", "").upper(),
+                        line=dict(width=2),
                     ),
-                    row=2, col=1
+                    row=2,
+                    col=1,
                 )
-        
-        # График 4: Эффективность (RPS/стоимость)
+
+        # Chart 4: Efficiency (RPS/cost)
         if self.cost_data:
             cost_df = pd.DataFrame(self.cost_data)
-            efficiency = cost_df['requests_per_second'] / cost_df['cost_per_hour']
+            efficiency = cost_df["requests_per_second"] / cost_df["cost_per_hour"]
             fig.add_trace(
                 go.Bar(
-                    x=cost_df['instance_name'],
+                    x=cost_df["instance_name"],
                     y=efficiency,
-                    name='RPS/Cost Efficiency',
-                    marker_color='lightgreen'
+                    name="RPS/Cost Efficiency",
+                    marker_color="lightgreen",
                 ),
-                row=2, col=2
+                row=2,
+                col=2,
             )
-        
-        fig.update_layout(
-            height=800,
-            title_text="Сравнение производительности инстансов",
-            showlegend=True
-        )
-        
-        # Сохраняем как HTML
-        html_str = fig.to_html(include_plotlyjs='cdn')
+
+        fig.update_layout(height=800, title_text="Instance Performance Comparison", showlegend=True)
+
+        # Save as HTML
+        html_str = fig.to_html(include_plotlyjs="cdn")
         return html_str
-    
+
     def create_cost_analysis_chart(self) -> str:
-        """Создание графика анализа стоимости"""
+        """Creates an interactive cost analysis bubble chart.
+
+        This chart visualizes the trade-offs between cost, performance (RPS),
+        and latency. The size of each bubble represents the overall
+        efficiency score.
+
+        Returns:
+            An HTML string of the Plotly chart, or an empty string if no
+            cost data is available.
+        """
         if not self.cost_data:
             return ""
-        
+
         df = pd.DataFrame(self.cost_data)
-        
-        # Создаем bubble chart
+
+        # Create bubble chart
         fig = go.Figure()
-        
-        # Размер пузырьков пропорционален общей эффективности
-        sizes = df['total_efficiency_score'] * 50
-        
-        fig.add_trace(go.Scatter(
-            x=df['cost_per_1000_predictions'],
-            y=df['requests_per_second'],
-            mode='markers',
-            marker=dict(
-                size=sizes,
-                color=df['avg_latency_ms'],
-                colorscale='Viridis',
-                showscale=True,
-                colorbar=dict(title="Латентность (ms)"),
-                line=dict(width=2, color='DarkSlateGrey')
-            ),
-            text=df['instance_name'],
-            textposition="middle center",
-            hovertemplate='<b>%{text}</b><br>' +
-                         'Стоимость 1000 пред.: $%{x:.4f}<br>' +
-                         'RPS: %{y:.1f}<br>' +
-                         'Латентность: %{marker.color:.1f}ms<br>' +
-                         '<extra></extra>'
-        ))
-        
-        fig.update_layout(
-            title='Анализ стоимости и производительности<br><sub>Размер пузырька = общая эффективность</sub>',
-            xaxis_title='Стоимость 1000 предсказаний (USD)',
-            yaxis_title='Запросов в секунду (RPS)',
-            width=800,
-            height=600
+
+        # Bubble size is proportional to total efficiency
+        sizes = df["total_efficiency_score"] * 50
+
+        fig.add_trace(
+            go.Scatter(
+                x=df["cost_per_1000_predictions"],
+                y=df["requests_per_second"],
+                mode="markers",
+                marker=dict(
+                    size=sizes,
+                    color=df["avg_latency_ms"],
+                    colorscale="Viridis",
+                    showscale=True,
+                    colorbar=dict(title="Latency (ms)"),
+                    line=dict(width=2, color="DarkSlateGrey"),
+                ),
+                text=df["instance_name"],
+                textposition="middle center",
+                hovertemplate="<b>%{text}</b><br>"
+                + "Cost per 1k Pred: $%{x:.4f}<br>"
+                + "RPS: %{y:.1f}<br>"
+                + "Latency: %{marker.color:.1f}ms<br>"
+                + "<extra></extra>",
+            )
         )
-        
-        return fig.to_html(include_plotlyjs='cdn')
-    
+
+        fig.update_layout(
+            title="Cost vs. Performance Analysis<br><sub>Bubble size = Total Efficiency</sub>",
+            xaxis_title="Cost per 1000 Predictions (USD)",
+            yaxis_title="Requests per Second (RPS)",
+            width=800,
+            height=600,
+        )
+
+        return fig.to_html(include_plotlyjs="cdn")
+
     def create_resource_utilization_chart(self) -> str:
-        """Создание графика утилизации ресурсов"""
+        """Creates an interactive chart for resource utilization.
+
+        This method generates a multi-plot figure showing CPU, memory, and
+        GPU utilization over time for each tested instance, along with a
+        summary bar chart of average usage.
+
+        Returns:
+            An HTML string of the Plotly chart, or an empty string if no
+            resource data is available.
+        """
         if not self.resource_data:
             return ""
-        
+
         fig = make_subplots(
-            rows=2, cols=2,
-            subplot_titles=('CPU Utilization', 'Memory Utilization', 
-                          'GPU Utilization', 'Resource Summary'),
-            specs=[[{"secondary_y": False}, {"secondary_y": False}],
-                   [{"secondary_y": False}, {"secondary_y": False}]]
+            rows=2,
+            cols=2,
+            subplot_titles=(
+                "CPU Utilization",
+                "Memory Utilization",
+                "GPU Utilization",
+                "Resource Summary",
+            ),
+            specs=[
+                [{"secondary_y": False}, {"secondary_y": False}],
+                [{"secondary_y": False}, {"secondary_y": False}],
+            ],
         )
-        
+
         colors = px.colors.qualitative.Set1
-        
+
         for i, resource_set in enumerate(self.resource_data):
-            instance = resource_set['instance']
-            metrics = resource_set['metrics']
-            
+            instance = resource_set["instance"]
+            metrics = resource_set["metrics"]
+
             if not metrics:
                 continue
-            
-            # Извлекаем временные ряды
-            timestamps = [m.get('timestamp', 0) for m in metrics]
-            cpu_usage = [m.get('cpu_percent', 0) for m in metrics]
-            memory_usage = [m.get('memory_percent', 0) for m in metrics]
-            gpu_usage = [m.get('gpu_utilization', 0) for m in metrics if m.get('gpu_utilization') is not None]
-            
+
+            # Extract time series
+            timestamps = [m.get("timestamp", 0) for m in metrics]
+            cpu_usage = [m.get("cpu_percent", 0) for m in metrics]
+            memory_usage = [m.get("memory_percent", 0) for m in metrics]
+            gpu_usage = [
+                m.get("gpu_utilization", 0) for m in metrics if m.get("gpu_utilization") is not None
+            ]
+
             color = colors[i % len(colors)]
-            
-            # CPU график
+
+            # CPU chart
             fig.add_trace(
                 go.Scatter(
                     x=list(range(len(cpu_usage))),
                     y=cpu_usage,
-                    mode='lines',
-                    name=f'{instance} CPU',
-                    line=dict(color=color, width=2)
+                    mode="lines",
+                    name=f"{instance} CPU",
+                    line=dict(color=color, width=2),
                 ),
-                row=1, col=1
+                row=1,
+                col=1,
             )
-            
-            # Memory график
+
+            # Memory chart
             fig.add_trace(
                 go.Scatter(
                     x=list(range(len(memory_usage))),
                     y=memory_usage,
-                    mode='lines',
-                    name=f'{instance} Memory',
-                    line=dict(color=color, width=2, dash='dash')
+                    mode="lines",
+                    name=f"{instance} Memory",
+                    line=dict(color=color, width=2, dash="dash"),
                 ),
-                row=1, col=2
+                row=1,
+                col=2,
             )
-            
-            # GPU график (если есть данные)
+
+            # GPU chart (if data exists)
             if gpu_usage:
                 fig.add_trace(
                     go.Scatter(
                         x=list(range(len(gpu_usage))),
                         y=gpu_usage,
-                        mode='lines',
-                        name=f'{instance} GPU',
-                        line=dict(color=color, width=2, dash='dot')
+                        mode="lines",
+                        name=f"{instance} GPU",
+                        line=dict(color=color, width=2, dash="dot"),
                     ),
-                    row=2, col=1
+                    row=2,
+                    col=1,
                 )
-        
-        # Сводный график средних значений
+
+        # Summary chart of average values
         avg_data = []
         for resource_set in self.resource_data:
-            instance = resource_set['instance']
-            metrics = resource_set['metrics']
-            
+            instance = resource_set["instance"]
+            metrics = resource_set["metrics"]
+
             if metrics:
-                avg_cpu = np.mean([m.get('cpu_percent', 0) for m in metrics])
-                avg_memory = np.mean([m.get('memory_percent', 0) for m in metrics])
-                gpu_values = [m.get('gpu_utilization', 0) for m in metrics if m.get('gpu_utilization') is not None]
+                avg_cpu = np.mean([m.get("cpu_percent", 0) for m in metrics])
+                avg_memory = np.mean([m.get("memory_percent", 0) for m in metrics])
+                gpu_values = [
+                    m.get("gpu_utilization", 0)
+                    for m in metrics
+                    if m.get("gpu_utilization") is not None
+                ]
                 avg_gpu = np.mean(gpu_values) if gpu_values else 0
-                
-                avg_data.append({
-                    'instance': instance,
-                    'cpu': avg_cpu,
-                    'memory': avg_memory,
-                    'gpu': avg_gpu
-                })
-        
+
+                avg_data.append(
+                    {"instance": instance, "cpu": avg_cpu, "memory": avg_memory, "gpu": avg_gpu}
+                )
+
         if avg_data:
             avg_df = pd.DataFrame(avg_data)
-            
+
             fig.add_trace(
                 go.Bar(
-                    x=avg_df['instance'],
-                    y=avg_df['cpu'],
-                    name='Avg CPU %',
-                    marker_color='lightblue'
+                    x=avg_df["instance"],
+                    y=avg_df["cpu"],
+                    name="Avg CPU %",
+                    marker_color="lightblue",
                 ),
-                row=2, col=2
+                row=2,
+                col=2,
             )
-            
+
             fig.add_trace(
                 go.Bar(
-                    x=avg_df['instance'],
-                    y=avg_df['memory'],
-                    name='Avg Memory %',
-                    marker_color='lightcoral'
+                    x=avg_df["instance"],
+                    y=avg_df["memory"],
+                    name="Avg Memory %",
+                    marker_color="lightcoral",
                 ),
-                row=2, col=2
+                row=2,
+                col=2,
             )
-            
-            # GPU только если есть данные
-            if avg_df['gpu'].sum() > 0:
+
+            # GPU only if data exists
+            if avg_df["gpu"].sum() > 0:
                 fig.add_trace(
                     go.Bar(
-                        x=avg_df['instance'],
-                        y=avg_df['gpu'],
-                        name='Avg GPU %',
-                        marker_color='lightgreen'
+                        x=avg_df["instance"],
+                        y=avg_df["gpu"],
+                        name="Avg GPU %",
+                        marker_color="lightgreen",
                     ),
-                    row=2, col=2
+                    row=2,
+                    col=2,
                 )
-        
+
         fig.update_layout(
-            height=800,
-            title_text="Утилизация ресурсов во время бенчмарка",
-            showlegend=True
+            height=800, title_text="Resource Utilization During Benchmark", showlegend=True
         )
-        
-        return fig.to_html(include_plotlyjs='cdn')
-    
+
+        return fig.to_html(include_plotlyjs="cdn")
+
     def generate_summary_statistics(self) -> Dict[str, Any]:
-        """Генерация сводной статистики"""
+        """Generates a dictionary of summary statistics.
+
+        This method calculates key highlights from the benchmark results,
+        such as the best performing instance for RPS, the instance with the
+        lowest latency, and the most cost-effective option.
+
+        Returns:
+            A dictionary containing summary statistics.
+        """
         stats = {
-            'total_benchmarks': len(self.benchmark_data),
-            'total_instances_tested': len(set(b['instance_type'] for b in self.benchmark_data)),
-            'best_performance': {},
-            'cost_efficiency': {},
-            'resource_usage': {}
+            "total_benchmarks": len(self.benchmark_data),
+            "total_instances_tested": len(set(b["instance_type"] for b in self.benchmark_data)),
+            "best_performance": {},
+            "cost_efficiency": {},
+            "resource_usage": {},
         }
-        
+
         if self.benchmark_data:
-            # Лучшая производительность
-            best_rps = max(self.benchmark_data, key=lambda x: x['requests_per_second'])
-            best_latency = min(self.benchmark_data, key=lambda x: x['avg_latency'])
-            
-            stats['best_performance'] = {
-                'highest_rps': {
-                    'instance': best_rps['instance_type'],
-                    'value': best_rps['requests_per_second']
+            # Best performance
+            best_rps = max(self.benchmark_data, key=lambda x: x["requests_per_second"])
+            best_latency = min(self.benchmark_data, key=lambda x: x["avg_latency"])
+
+            stats["best_performance"] = {
+                "highest_rps": {
+                    "instance": best_rps["instance_type"],
+                    "value": best_rps["requests_per_second"],
                 },
-                'lowest_latency': {
-                    'instance': best_latency['instance_type'],
-                    'value': best_latency['avg_latency']
-                }
+                "lowest_latency": {
+                    "instance": best_latency["instance_type"],
+                    "value": best_latency["avg_latency"],
+                },
             }
-        
+
         if self.cost_data:
-            # Стоимостная эффективность
-            best_cost = min(self.cost_data, key=lambda x: x['cost_per_1000_predictions'])
-            best_efficiency = max(self.cost_data, key=lambda x: x['total_efficiency_score'])
-            
-            stats['cost_efficiency'] = {
-                'most_cost_effective': {
-                    'instance': best_cost['instance_name'],
-                    'cost_per_1000': best_cost['cost_per_1000_predictions']
+            # Cost efficiency
+            best_cost = min(self.cost_data, key=lambda x: x["cost_per_1000_predictions"])
+            best_efficiency = max(self.cost_data, key=lambda x: x["total_efficiency_score"])
+
+            stats["cost_efficiency"] = {
+                "most_cost_effective": {
+                    "instance": best_cost["instance_name"],
+                    "cost_per_1000": best_cost["cost_per_1000_predictions"],
                 },
-                'best_overall_efficiency': {
-                    'instance': best_efficiency['instance_name'],
-                    'score': best_efficiency['total_efficiency_score']
-                }
+                "best_overall_efficiency": {
+                    "instance": best_efficiency["instance_name"],
+                    "score": best_efficiency["total_efficiency_score"],
+                },
             }
-        
+
         return stats
-    
+
     def generate_html_report(self, output_path: str):
-        """Генерация HTML отчета"""
-        logger.info("Генерация HTML отчета...")
-        
-        # Создаем графики
+        """Generates the final HTML report.
+
+        This method orchestrates the creation of all charts and summary
+        statistics, renders them into an HTML template using Jinja2, and
+        saves the result to a file.
+
+        Args:
+            output_path: The path to save the final HTML report.
+        """
+        logger.info("Generating HTML report...")
+
+        # Create charts
         performance_chart = self.create_performance_comparison_chart()
         cost_chart = self.create_cost_analysis_chart()
         resource_chart = self.create_resource_utilization_chart()
-        
-        # Генерируем статистику
+
+        # Generate statistics
         stats = self.generate_summary_statistics()
-        
-        # HTML шаблон
+
+        # HTML template
         html_template = """
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -469,62 +557,62 @@ class BenchmarkReportGenerator:
 <body>
     <div class="container">
         <h1>🚀 MLOps Sentiment Analysis<br>Benchmark Report</h1>
-        
+
         <div class="stats-grid">
             <div class="stat-card">
-                <div>Всего бенчмарков</div>
+                <div>Total Benchmarks</div>
                 <div class="stat-value">{{ stats.total_benchmarks }}</div>
             </div>
             <div class="stat-card">
-                <div>Протестировано инстансов</div>
+                <div>Instances Tested</div>
                 <div class="stat-value">{{ stats.total_instances_tested }}</div>
             </div>
             {% if stats.best_performance.highest_rps %}
             <div class="stat-card">
-                <div>Лучший RPS</div>
+                <div>Best RPS</div>
                 <div class="stat-value">{{ "%.1f"|format(stats.best_performance.highest_rps.value) }}</div>
                 <div>{{ stats.best_performance.highest_rps.instance }}</div>
             </div>
             {% endif %}
             {% if stats.cost_efficiency.most_cost_effective %}
             <div class="stat-card">
-                <div>Самый экономичный</div>
+                <div>Most Cost-Effective</div>
                 <div class="stat-value">${{ "%.4f"|format(stats.cost_efficiency.most_cost_effective.cost_per_1000) }}</div>
                 <div>{{ stats.cost_efficiency.most_cost_effective.instance }}</div>
             </div>
             {% endif %}
         </div>
-        
-        <h2>📊 Сравнение производительности</h2>
+
+        <h2>📊 Performance Comparison</h2>
         <div class="chart-container">
             {{ performance_chart|safe }}
         </div>
-        
+
         {% if cost_chart %}
-        <h2>💰 Анализ стоимости</h2>
+        <h2>💰 Cost Analysis</h2>
         <div class="chart-container">
             {{ cost_chart|safe }}
         </div>
         {% endif %}
-        
+
         {% if resource_chart %}
-        <h2>🖥️ Утилизация ресурсов</h2>
+        <h2>🖥️ Resource Utilization</h2>
         <div class="chart-container">
             {{ resource_chart|safe }}
         </div>
         {% endif %}
-        
-        <h2>📋 Детальные результаты</h2>
+
+        <h2>📋 Detailed Results</h2>
         <table>
             <thead>
                 <tr>
-                    <th>Инстанс</th>
-                    <th>Пользователи</th>
+                    <th>Instance</th>
+                    <th>Users</th>
                     <th>RPS</th>
-                    <th>Средняя латентность (ms)</th>
-                    <th>P95 латентность (ms)</th>
-                    <th>Успешных запросов</th>
-                    <th>Ошибок (%)</th>
+                    <th>Avg Latency (ms)</th>
+                    <th>P95 Latency (ms)</th>
+                    <th>Successful Requests</th>
+                    <th>Errors (%)</th>
                 </tr>
             </thead>
             <tbody>
@@ -541,17 +629,17 @@ class BenchmarkReportGenerator:
                 {% endfor %}
             </tbody>
         </table>
-        
+
         {% if cost_data %}
-        <h2>💵 Анализ стоимости</h2>
+        <h2>💵 Cost Breakdown</h2>
         <table>
             <thead>
                 <tr>
-                    <th>Инстанс</th>
-                    <th>Стоимость/час ($)</th>
-                    <th>Стоимость 1000 пред. ($)</th>
+                    <th>Instance</th>
+                    <th>Cost/Hour ($)</th>
+                    <th>Cost per 1k Pred. ($)</th>
                     <th>RPS</th>
-                    <th>Эффективность</th>
+                    <th>Efficiency Score</th>
                 </tr>
             </thead>
             <tbody>
@@ -567,34 +655,34 @@ class BenchmarkReportGenerator:
             </tbody>
         </table>
         {% endif %}
-        
+
         <div class="recommendations">
-            <h3>🎯 Рекомендации</h3>
+            <h3>🎯 Recommendations</h3>
             <ul>
                 {% if stats.best_performance.highest_rps %}
-                <li><strong>Для высокой нагрузки:</strong> Используйте {{ stats.best_performance.highest_rps.instance }} ({{ "%.1f"|format(stats.best_performance.highest_rps.value) }} RPS)</li>
+                <li><strong>For High Throughput:</strong> Use {{ stats.best_performance.highest_rps.instance }} ({{ "%.1f"|format(stats.best_performance.highest_rps.value) }} RPS)</li>
                 {% endif %}
                 {% if stats.best_performance.lowest_latency %}
-                <li><strong>Для низкой латентности:</strong> Используйте {{ stats.best_performance.lowest_latency.instance }} ({{ "%.1f"|format(stats.best_performance.lowest_latency.value) }}ms)</li>
+                <li><strong>For Low Latency:</strong> Use {{ stats.best_performance.lowest_latency.instance }} ({{ "%.1f"|format(stats.best_performance.lowest_latency.value) }}ms)</li>
                 {% endif %}
                 {% if stats.cost_efficiency.most_cost_effective %}
-                <li><strong>Для экономии:</strong> Используйте {{ stats.cost_efficiency.most_cost_effective.instance }} (${{ "%.4f"|format(stats.cost_efficiency.most_cost_effective.cost_per_1000) }} за 1000 предсказаний)</li>
+                <li><strong>For Cost Savings:</strong> Use {{ stats.cost_efficiency.most_cost_effective.instance }} (${{ "%.4f"|format(stats.cost_efficiency.most_cost_effective.cost_per_1000) }} per 1k predictions)</li>
                 {% endif %}
-                <li><strong>Мониторинг:</strong> Настройте алерты на латентность >500ms и error rate >5%</li>
-                <li><strong>Автомасштабирование:</strong> Используйте HPA с метриками CPU и custom metrics</li>
+                <li><strong>Monitoring:</strong> Set up alerts for latency >500ms and an error rate >5%</li>
+                <li><strong>Autoscaling:</strong> Use HPA with CPU and custom metrics for dynamic scaling</li>
             </ul>
         </div>
-        
+
         <div class="footer">
-            <p>Отчет сгенерирован: {{ generation_time }}</p>
+            <p>Report generated on: {{ generation_time }}</p>
             <p>MLOps Sentiment Analysis Benchmarking Framework</p>
         </div>
     </div>
 </body>
 </html>
         """
-        
-        # Рендерим шаблон
+
+        # Render the template
         template = Template(html_template)
         html_content = template.render(
             stats=stats,
@@ -603,39 +691,45 @@ class BenchmarkReportGenerator:
             performance_chart=performance_chart,
             cost_chart=cost_chart,
             resource_chart=resource_chart,
-            generation_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            generation_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
-        
-        # Сохраняем файл
-        with open(output_path, 'w', encoding='utf-8') as f:
+
+        # Save the file
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write(html_content)
-        
-        logger.info(f"HTML отчет сохранен: {output_path}")
+
+        logger.info(f"HTML report saved to: {output_path}")
+
 
 def main():
-    parser = argparse.ArgumentParser(description='Comprehensive Benchmark Report Generator')
-    parser.add_argument('--results-dir', default='results',
-                       help='Directory containing benchmark results')
-    parser.add_argument('--output', default='benchmark_comprehensive_report.html',
-                       help='Output HTML file path')
-    
+    """The main entry point for the report generation script."""
+    parser = argparse.ArgumentParser(description="Comprehensive Benchmark Report Generator")
+    parser.add_argument(
+        "--results-dir", default="results", help="Directory containing benchmark results"
+    )
+    parser.add_argument(
+        "--output", default="benchmark_comprehensive_report.html", help="Output HTML file path"
+    )
+
     args = parser.parse_args()
-    
-    # Создаем генератор отчетов
+
+    # Create the report generator
     generator = BenchmarkReportGenerator(args.results_dir)
-    
+
     try:
-        # Загружаем данные
+        # Load the data
         generator.load_data()
-        
-        # Генерируем HTML отчет
+
+        # Generate the HTML report
         generator.generate_html_report(args.output)
-        
-        logger.info(f"✅ Комплексный отчет создан: {args.output}")
-        
+
+        logger.info(f"✅ Comprehensive report created: {args.output}")
+
     except Exception as e:
-        logger.error(f"Ошибка при генерации отчета: {e}")
+        logger.error(f"Error generating report: {e}")
         raise
 
+
 if __name__ == "__main__":
+    main()
     main()

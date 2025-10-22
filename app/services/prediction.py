@@ -16,45 +16,50 @@ logger = get_logger(__name__)
 
 
 class PredictionService:
-    """
-    Service class for handling sentiment predictions.
+    """Orchestrates the sentiment analysis prediction workflow.
 
-    This class encapsulates the business logic for predictions,
-    coordinating between models and providing a clean interface
-    for the API layer.
+    This service class acts as an intermediary between the API layer and the
+    model layer. It encapsulates the business logic for making predictions,
+    ensuring that concerns are properly separated. It relies on a `ModelStrategy`
+    instance, which is dependency-injected, allowing for flexibility in the
+    choice of the underlying model backend.
+
+    Attributes:
+        model: An instance of a class that implements the `ModelStrategy`
+            protocol.
+        settings: The application's configuration settings.
+        logger: A configured logger instance.
     """
 
     def __init__(self, model: ModelStrategy, settings: Settings):
-        """
-        Initialize the prediction service.
+        """Initializes the prediction service.
 
         Args:
-            model: The model strategy instance
-            settings: Application settings
+            model: An instance of a model strategy (e.g., PyTorch or ONNX).
+            settings: The application's configuration settings.
         """
         self.model = model
         self.settings = settings
         self.logger = get_logger(__name__)
 
     def predict(self, text: str) -> Dict[str, Any]:
-        """
-        Perform sentiment prediction on input text.
+        """Performs sentiment analysis on a given text.
 
-        This method orchestrates the prediction workflow, including:
-        - Input validation
-        - Model readiness check
-        - Prediction execution
-        - Result post-processing
+        This method handles the core prediction logic. It first validates the
+        input text and checks if the model is ready. It then calls the
+        `predict` method of the injected model strategy and returns the result.
 
         Args:
-            text: The input text to analyze
+            text: The input text to be analyzed.
 
         Returns:
-            Dict[str, Any]: Prediction result with label, score, and metadata
+            A dictionary containing the prediction results.
 
         Raises:
-            ModelNotLoadedError: If the model is not ready
-            TextEmptyError: If the input text is invalid
+            TextEmptyError: If the input text is empty or contains only
+                whitespace.
+            ModelNotLoadedError: If the model is not loaded or ready for
+                inference.
         """
         # Create contextual logger for this prediction
         prediction_logger = get_contextual_logger(
@@ -67,9 +72,7 @@ class PredictionService:
 
         # Validate input
         if not text or not text.strip():
-            raise TextEmptyError(
-                context={"text_length": len(text) if text else 0}
-            )
+            raise TextEmptyError(context={"text_length": len(text) if text else 0})
 
         # Check model readiness
         if not self.model.is_ready():
@@ -78,9 +81,11 @@ class PredictionService:
                 model_status="unavailable",
             )
             raise ModelNotLoadedError(
-                model_name=getattr(self.model, "settings", None).model_name
-                if hasattr(self.model, "settings")
-                else "unknown",
+                model_name=(
+                    getattr(self.model, "settings", None).model_name
+                    if hasattr(self.model, "settings")
+                    else "unknown"
+                ),
                 context={"service": "prediction"},
             )
 
@@ -107,11 +112,11 @@ class PredictionService:
             raise
 
     def get_model_status(self) -> Dict[str, Any]:
-        """
-        Get the current status of the model.
+        """Retrieves the current status and information about the model.
 
         Returns:
-            Dict[str, Any]: Model status information
+            A dictionary containing the model's readiness status and other
+            metadata.
         """
         return {
             "is_ready": self.model.is_ready(),
@@ -119,11 +124,13 @@ class PredictionService:
         }
 
     def clear_cache(self) -> Dict[str, str]:
-        """
-        Clear the prediction cache.
+        """Clears the prediction cache of the underlying model.
+
+        This method checks if the injected model strategy supports cache
+        clearing and, if so, invokes it.
 
         Returns:
-            Dict[str, str]: Status message
+            A dictionary indicating the status of the cache clearing operation.
         """
         if hasattr(self.model, "clear_cache"):
             self.model.clear_cache()
@@ -132,4 +139,3 @@ class PredictionService:
         else:
             self.logger.warning("Model does not support cache clearing")
             return {"status": "not_supported"}
-

@@ -28,21 +28,26 @@ async def predict_sentiment(
     backend: str = Depends(get_model_backend),
     settings: Settings = Depends(get_settings),
 ) -> PredictionResponse:
-    """
-    Analyze sentiment of the input text.
+    """Analyzes the sentiment of a given text.
+
+    This is the primary endpoint for sentiment analysis. It accepts a text
+    input and returns a prediction of its sentiment, including a label (e.g.,
+    'POSITIVE', 'NEGATIVE') and a confidence score. The endpoint also provides
+    metadata in its response headers, such as the inference time.
 
     Args:
-        payload: The input text data
-        response: FastAPI response object for headers
-        prediction_service: The prediction service
-        backend: The backend being used
-        settings: Application settings
+        payload: The request body containing the text to be analyzed.
+        response: The FastAPI `Response` object, used to set custom headers.
+        prediction_service: The prediction service, injected as a dependency.
+        backend: The name of the model backend in use.
+        settings: The application's configuration settings.
 
     Returns:
-        PredictionResponse: Sentiment prediction results
+        A `PredictionResponse` object with the sentiment analysis results.
 
     Raises:
-        HTTPException: If the model is unavailable or prediction fails
+        HTTPException: If the model is not loaded or if an error occurs
+            during the prediction process.
     """
     # Create contextual logger for this request
     logger = get_contextual_logger(
@@ -98,4 +103,3 @@ async def predict_sentiment(
             status_code=500,
             text_length=len(payload.text),
         )
-

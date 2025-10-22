@@ -15,11 +15,40 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """
-    Application settings with environment variable support.
+    """Manages application settings, environment variables, and secrets.
 
-    All settings can be overridden via environment variables with the prefix 'MLOPS_'.
-    For example: MLOPS_MODEL_NAME="custom-model"
+    This class centralizes all configuration parameters for the application.
+    Settings are loaded from environment variables with the prefix 'MLOPS_'.
+    It supports HashiCorp Vault for secure secret management, falling back to
+    environment variables if Vault is not enabled.
+
+    Attributes:
+        app_name: The name of the application.
+        app_version: The version of the application.
+        debug: A flag to enable or disable debug mode.
+        host: The host on which the server will run.
+        port: The port on which the server will listen.
+        workers: The number of worker processes for the server.
+        model_name: The identifier of the Hugging Face model to be used.
+        allowed_models: A list of model names that are permitted for use.
+        model_cache_dir: The directory to cache downloaded models.
+        onnx_model_path: The path to the ONNX model for optimized inference.
+        onnx_model_path_default: The default path for the ONNX model.
+        max_request_timeout: The maximum request timeout in seconds.
+        max_text_length: The maximum length of input text.
+        prediction_cache_max_size: The maximum number of predictions to cache.
+        enable_metrics: A flag to enable or disable metrics collection.
+        log_level: The logging level for the application.
+        metrics_cache_ttl: The time-to-live for cached Prometheus metrics.
+        api_key: The API key for securing application endpoints.
+        allowed_origins: A list of allowed origins for CORS.
+        vault_enabled: A flag to enable Vault for secrets management.
+        vault_addr: The address of the Vault server.
+        vault_namespace: The Vault namespace for multi-tenancy.
+        vault_role: The Kubernetes service account role for Vault authentication.
+        vault_mount_point: The mount point for the KV v2 secrets engine.
+        vault_secrets_path: The base path for secrets in Vault.
+        vault_token: The Vault token for direct authentication (not for production).
     """
 
     # Application settings
@@ -147,7 +176,17 @@ class Settings(BaseSettings):
     @field_validator("allowed_models")
     @classmethod
     def validate_model_names(cls, v):
-        """Validate each model name format."""
+        """Validates the format of each model name in the allowed list.
+
+        Args:
+            v: The list of allowed model names.
+
+        Returns:
+            The validated list of model names.
+
+        Raises:
+            ValueError: If a model name has an invalid format or is too long.
+        """
         for model_name in v:
             # Basic validation for Hugging Face model names
             if not re.match(r"^[a-zA-Z0-9/_-]+$", model_name):
@@ -159,7 +198,17 @@ class Settings(BaseSettings):
     @field_validator("model_cache_dir")
     @classmethod
     def validate_cache_dir(cls, v):
-        """Validate cache directory path."""
+        """Validates that the cache directory is an absolute path and its parent exists.
+
+        Args:
+            v: The path to the model cache directory.
+
+        Returns:
+            The validated cache directory path.
+
+        Raises:
+            ValueError: If the path is not absolute or the parent directory does not exist.
+        """
         if v is not None:
             # Check if path is absolute and valid
             if not os.path.isabs(v):
@@ -172,13 +221,27 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> List[str]:
-        """Get CORS origins for middleware configuration."""
+        """Provides the list of CORS origins for middleware configuration.
+
+        Returns:
+            A list of strings representing the allowed origins for CORS.
+        """
         return self.allowed_origins
 
     @field_validator("allowed_origins")
     @classmethod
     def validate_cors_origins(cls, v):
-        """Validate CORS origin URLs."""
+        """Validates the format of CORS origin URLs and disallows wildcards.
+
+        Args:
+            v: The list of CORS origins.
+
+        Returns:
+            The validated list of CORS origins.
+
+        Raises:
+            ValueError: If a wildcard origin is used or a URL is invalid.
+        """
         for origin in v:
             # Wildcard CORS is a security risk - require explicit origins
             if origin == "*":
@@ -196,7 +259,19 @@ class Settings(BaseSettings):
     @field_validator("api_key")
     @classmethod
     def validate_api_key(cls, v):
-        """Validate API key strength."""
+        """Validates the strength of the API key.
+
+        The key must be at least 8 characters long and contain both letters and numbers.
+
+        Args:
+            v: The API key.
+
+        Returns:
+            The validated API key.
+
+        Raises:
+            ValueError: If the API key is not strong enough.
+        """
         if v is not None:
             if len(v) < 8:
                 raise ValueError("API key must be at least 8 characters")
@@ -206,19 +281,31 @@ class Settings(BaseSettings):
         return v
 
     def _validate_model_in_allowed_list(self) -> None:
-        """Ensure model_name is in allowed_models list."""
+        """Ensures the selected model_name is in the allowed_models list.
+
+        Raises:
+            ValueError: If `model_name` is not in `allowed_models`.
+        """
         if self.model_name and self.allowed_models and self.model_name not in self.allowed_models:
             raise ValueError(
                 f"Model '{self.model_name}' must be in allowed_models list: {self.allowed_models}"
             )
 
     def _validate_worker_count_consistency(self) -> None:
-        """Validate worker count based on debug mode."""
+        """Validates that multiple workers are not used in debug mode.
+
+        Raises:
+            ValueError: If `debug` is True and `workers` is greater than 1.
+        """
         if self.debug and self.workers > 1:
             raise ValueError("Cannot use multiple workers in debug mode")
 
     def _validate_cache_memory_usage(self) -> None:
-        """Validate cache settings to prevent excessive memory usage."""
+        """Estimates cache memory usage to prevent excessive allocation.
+
+        Raises:
+            ValueError: If the estimated memory usage exceeds a predefined limit.
+        """
         # Rough estimate: each cache entry might be ~1KB per 100 chars
         estimated_memory_mb = (self.prediction_cache_max_size * self.max_text_length) / 100000
         if estimated_memory_mb > 1000:  # 1GB limit
@@ -229,7 +316,14 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_configuration_consistency(self):
-        """Validate cross-field configuration consistency."""
+        """Performs cross-field validation to ensure configuration consistency.
+
+        This validator runs after individual field validators and checks relationships
+        between different configuration settings.
+
+        Returns:
+            The validated Settings instance.
+        """
         self._validate_model_in_allowed_list()
         self._validate_worker_count_consistency()
         self._validate_cache_memory_usage()
@@ -237,11 +331,14 @@ class Settings(BaseSettings):
 
     @cached_property
     def secret_manager(self):
-        """
-        Get the secret manager instance for this configuration.
+        """Initializes and retrieves the appropriate secret manager.
+
+        This property lazily initializes the secret manager based on whether Vault
+        is enabled. It returns either a `VaultSecretManager` or an
+        `EnvironmentSecretManager` instance.
 
         Returns:
-            SecretManager: Configured secret manager (Vault or Environment)
+            An instance of a secret manager.
         """
         from app.core.secrets import get_secret_manager
 
@@ -256,19 +353,31 @@ class Settings(BaseSettings):
         )
 
     def get_secret(self, key: str, default: Optional[str] = None) -> Optional[str]:
-        """
-        Get a secret from the configured secret manager.
+        """Retrieves a secret from the configured secret manager.
+
+        This method abstracts the secret retrieval process, allowing other parts
+        of the application to fetch secrets without needing to know the
+        underlying secret management system.
 
         Args:
-            key: Secret key
-            default: Default value if not found
+            key: The key of the secret to retrieve.
+            default: The default value to return if the secret is not found.
 
         Returns:
-            Secret value or default
+            The value of the secret, or the default value if not found.
         """
         return self.secret_manager.get_secret(key, default)
 
     class Config:
+        """Pydantic configuration options for the Settings class.
+
+        Attributes:
+            env_prefix: The prefix for environment variables (e.g., `MLOPS_APP_NAME`).
+            env_file: The name of the environment file to load (e.g., `.env`).
+            case_sensitive: A flag indicating whether environment variables are case-sensitive.
+            extra: A setting to ignore extra fields provided.
+        """
+
         env_prefix = "MLOPS_"
         env_file = ".env"
         case_sensitive = False
@@ -280,10 +389,12 @@ settings = Settings()
 
 
 def get_settings() -> Settings:
-    """
-    Dependency function to get application settings.
+    """Dependency function to get the application settings instance.
+
+    This function is used by FastAPI's dependency injection system to provide
+    the global `Settings` object to route handlers and other dependencies.
 
     Returns:
-        Settings: The application settings instance
+        The singleton instance of the application settings.
     """
     return settings

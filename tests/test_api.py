@@ -1,7 +1,9 @@
-"""
-Unit tests for the MLOps sentiment analysis service.
+"""Unit tests for the MLOps sentiment analysis API endpoints.
 
-This module contains unit tests for API endpoints and core functionality.
+This module contains test cases for the main API endpoints, including
+`/predict`, `/health`, `/metrics`, and `/model-info`. It uses `pytest` fixtures
+to create a test client and mock dependencies like the sentiment analyzer and
+application settings.
 """
 
 from unittest.mock import Mock, patch
@@ -15,7 +17,15 @@ from app.models.pytorch_sentiment import SentimentAnalyzer
 
 @pytest.fixture
 def mock_analyzer():
-    """Create a mock sentiment analyzer."""
+    """Creates a mock `SentimentAnalyzer` for testing.
+
+    This fixture provides a mock object that simulates the behavior of the
+    `SentimentAnalyzer` without loading the actual model. It sets predefined
+    return values for methods like `predict`, `is_ready`, etc.
+
+    Returns:
+        A `Mock` object simulating `SentimentAnalyzer`.
+    """
     analyzer = Mock(spec=SentimentAnalyzer)
     analyzer.is_ready.return_value = True
     analyzer.predict.return_value = {
@@ -46,7 +56,15 @@ def mock_analyzer():
 
 @pytest.fixture
 def mock_settings():
-    """Create mock settings with debug=True to avoid API prefix."""
+    """Creates a mock settings object for testing.
+
+    This fixture simulates the application's settings, allowing tests to
+    control configuration-dependent behavior, such as enabling or disabling
+    metrics.
+
+    Returns:
+        A `Mock` object simulating the application settings.
+    """
     settings = Mock()
     settings.enable_metrics = True
     settings.app_version = "1.0.0"
@@ -56,7 +74,19 @@ def mock_settings():
 
 @pytest.fixture
 def app(mock_analyzer, mock_settings):
-    """Create a test FastAPI app with mocked dependencies."""
+    """Creates a test FastAPI application instance.
+
+    This fixture sets up a new FastAPI app for each test, includes the API
+    routers, and patches the dependency injection system to use the mock
+    analyzer and settings.
+
+    Args:
+        mock_analyzer: The mocked `SentimentAnalyzer` fixture.
+        mock_settings: The mocked settings fixture.
+
+    Yields:
+        The configured `FastAPI` app instance for testing.
+    """
     from app.api.routes.health import router as health_router
     from app.api.routes.metrics import router as metrics_router
     from app.api.routes.model_info import router as model_info_router
@@ -78,15 +108,29 @@ def app(mock_analyzer, mock_settings):
 
 @pytest.fixture
 def client(app):
-    """Create a test client for the FastAPI app."""
+    """Creates a `TestClient` for the FastAPI application.
+
+    This provides a client to make requests to the test application.
+
+    Args:
+        app: The test `FastAPI` application instance.
+
+    Returns:
+        A `TestClient` instance.
+    """
     return TestClient(app)
 
 
 class TestPredictEndpoint:
-    """Test cases for the /predict endpoint."""
+    """Contains test cases for the `/predict` endpoint."""
 
     def test_predict_success(self, client, mock_analyzer, mock_settings):
-        """Test successful sentiment prediction."""
+        """Tests a successful sentiment prediction request.
+
+        This test verifies that the endpoint returns a 200 OK status and that
+        the response body has the expected structure and data types for a
+        valid input.
+        """
         # Note: Mock isn't working due to dependency injection timing,
         # so we'll test with the actual model but check basic structure
         response = client.post("/predict", json={"text": "I love this product!"})
@@ -100,7 +144,12 @@ class TestPredictEndpoint:
         assert data["score"] >= 0.0 and data["score"] <= 1.0
 
     def test_predict_empty_text(self, client, mock_analyzer, mock_settings):
-        """Test prediction with empty text."""
+        """Tests the prediction endpoint with an empty text input.
+
+        This test ensures that providing an empty string in the request
+        results in a 422 Unprocessable Entity error, as expected from the
+        input validation.
+        """
         with (
             patch(
                 "app.models.pytorch_sentiment.get_sentiment_analyzer", return_value=mock_analyzer
@@ -112,7 +161,12 @@ class TestPredictEndpoint:
             assert response.status_code == 422
 
     def test_predict_model_unavailable(self, client, mock_settings):
-        """Test prediction when model is unavailable."""
+        """Tests the prediction endpoint when the model is unavailable.
+
+        This test is a placeholder to confirm that the endpoint exists and
+        handles a normal case, as mocking the model's unavailable state
+        requires more complex setup.
+        """
         # This test would require mocking the analyzer at module level
         # For now, we'll test that the endpoint exists and handles normal cases
         response = client.post("/predict", json={"text": "Test text"})
@@ -120,7 +174,12 @@ class TestPredictEndpoint:
         assert response.status_code == 200
 
     def test_predict_runtime_error(self, client, mock_analyzer, mock_settings):
-        """Test prediction with runtime error."""
+        """Tests the prediction endpoint's behavior during a runtime error.
+
+        This is a placeholder test to ensure the endpoint functions correctly
+        under normal conditions, as simulating a runtime error would require
+        more intricate mocking.
+        """
         # This would require more complex mocking
         # For now, test that normal operation works
         response = client.post("/predict", json={"text": "Test text"})
@@ -128,10 +187,14 @@ class TestPredictEndpoint:
 
 
 class TestHealthEndpoint:
-    """Test cases for the /health endpoint."""
+    """Contains test cases for the `/health` endpoint."""
 
     def test_health_success(self, client, mock_analyzer, mock_settings):
-        """Test successful health check."""
+        """Tests a successful health check.
+
+        This test verifies that the `/health` endpoint returns a 200 OK status
+        and the correct response structure when the model is available.
+        """
         with (
             patch(
                 "app.models.pytorch_sentiment.get_sentiment_analyzer", return_value=mock_analyzer
@@ -146,7 +209,12 @@ class TestHealthEndpoint:
             assert data["model_status"] == "available"
 
     def test_health_model_unavailable(self, client, mock_settings):
-        """Test health check when model is unavailable."""
+        """Tests the health check when the model is unavailable.
+
+        This test checks that the endpoint returns a 200 OK status and that
+        the `model_status` field correctly reflects the model's state, which
+        could be either 'available' or 'unavailable'.
+        """
         # Test normal health check
         response = client.get("/health")
         assert response.status_code == 200
@@ -156,16 +224,25 @@ class TestHealthEndpoint:
 
 
 class TestMetricsEndpoint:
-    """Test cases for the /metrics endpoints."""
+    """Contains test cases for the `/metrics` and `/metrics-json` endpoints."""
 
     def test_metrics_disabled(self, client):
-        """Test metrics endpoint when disabled."""
+        """Tests the `/metrics` endpoint when it might be disabled.
+
+        This test confirms that the endpoint exists but allows for either a
+        200 OK (if enabled) or 404 Not Found (if disabled) response, as this
+        can be configured.
+        """
         # Test that metrics endpoint exists (can't easily test disabled state)
         response = client.get("/metrics")
         assert response.status_code in [200, 404]  # Either enabled or disabled
 
     def test_metrics_json_success(self, client, mock_analyzer, mock_settings):
-        """Test successful JSON metrics retrieval."""
+        """Tests a successful retrieval of JSON-formatted metrics.
+
+        This test verifies that the `/metrics-json` endpoint returns a 200 OK
+        status and that the response contains the expected performance metrics.
+        """
         with (
             patch(
                 "app.models.pytorch_sentiment.get_sentiment_analyzer", return_value=mock_analyzer
@@ -181,10 +258,15 @@ class TestMetricsEndpoint:
 
 
 class TestModelInfoEndpoint:
-    """Test cases for the /model-info endpoint."""
+    """Contains test cases for the `/model-info` endpoint."""
 
     def test_model_info_success(self, client, mock_analyzer):
-        """Test successful model info retrieval."""
+        """Tests the successful retrieval of model information.
+
+        This test ensures that the `/model-info` endpoint returns a 200 OK
+        status and provides a response containing key details about the
+        loaded model, such as its name and readiness state.
+        """
         response = client.get("/model-info")
 
         assert response.status_code == 200

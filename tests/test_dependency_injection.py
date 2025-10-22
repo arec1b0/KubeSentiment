@@ -1,8 +1,9 @@
-"""
-Tests for dependency injection and service layer architecture.
+"""Tests for the dependency injection and service layer architecture.
 
-These tests verify that the new service-based approach works correctly,
-providing proper separation of concerns between models, services, and API layers.
+This module contains test cases to verify that the service-based architecture
+works as intended. It ensures proper separation of concerns between the model,
+service, and API layers, and confirms that the dependency injection system
+correctly provides service instances.
 """
 
 from unittest.mock import Mock, patch
@@ -18,10 +19,15 @@ from app.services.prediction import PredictionService
 
 
 class TestPredictionService:
-    """Test the PredictionService class functionality."""
+    """A test suite for the `PredictionService` class.
+
+    These tests verify the core business logic of the prediction service,
+    ensuring it correctly handles successful predictions, input validation,
+    and error conditions like the model not being ready.
+    """
 
     def test_prediction_service_initialization(self):
-        """Test that PredictionService initializes correctly."""
+        """Tests that the `PredictionService` initializes correctly with its dependencies."""
         mock_model = Mock(spec=ModelStrategy)
         mock_settings = Mock()
 
@@ -32,7 +38,7 @@ class TestPredictionService:
         assert hasattr(service, "logger")
 
     def test_predict_success(self):
-        """Test successful prediction through service."""
+        """Tests a successful prediction call through the service layer."""
         # Setup mocks
         mock_model = Mock(spec=ModelStrategy)
         mock_model.is_ready.return_value = True
@@ -54,20 +60,20 @@ class TestPredictionService:
         mock_model.predict.assert_called_once_with("I love this product!")
 
     def test_predict_empty_text_raises_error(self):
-        """Test that empty text raises TextEmptyError."""
+        """Tests that providing empty or whitespace-only text raises an exception."""
         mock_model = Mock(spec=ModelStrategy)
         mock_settings = Mock()
 
         service = PredictionService(model=mock_model, settings=mock_settings)
 
-        with pytest.raises(Exception):  # Should be TextEmptyError, but we'll test the behavior
+        with pytest.raises(Exception):  # Should be TextEmptyError
             service.predict("")
 
         with pytest.raises(Exception):
             service.predict("   ")
 
     def test_predict_model_not_ready_raises_error(self):
-        """Test that unavailable model raises ModelNotLoadedError."""
+        """Tests that an exception is raised if the model is not ready for prediction."""
         mock_model = Mock(spec=ModelStrategy)
         mock_model.is_ready.return_value = False
         mock_model.settings = Mock()
@@ -80,7 +86,7 @@ class TestPredictionService:
             service.predict("Some text")
 
     def test_get_model_status(self):
-        """Test getting model status through service."""
+        """Tests the retrieval of the model's status through the service."""
         mock_model = Mock(spec=ModelStrategy)
         mock_model.is_ready.return_value = True
         mock_model.get_model_info.return_value = {"model_name": "test-model"}
@@ -97,12 +103,20 @@ class TestPredictionService:
 
 
 class TestDependencyInjectionFunctions:
-    """Test the dependency injection functions in app.core.dependencies."""
+    """A test suite for the dependency injection functions.
+
+    These tests ensure that the functions in `app.core.dependencies`
+    correctly create and provide instances of services.
+    """
 
     @patch("app.models.factory.get_settings")
     @patch("app.models.pytorch_sentiment.pipeline")
     def test_get_prediction_service_integration(self, mock_pipeline, mock_get_settings):
-        """Test that get_prediction_service works with real dependencies."""
+        """Tests the `get_prediction_service` dependency provider.
+
+        This test verifies that the function successfully creates a
+        `PredictionService` instance with its dependencies resolved.
+        """
         # Setup mocks for the model creation chain
         mock_settings = Mock()
         mock_settings.allowed_models = ["test-model"]
@@ -121,17 +135,21 @@ class TestDependencyInjectionFunctions:
         assert hasattr(service, "get_model_status")
 
     def test_get_prediction_service_is_callable(self):
-        """Test that get_prediction_service is a callable function."""
+        """Performs a basic sanity check on the `get_prediction_service` function."""
         # Basic sanity check that the function exists and is callable
         assert callable(get_prediction_service)
         assert get_prediction_service.__name__ == "get_prediction_service"
 
 
 class TestTestingCapabilities:
-    """Test that the new approach improves testability."""
+    """A test suite to demonstrate the testability of the service-based architecture.
+
+    These tests show how the separation of concerns allows for easy mocking
+    and isolation of components during testing.
+    """
 
     def test_can_mock_model_in_prediction_service(self):
-        """Test that we can easily mock the model for testing."""
+        """Tests that the model dependency can be easily mocked for service-level tests."""
         mock_model = Mock(spec=ModelStrategy)
         mock_model.is_ready.return_value = True
         mock_model.predict.return_value = {"label": "POSITIVE", "score": 0.95}
@@ -146,7 +164,7 @@ class TestTestingCapabilities:
         mock_model.predict.assert_called_once_with("Test text")
 
     def test_service_isolation_between_tests(self):
-        """Test that services can be isolated between tests."""
+        """Tests that separate service instances can be created with different dependencies."""
         # Create two separate services with different models
         mock_model1 = Mock(spec=ModelStrategy)
         mock_model2 = Mock(spec=ModelStrategy)
@@ -161,7 +179,7 @@ class TestTestingCapabilities:
         assert service2.model is mock_model2
 
     def test_dependency_injection_can_be_mocked(self):
-        """Test that dependency injection can be easily mocked in tests."""
+        """Tests that the entire service can be mocked for API-level tests."""
         # Create a mock service directly (simulating what would happen in FastAPI tests)
         mock_service = Mock(spec=PredictionService)
         mock_service.predict.return_value = {"label": "NEGATIVE", "score": 0.85}
@@ -176,12 +194,16 @@ class TestTestingCapabilities:
 
 
 class TestModelFactoryIntegration:
-    """Test integration between ModelFactory and service layer."""
+    """A test suite for the `ModelFactory` and its integration with the service layer.
+
+    These tests ensure that the model factory correctly creates different
+    model backends based on the provided configuration.
+    """
 
     @patch("app.models.factory.get_settings")
     @patch("app.models.pytorch_sentiment.pipeline")
     def test_model_factory_creates_pytorch_model(self, mock_pipeline, mock_get_settings):
-        """Test that ModelFactory creates PyTorch model correctly."""
+        """Tests that the `ModelFactory` can successfully create a PyTorch model backend."""
         from app.models.factory import ModelFactory
 
         # Setup mocks
@@ -203,14 +225,14 @@ class TestModelFactoryIntegration:
 
     @patch("app.models.factory.ONNX_AVAILABLE", False)
     def test_model_factory_unsupported_backend_raises_error(self):
-        """Test that unsupported backend raises ValueError."""
+        """Tests that requesting an unsupported backend from the factory raises a `ValueError`."""
         from app.models.factory import ModelFactory
 
         with pytest.raises(ValueError, match="Unsupported backend"):
             ModelFactory.create_model("invalid_backend")
 
     def test_model_factory_available_backends(self):
-        """Test that available backends are correctly reported."""
+        """Tests that the factory correctly reports the list of available backends."""
         from app.models.factory import ModelFactory
 
         backends = ModelFactory.get_available_backends()
@@ -223,13 +245,17 @@ class TestModelFactoryIntegration:
 
 
 class TestServiceLayerIntegration:
-    """Test integration between service layer and model layer."""
+    """A test suite for the end-to-end integration of the service and model layers.
+
+    This test verifies that the full dependency injection chain is wired
+    correctly, from the top-level service provider down to the model creation.
+    """
 
     @patch("app.models.factory.get_settings")
     @patch("app.models.pytorch_sentiment.pipeline")
     @patch("app.core.dependencies.get_settings")
     def test_full_dependency_chain(self, mock_core_settings, mock_pipeline, mock_factory_settings):
-        """Test the full dependency injection chain."""
+        """Tests the full dependency injection chain from service to model."""
         # Setup mocks
         mock_factory_settings.return_value = Mock()
         mock_core_settings.return_value = Mock()

@@ -5,26 +5,21 @@ This module handles model loading, caching, and prediction logic
 for sentiment analysis using Hugging Face transformers.
 """
 
-import time
 import hashlib
-from typing import Dict, Optional, Any
+import time
 from collections import OrderedDict
+from typing import Any, Dict, Optional
 
 import torch
-from transformers import pipeline, Pipeline
+from transformers import Pipeline, pipeline
 
 from ..config import get_settings
+from ..exceptions import InvalidModelError, ModelInferenceError, ModelNotLoadedError, TextEmptyError
 from ..logging_config import (
+    get_contextual_logger,
     get_logger,
     log_model_operation,
     log_security_event,
-    get_contextual_logger,
-)
-from ..exceptions import (
-    ModelNotLoadedError,
-    ModelInferenceError,
-    InvalidModelError,
-    TextEmptyError,
 )
 
 # Import monitoring at module level to avoid circular imports
@@ -39,15 +34,20 @@ logger = get_logger(__name__)
 
 
 class SentimentAnalyzer:
-    """
-    A wrapper class for sentiment analysis using Hugging Face transformers.
+    """Manages sentiment analysis using a Hugging Face transformer model.
 
-    This class provides methods for model loading, prediction, and performance monitoring
-    with proper error handling and graceful degradation.
+    This class encapsulates the logic for loading a sentiment analysis model,
+    performing predictions, and caching results. It is designed to be a
+    self-contained component that can be easily integrated into the application.
+    It includes an LRU cache for predictions to improve performance for
+    repeated requests.
+
+    Attributes:
+        settings: The application's configuration settings.
     """
 
     def __init__(self):
-        """Initialize the sentiment analyzer."""
+        """Initializes the sentiment analyzer and loads the model."""
         self.settings = get_settings()
         self._pipeline: Optional[Pipeline] = None
         self._is_loaded = False
@@ -57,32 +57,33 @@ class SentimentAnalyzer:
         self._load_model()
 
     def _get_cache_key(self, text: str) -> str:
-        """
-        Generate a cache key for the given text.
+        """Generates a secure and efficient cache key for a given text.
 
-        Uses BLAKE2b for fast and secure cache key generation.
-        BLAKE2b is 8x faster than SHA-256 while providing equivalent security.
+        This method uses the BLAKE2b hashing algorithm, which is faster than
+        SHA-256 while providing a high level of security against collisions,
+        making it suitable for use in a caching system.
 
         Args:
-            text: The input text
+            text: The input text to be hashed.
 
         Returns:
-            str: A hash-based cache key
+            A hexadecimal string representing the hash of the text.
         """
         # Create a hash of the text for cache key using BLAKE2b with 16-byte digest
         return hashlib.blake2b(text.encode("utf-8"), digest_size=16).hexdigest()
 
     def _get_cached_prediction(self, cache_key: str) -> Optional[Dict[str, Any]]:
-        """
-        Retrieve a cached prediction if it exists.
+        """Retrieves a prediction from the cache if it exists.
 
-        Implements LRU behavior by moving accessed items to the end of the OrderedDict.
+        This method implements an LRU (Least Recently Used) caching policy by
+        moving any accessed item to the end of the `OrderedDict`, which marks
+        it as recently used.
 
         Args:
-            cache_key: The cache key to look up
+            cache_key: The cache key for the desired prediction.
 
         Returns:
-            Optional[Dict[str, Any]]: Cached prediction result or None
+            The cached prediction dictionary, or `None` if not found.
         """
         if cache_key in self._prediction_cache:
             # Move to end to mark as recently used (LRU)
@@ -93,15 +94,15 @@ class SentimentAnalyzer:
         return None
 
     def _cache_prediction(self, cache_key: str, result: Dict[str, Any]) -> None:
-        """
-        Cache a prediction result with LRU eviction.
+        """Adds a prediction to the cache and handles eviction.
 
-        Implements LRU (Least Recently Used) eviction strategy when cache size limit is reached.
-        Uses OrderedDict for O(1) eviction of least recently used items.
+        If the cache is full, this method evicts the least recently used item
+        before adding the new one. The `OrderedDict`'s behavior ensures that
+        the item at the beginning of the dictionary is the LRU item.
 
         Args:
-            cache_key: The cache key
-            result: The prediction result to cache
+            cache_key: The key under which to store the prediction.
+            result: The prediction dictionary to be cached.
         """
         if len(self._prediction_cache) >= self._cache_max_size:
             # Remove least recently used entry (first item in OrderedDict)
@@ -114,19 +115,16 @@ class SentimentAnalyzer:
         logger.debug(f"Cached prediction for text hash: {cache_key[:8]}...")
 
     def clear_cache(self) -> None:
-        """
-        Clear all cached predictions.
-        """
+        """Clears all entries from the prediction cache."""
         cache_size = len(self._prediction_cache)
         self._prediction_cache.clear()
         logger.info(f"Cleared prediction cache ({cache_size} entries)")
 
     def get_cache_stats(self) -> Dict[str, Any]:
-        """
-        Get cache statistics.
+        """Retrieves statistics about the prediction cache.
 
         Returns:
-            Dict[str, Any]: Cache statistics
+            A dictionary containing the current and maximum size of the cache.
         """
         return {
             "cache_size": len(self._prediction_cache),
@@ -135,17 +133,16 @@ class SentimentAnalyzer:
         }
 
     def _validate_model_name(self, model_name: str) -> None:
-        """
-        Validate that the model name is in the allowed list.
+        """Validates the model name against an allowed list from the settings.
 
-        Security-critical function that prevents loading of unauthorized models
-        which could lead to code execution or data exfiltration vulnerabilities.
+        This is a security measure to prevent the loading of arbitrary,
+        potentially malicious models from the Hugging Face Hub.
 
         Args:
-            model_name: The model name to validate
+            model_name: The name of the model to be validated.
 
         Raises:
-            ValueError: If model name is not in the allowed list
+            InvalidModelError: If the model name is not in the allowed list.
         """
         if model_name not in self.settings.allowed_models:
             log_security_event(
@@ -169,17 +166,11 @@ class SentimentAnalyzer:
         )
 
     def _load_model(self) -> None:
-        """
-        Load the sentiment analysis model from Hugging Face.
+        """Loads the sentiment analysis model from Hugging Face.
 
-        Attempts to load the specified model using the transformers pipeline.
-        Model validation is performed before loading to prevent security issues.
-        If loading fails, the analyzer will operate in degraded mode with is_ready() returning False.
-
-        Side Effects:
-            - Updates self._pipeline and self._is_loaded
-            - Updates monitoring metrics if available
-            - Logs model loading events
+        This method initializes the Hugging Face pipeline for sentiment
+        analysis. It first validates the model name for security. If the model
+        fails to load, the analyzer will be in a non-ready state.
         """
         try:
             # Validate model name first
@@ -233,25 +224,24 @@ class SentimentAnalyzer:
                 metrics.set_model_status(False)
 
     def is_ready(self) -> bool:
-        """
-        Check if the model is loaded and ready for predictions.
+        """Checks if the model is loaded and ready for inference.
 
         Returns:
-            bool: True if the model is ready, False otherwise
+            `True` if the model is loaded, `False` otherwise.
         """
         return self._is_loaded and self._pipeline is not None
 
     def _validate_input_text(self, text: str, logger) -> None:
-        """
-        Validate input text and model readiness.
+        """Validates the input text and ensures the model is ready.
 
         Args:
-            text: The input text to validate
-            logger: Logger instance for this request
+            text: The input text to be validated.
+            logger: The logger instance for this request.
 
         Raises:
-            ModelNotLoadedError: If model is not ready
-            TextEmptyError: If text is empty or whitespace
+            ModelNotLoadedError: If the model is not loaded and ready.
+            TextEmptyError: If the input text is empty or contains only
+                whitespace.
         """
         if not self.is_ready():
             logger.error(
@@ -275,18 +265,15 @@ class SentimentAnalyzer:
                 }
             )
 
-    def _try_get_cached_result(
-        self, text: str, logger
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Try to retrieve a cached prediction result.
+    def _try_get_cached_result(self, text: str, logger) -> Optional[Dict[str, Any]]:
+        """Attempts to retrieve a prediction from the cache.
 
         Args:
-            text: The input text
-            logger: Logger instance for this request
+            text: The input text for which to check the cache.
+            logger: The logger instance for this request.
 
         Returns:
-            Optional[Dict[str, Any]]: Cached result if found, None otherwise
+            The cached prediction dictionary if found, otherwise `None`.
         """
         cache_key = self._get_cache_key(text.strip())
         logger.debug("Generated cache key", cache_key_prefix=cache_key[:8])
@@ -307,15 +294,18 @@ class SentimentAnalyzer:
         return None
 
     def _preprocess_text(self, text: str, logger) -> tuple[str, str, bool]:
-        """
-        Preprocess input text (truncation if needed).
+        """Preprocesses the input text before inference.
+
+        Currently, this method's primary function is to truncate the text if
+        it exceeds the maximum configured length.
 
         Args:
-            text: The input text
-            logger: Logger instance for this request
+            text: The input text to be preprocessed.
+            logger: The logger instance for this request.
 
         Returns:
-            tuple: (processed_text, original_text, was_truncated)
+            A tuple containing the processed text, the original text, and a
+            boolean indicating if the text was truncated.
         """
         original_text = text
         text_truncated = False
@@ -336,19 +326,20 @@ class SentimentAnalyzer:
     def _run_model_inference(
         self, text: str, original_text: str, logger
     ) -> tuple[Dict[str, Any], float]:
-        """
-        Run the actual model inference.
+        """Runs the sentiment analysis model on the preprocessed text.
 
         Args:
-            text: The preprocessed text
-            original_text: The original unprocessed text
-            logger: Logger instance for this request
+            text: The preprocessed (and possibly truncated) text.
+            original_text: The original, unprocessed text.
+            logger: The logger instance for this request.
 
         Returns:
-            tuple: (prediction_result, inference_time_ms)
+            A tuple containing the prediction result dictionary and the
+            inference time in milliseconds.
 
         Raises:
-            ModelInferenceError: If inference fails
+            ModelInferenceError: If an error occurs during the model's
+                prediction process.
         """
         start_time = time.time()
         logger.debug("Starting model inference", operation_stage="inference_start")
@@ -391,13 +382,15 @@ class SentimentAnalyzer:
     def _record_prediction_metrics(
         self, score: float, text_length: int, inference_time_ms: float
     ) -> None:
-        """
-        Record prediction metrics for monitoring.
+        """Records Prometheus metrics for a prediction.
+
+        If monitoring is enabled, this method updates the relevant Prometheus
+        metrics, such as inference duration and prediction scores.
 
         Args:
-            score: The prediction confidence score
-            text_length: Length of the input text
-            inference_time_ms: Inference time in milliseconds
+            score: The confidence score of the prediction.
+            text_length: The length of the input text.
+            inference_time_ms: The inference time in milliseconds.
         """
         if MONITORING_AVAILABLE:
             metrics = get_metrics()
@@ -405,22 +398,22 @@ class SentimentAnalyzer:
             metrics.record_prediction_metrics(score, text_length)
 
     def predict(self, text: str) -> Dict[str, Any]:
-        """
-        Perform sentiment analysis on the input text.
+        """Performs sentiment analysis on a given text.
 
-        This is the main orchestrator method that coordinates the prediction workflow
-        using smaller, focused helper methods for better testability and maintainability.
+        This method orchestrates the entire prediction process, including input
+        validation, cache checking, text preprocessing, model inference, and
+        result caching.
 
         Args:
-            text (str): The input text to analyze
+            text: The input text to be analyzed.
 
         Returns:
-            Dict[str, Any]: Prediction result with label, score, and metadata
+            A dictionary containing the prediction results.
 
         Raises:
-            ModelNotLoadedError: If the model is not loaded
-            TextEmptyError: If the input text is invalid
-            ModelInferenceError: If prediction fails
+            ModelNotLoadedError: If the model is not ready for inference.
+            TextEmptyError: If the input text is empty.
+            ModelInferenceError: If an error occurs during inference.
         """
         # Create contextual logger for this prediction
         prediction_logger = get_contextual_logger(
@@ -475,11 +468,11 @@ class SentimentAnalyzer:
         return prediction_result
 
     def get_model_info(self) -> Dict[str, Any]:
-        """
-        Get information about the loaded model.
+        """Retrieves metadata about the PyTorch model and its environment.
 
         Returns:
-            Dict[str, Any]: Model information and status
+            A dictionary containing details about the model, its readiness,
+            and the underlying PyTorch and CUDA environment.
         """
         cache_stats = self.get_cache_stats()
         return {
@@ -489,18 +482,16 @@ class SentimentAnalyzer:
             "cache_dir": self.settings.model_cache_dir,
             "torch_version": torch.__version__,
             "cuda_available": torch.cuda.is_available(),
-            "device_count": torch.cuda.device_count()
-            if torch.cuda.is_available()
-            else 0,
+            "device_count": torch.cuda.device_count() if torch.cuda.is_available() else 0,
             "cache_stats": cache_stats,
         }
 
     def get_performance_metrics(self) -> Dict[str, Any]:
-        """
-        Get performance metrics for the model.
+        """Retrievess performance metrics, particularly related to CUDA.
 
         Returns:
-            Dict[str, Any]: Performance metrics
+            A dictionary of performance metrics, including CUDA memory usage if
+            a GPU is available.
         """
         metrics = {
             "torch_version": torch.__version__,
@@ -510,12 +501,8 @@ class SentimentAnalyzer:
         if torch.cuda.is_available():
             metrics.update(
                 {
-                    "cuda_memory_allocated_mb": round(
-                        torch.cuda.memory_allocated() / 1e6, 2
-                    ),
-                    "cuda_memory_reserved_mb": round(
-                        torch.cuda.memory_reserved() / 1e6, 2
-                    ),
+                    "cuda_memory_allocated_mb": round(torch.cuda.memory_allocated() / 1e6, 2),
+                    "cuda_memory_reserved_mb": round(torch.cuda.memory_reserved() / 1e6, 2),
                     "cuda_device_count": torch.cuda.device_count(),
                 }
             )
@@ -536,23 +523,24 @@ from functools import lru_cache
 
 @lru_cache(maxsize=1)
 def get_sentiment_analyzer() -> SentimentAnalyzer:
-    """
-    Dependency injection function to get the sentiment analyzer.
+    """Creates and retrieves a singleton instance of the sentiment analyzer.
 
-    Uses lru_cache to ensure a single instance per application,
-    providing proper singleton behavior without global state.
-    This is thread-safe and can be easily mocked for testing.
+    This factory function uses `@lru_cache(maxsize=1)` to ensure that only one
+    instance of the `SentimentAnalyzer` is created. This approach provides
+    thread-safe, singleton-like behavior, which is efficient for managing a
+    resource-intensive object like a model.
 
     Returns:
-        SentimentAnalyzer: The sentiment analyzer instance
+        The singleton instance of the `SentimentAnalyzer`.
     """
     return SentimentAnalyzer()
 
 
 def reset_sentiment_analyzer() -> None:
-    """
-    Reset the analyzer instance (useful for testing).
+    """Resets the singleton instance of the sentiment analyzer.
 
-    Clears the lru_cache to allow a fresh instance to be created.
+    This function is primarily intended for use in testing scenarios where a
+    fresh instance of the analyzer is needed for different test cases. It
+    works by clearing the cache of the `get_sentiment_analyzer` function.
     """
     get_sentiment_analyzer.cache_clear()

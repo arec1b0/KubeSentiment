@@ -12,20 +12,26 @@ logger = get_logger(__name__)
 
 
 class HealthChecker:
-    """
-    Health checker for models and services.
+    """Provides methods for checking the health of system components.
+
+    This class centralizes health-checking logic, offering a consistent way to
+    verify the status of different parts of the application, such as machine
+    learning models and the underlying system resources.
     """
 
     @staticmethod
     def check_model_health(model) -> Dict[str, Any]:
-        """
-        Check the health of a model.
+        """Checks the health and readiness of a given model instance.
+
+        This method queries the model for its readiness status and detailed
+        information, providing a comprehensive overview of its health.
 
         Args:
-            model: The model instance to check
+            model: An instance of a model that adheres to the `ModelStrategy`
+                protocol.
 
         Returns:
-            Dict[str, Any]: Health status information
+            A dictionary containing the model's health status.
         """
         try:
             is_ready = model.is_ready()
@@ -47,11 +53,14 @@ class HealthChecker:
 
     @staticmethod
     def check_system_health() -> Dict[str, Any]:
-        """
-        Check overall system health.
+        """Checks the overall health of the system.
+
+        This method gathers key metrics about the system's resources, such as
+        CPU and memory usage. It can be used to detect if the system is under
+        heavy load, which might impact the application's performance.
 
         Returns:
-            Dict[str, Any]: System health information
+            A dictionary containing system health metrics.
         """
         import psutil
         import torch
@@ -81,4 +90,3 @@ class HealthChecker:
                 "status": "unknown",
                 "error": str(e),
             }
-

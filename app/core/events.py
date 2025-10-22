@@ -17,16 +17,18 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """
-    Application lifespan manager.
+    """Manages the application's startup and shutdown events.
 
-    Handles startup and shutdown events for proper resource management.
+    This asynchronous context manager is used by FastAPI to handle application
+    lifecycle events. The code before the `yield` statement is executed on
+    startup, and the code after is executed on shutdown. It ensures that
+    resources like model connections are properly initialized and released.
 
     Args:
-        app: The FastAPI application instance
+        app: The FastAPI application instance.
 
     Yields:
-        None: Control during the application lifetime
+        Control back to the application, which runs until it's terminated.
     """
     settings = get_settings()
 
@@ -66,4 +68,3 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Application shutdown initiated")
     # Add any cleanup logic here if needed
     logger.info("Application shutdown complete")
-

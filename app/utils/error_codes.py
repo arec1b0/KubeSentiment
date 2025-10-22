@@ -6,12 +6,18 @@ for consistent error handling across the API.
 """
 
 from enum import Enum
-from typing import Dict, Any
+from typing import Any, Dict
+
 from fastapi import HTTPException
 
 
 class ErrorCode(str, Enum):
-    """Standardized error codes for the service."""
+    """Defines standardized error codes for the application.
+
+    This enumeration centralizes all error codes, making them easy to manage
+    and reference. The codes are categorized by their nature (e.g., input
+    validation, model errors).
+    """
 
     # Input validation errors (1000-1099)
     INVALID_INPUT_TEXT = "E1001"
@@ -35,7 +41,11 @@ class ErrorCode(str, Enum):
 
 
 class ErrorMessages:
-    """Error messages corresponding to error codes."""
+    """Provides human-readable messages for each error code.
+
+    This class maps each `ErrorCode` to a descriptive message, which can be
+    used in API error responses.
+    """
 
     MESSAGES = {
         ErrorCode.INVALID_INPUT_TEXT: "Invalid input text provided",
@@ -54,7 +64,15 @@ class ErrorMessages:
 
     @classmethod
     def get_message(cls, error_code: ErrorCode) -> str:
-        """Get the message for an error code."""
+        """Retrieves the message for a given error code.
+
+        Args:
+            error_code: The `ErrorCode` for which to get the message.
+
+        Returns:
+            The corresponding error message, or a default message if the
+            code is not found.
+        """
         return cls.MESSAGES.get(error_code, "Unknown error occurred")
 
 
@@ -64,17 +82,20 @@ def create_error_response(
     status_code: int = 400,
     **additional_context,
 ) -> Dict[str, Any]:
-    """
-    Create a standardized error response.
+    """Constructs a standardized error response dictionary.
+
+    This function creates a consistent structure for all API error responses,
+    including the error code, a message, and any additional context.
 
     Args:
-        error_code: The error code
-        detail: Additional detail message
-        status_code: HTTP status code
-        **additional_context: Additional context data
+        error_code: The `ErrorCode` for this error.
+        detail: A more specific, human-readable message about the error.
+        status_code: The HTTP status code for the response.
+        **additional_context: Any extra information to include in the
+            'context' field of the response.
 
     Returns:
-        Dict[str, Any]: Standardized error response
+        A dictionary representing the standardized error response.
     """
     response = {
         "error_code": error_code.value,
@@ -97,19 +118,22 @@ def raise_validation_error(
     status_code: int = 400,
     **additional_context,
 ) -> None:
-    """
-    Raise a validation error with standardized format.
+    """Creates a standardized error response and raises it as an `HTTPException`.
+
+    This utility function is a convenient way to raise exceptions that will be
+    automatically handled by FastAPI and converted into a JSON error response.
 
     Args:
-        error_code: The error code
-        detail: Additional detail message
-        status_code: HTTP status code
-        **additional_context: Additional context data
+        error_code: The `ErrorCode` for this error.
+        detail: A more specific, human-readable message about the error.
+        status_code: The HTTP status code for the exception.
+        **additional_context: Any extra information to include in the
+            error response.
 
     Raises:
-        HTTPException: Formatted validation error
+        HTTPException: An exception that FastAPI will convert into a
+            standardized JSON error response.
     """
-    error_response = create_error_response(
-        error_code, detail, status_code, **additional_context
-    )
+    error_response = create_error_response(error_code, detail, status_code, **additional_context)
+    raise HTTPException(status_code=status_code, detail=error_response)
     raise HTTPException(status_code=status_code, detail=error_response)

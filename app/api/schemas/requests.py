@@ -9,7 +9,16 @@ from app.utils.exceptions import TextEmptyError, TextTooLongError
 
 
 class TextInput(BaseModel):
-    """Input schema for text analysis requests."""
+    """Defines the schema for requests containing text to be analyzed.
+
+    This Pydantic model is used to validate the input for the prediction
+    endpoints. It ensures that the incoming JSON payload contains a `text`
+    field that is a non-empty string and does not exceed the configured
+    maximum length.
+
+    Attributes:
+        text: The input text to be analyzed.
+    """
 
     text: str = Field(
         ...,
@@ -22,7 +31,24 @@ class TextInput(BaseModel):
     @field_validator("text")
     @classmethod
     def validate_text(cls, v: str) -> str:
-        """Validate and clean input text."""
+        """Validates and sanitizes the input text.
+
+        This validator checks two main conditions:
+        1. The text must not be empty or contain only whitespace.
+        2. The text's length must not exceed the `max_text_length` setting.
+
+        It also strips leading and trailing whitespace from the text.
+
+        Args:
+            v: The raw input text from the request.
+
+        Returns:
+            The validated and stripped text.
+
+        Raises:
+            TextEmptyError: If the input text is empty.
+            TextTooLongError: If the input text exceeds the maximum allowed length.
+        """
         if not v or not v.strip():
             raise TextEmptyError(context={"text_length": len(v) if v else 0})
 
@@ -38,4 +64,3 @@ class TextInput(BaseModel):
             )
 
         return v.strip()
-

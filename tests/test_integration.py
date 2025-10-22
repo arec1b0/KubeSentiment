@@ -1,8 +1,8 @@
-"""
-Integration tests for the MLOps sentiment analysis service.
+"""Integration tests for the MLOps sentiment analysis service.
 
-These tests verify end-to-end functionality including API endpoints,
-model loading, caching, monitoring, and error handling across the full stack.
+These tests verify the end-to-end functionality of the application,
+including API endpoints, model loading, caching, monitoring, and error
+handling across the full stack.
 """
 
 import asyncio
@@ -20,27 +20,49 @@ from app.main import create_app
 
 
 class TestFullRequestFlow:
-    """Test complete request flows from API to model inference."""
+    """A test suite for the complete request flows, from API to model inference.
+
+    These tests verify the end-to-end behavior of the primary application
+    features, such as prediction, health checks, and metrics, ensuring all
+    components are correctly integrated.
+    """
 
     @pytest.fixture
     def test_settings(self):
-        """Create test settings with validation."""
+        """Creates a `Settings` object tailored for integration testing.
+
+        This fixture provides a consistent configuration for tests, with
+        features like metrics enabled and authentication disabled for simplicity.
+
+        Returns:
+            A `Settings` object for testing.
+        """
         return Settings(
             debug=True,
             model_name="distilbert-base-uncased-finetuned-sst-2-english",
             allowed_models=["distilbert-base-uncased-finetuned-sst-2-english"],
-            max_text_length=100,
+            max_text_length=1000,
             prediction_cache_max_size=10,
             enable_metrics=True,
             api_key=None,  # No auth for integration tests
-            allowed_origins=["*"],
         )
 
     @pytest.fixture
     def client(self, test_settings):
-        """Create test client with mocked dependencies."""
-        with patch("app.config.get_settings", return_value=test_settings):
-            with patch("app.ml.sentiment.pipeline") as mock_pipeline:
+        """Creates a `TestClient` with mocked dependencies for the full app.
+
+        This fixture sets up the FastAPI application but patches the underlying
+        Hugging Face pipeline to avoid loading the actual model. This allows for
+        fast, isolated integration tests of the application stack.
+
+        Args:
+            test_settings: The test settings fixture.
+
+        Yields:
+            A `TestClient` instance for the application.
+        """
+        with patch("app.core.config.get_settings", return_value=test_settings):
+            with patch("app.models.pytorch_sentiment.pipeline") as mock_pipeline:
                 # Mock the transformers pipeline
                 mock_model = Mock()
                 mock_model.return_value = [{"label": "POSITIVE", "score": 0.95}]
@@ -55,7 +77,11 @@ class TestFullRequestFlow:
                 yield TestClient(app)
 
     def test_successful_prediction_flow(self, client):
-        """Test successful end-to-end prediction flow."""
+        """Tests the full, successful prediction flow from request to response.
+
+        This test verifies the status code, response body structure, and key
+        values for a standard prediction request.
+        """
         # Test data
         test_text = "I love this product!"
 
@@ -67,15 +93,16 @@ class TestFullRequestFlow:
         data = response.json()
 
         # Check response structure
-        assert "label" in data
-        assert "score" in data
+        assert "sentiment" in data
+        assert "label" in data["sentiment"]
+        assert "score" in data["sentiment"]
         assert "inference_time_ms" in data
         assert "model_name" in data
         assert "text_length" in data
 
         # Check response values
-        assert data["label"] == "POSITIVE"
-        assert data["score"] == 0.95
+        assert data["sentiment"]["label"] == "POSITIVE"
+        assert data["sentiment"]["score"] == 0.95
         assert data["text_length"] == len(test_text)
         assert data["model_name"] == "distilbert-base-uncased-finetuned-sst-2-english"
         assert isinstance(data["inference_time_ms"], (int, float))
@@ -83,9 +110,14 @@ class TestFullRequestFlow:
 
         # Check response headers
         assert "X-Inference-Time-MS" in response.headers
+        assert "X-Correlation-ID" in response.headers
 
     def test_prediction_caching_flow(self, client):
-        """Test that prediction caching works correctly."""
+        """Tests that the prediction caching mechanism works correctly end-to-end.
+
+        This test makes the same request twice and verifies that the second
+        response is served from the cache.
+        """
         test_text = "This is a test message for caching"
 
         # First request - should not be cached
@@ -101,12 +133,12 @@ class TestFullRequestFlow:
         assert data2.get("cached", False) is True
 
         # Results should be identical except for cached flag
-        assert data1["label"] == data2["label"]
-        assert data1["score"] == data2["score"]
+        assert data1["sentiment"]["label"] == data2["sentiment"]["label"]
+        assert data1["sentiment"]["score"] == data2["sentiment"]["score"]
         assert data1["text_length"] == data2["text_length"]
 
     def test_health_check_flow(self, client):
-        """Test health check endpoint functionality."""
+        """Tests the `/health` endpoint to ensure it returns a healthy status."""
         response = client.get("/health")
 
         assert response.status_code == 200
@@ -121,10 +153,10 @@ class TestFullRequestFlow:
         # Check values
         assert data["status"] == "healthy"
         assert data["model_status"] == "available"
-        assert isinstance(data["timestamp"], (int, float))
+        assert isinstance(data["timestamp"], str)
 
     def test_metrics_endpoint_flow(self, client):
-        """Test metrics endpoint functionality."""
+        """Tests the functionality of the `/metrics` and `/metrics-json` endpoints."""
         # First make some predictions to generate metrics
         client.post("/predict", json={"text": "Test message 1"})
         client.post("/predict", json={"text": "Test message 2"})
@@ -142,7 +174,7 @@ class TestFullRequestFlow:
         assert "sentiment_inference_duration_seconds" in metrics_text
 
         # Get JSON metrics
-        response_json = client.get("/metrics-json")
+        response_json = client.get("/api/v1/metrics/json")
         assert response_json.status_code == 200
 
         data = response_json.json()
@@ -150,8 +182,8 @@ class TestFullRequestFlow:
         assert "cuda_available" in data
 
     def test_model_info_flow(self, client):
-        """Test model info endpoint functionality."""
-        response = client.get("/model-info")
+        """Tests the `/api/v1/info/model` endpoint to ensure it returns correct model metadata."""
+        response = client.get("/api/v1/info/model")
 
         assert response.status_code == 200
         data = response.json()
@@ -171,19 +203,28 @@ class TestFullRequestFlow:
 
 
 class TestErrorHandlingFlow:
-    """Test error handling across the full stack."""
+    """A test suite for verifying error handling across the full application stack.
+
+    These tests cover scenarios like authentication failures, model loading
+    errors, and input validation errors, ensuring the API responds with the
+
+    correct status codes and error details.
+    """
 
     @pytest.fixture
     def client_with_auth(self):
-        """Create client with API key authentication."""
+        """Creates a `TestClient` with API key authentication enabled.
+
+        Yields:
+            A `TestClient` instance configured to require an API key.
+        """
         test_settings = Settings(
             debug=False,
             api_key="test123key",  # Valid API key
-            allowed_origins=["*"],
         )
 
-        with patch("app.config.get_settings", return_value=test_settings):
-            with patch("app.ml.sentiment.pipeline") as mock_pipeline:
+        with patch("app.core.config.get_settings", return_value=test_settings):
+            with patch("app.models.pytorch_sentiment.pipeline") as mock_pipeline:
                 mock_model = Mock()
                 mock_model.return_value = [{"label": "POSITIVE", "score": 0.95}]
                 mock_pipeline.return_value = mock_model
@@ -192,7 +233,7 @@ class TestErrorHandlingFlow:
                 yield TestClient(app)
 
     def test_authentication_error_flow(self, client_with_auth):
-        """Test authentication error handling."""
+        """Tests the authentication flow with and without a valid API key."""
         # Request without API key
         response = client_with_auth.post("/predict", json={"text": "test"})
         assert response.status_code == 401
@@ -212,7 +253,11 @@ class TestErrorHandlingFlow:
 
     @pytest.fixture
     def client_with_broken_model(self):
-        """Create client with model that fails to load."""
+        """Creates a `TestClient` where the model is mocked to fail on loading.
+
+        Yields:
+            A `TestClient` instance configured with a failing model.
+        """
         test_settings = Settings(
             debug=True,
             model_name="invalid-model",
@@ -220,13 +265,20 @@ class TestErrorHandlingFlow:
             api_key=None,
         )
 
-        with patch("app.config.get_settings", return_value=test_settings):
-            with patch("app.ml.sentiment.pipeline", side_effect=Exception("Model load failed")):
+        with patch("app.core.config.get_settings", return_value=test_settings):
+            with patch(
+                "app.models.pytorch_sentiment.pipeline", side_effect=Exception("Model load failed")
+            ):
                 app = create_app()
                 yield TestClient(app)
 
     def test_model_loading_error_flow(self, client_with_broken_model):
-        """Test handling of model loading failures."""
+        """Tests how the application behaves when the model fails to load.
+
+        This test verifies that the health check reports the model as
+        unavailable and that prediction requests fail with a 503 Service
+        Unavailable status.
+        """
         # Health check should show model unavailable
         response = client_with_broken_model.get("/health")
         assert response.status_code == 200
@@ -239,7 +291,7 @@ class TestErrorHandlingFlow:
         assert "MODEL_NOT_LOADED" in response.json()["error_code"]
 
     def test_validation_error_flow(self, client):
-        """Test input validation error handling."""
+        """Tests the API's response to various input validation errors."""
         # Empty text
         response = client.post("/predict", json={"text": ""})
         assert response.status_code == 400
@@ -250,22 +302,33 @@ class TestErrorHandlingFlow:
         assert response.status_code == 422  # Pydantic validation error
 
         # Text too long
-        long_text = "x" * 1000  # Exceeds max_text_length of 100
+        long_text = "x" * 2000  # Exceeds max_text_length
         response = client.post("/predict", json={"text": long_text})
         assert response.status_code == 400
         assert "TEXT_TOO_LONG" in response.json()["error_code"]
 
 
 class TestConcurrencyAndPerformance:
-    """Test concurrent requests and performance characteristics."""
+    """A test suite for concurrency and performance characteristics.
+
+    These tests assess the service's ability to handle multiple requests
+    concurrently and measure the performance benefits of features like caching.
+    """
 
     @pytest.fixture
     def client(self):
-        """Create client for performance testing."""
+        """Creates a `TestClient` for performance and concurrency testing.
+
+        This fixture uses a mock model with an artificial delay to simulate
+        real-world inference latency.
+
+        Yields:
+            A `TestClient` instance.
+        """
         test_settings = Settings(debug=False, prediction_cache_max_size=100, api_key=None)
 
-        with patch("app.config.get_settings", return_value=test_settings):
-            with patch("app.ml.sentiment.pipeline") as mock_pipeline:
+        with patch("app.core.config.get_settings", return_value=test_settings):
+            with patch("app.models.pytorch_sentiment.pipeline") as mock_pipeline:
                 # Mock with slight delay to simulate real inference
                 def mock_inference(text):
                     time.sleep(0.01)  # 10ms delay
@@ -278,7 +341,7 @@ class TestConcurrencyAndPerformance:
                 yield TestClient(app)
 
     def test_concurrent_requests(self, client):
-        """Test handling of concurrent requests."""
+        """Tests the service's ability to handle multiple concurrent requests."""
         import queue
         import threading
 
@@ -313,7 +376,7 @@ class TestConcurrencyAndPerformance:
         assert success_count == 10
 
     def test_cache_performance(self, client):
-        """Test cache performance under load."""
+        """Tests the performance improvement provided by the prediction cache."""
         test_messages = [
             "This is test message 1",
             "This is test message 2",
@@ -340,12 +403,17 @@ class TestConcurrencyAndPerformance:
 
 
 class TestConfigurationIntegration:
-    """Test configuration validation in real application context."""
+    """A test suite for configuration validation in a real application context.
+
+    These tests ensure that the application correctly handles both valid and
+    invalid configurations, including loading from environment variables and
+    preventing startup on invalid settings.
+    """
 
     def test_invalid_configuration_prevents_startup(self):
-        """Test that invalid configuration prevents application startup."""
+        """Tests that an invalid `Settings` configuration raises a `ValueError`."""
         # Test invalid model name not in allowed list
-        with pytest.raises(ValueError, match="not in allowed models"):
+        with pytest.raises(ValueError, match="is not in the list of allowed models"):
             Settings(model_name="unauthorized-model", allowed_models=["valid-model"])
 
         # Test invalid port range
@@ -357,7 +425,7 @@ class TestConfigurationIntegration:
             Settings(log_level="INVALID")
 
     def test_configuration_validation_with_environment(self):
-        """Test configuration validation with environment variables."""
+        """Tests that the `Settings` model correctly loads values from environment variables."""
         import os
 
         # Test valid configuration
@@ -377,15 +445,23 @@ class TestConfigurationIntegration:
 
 
 class TestMonitoringIntegration:
-    """Test monitoring and metrics integration."""
+    """A test suite for the monitoring and metrics integration.
+
+    These tests verify that the application correctly collects and exposes
+    Prometheus metrics for requests and system status.
+    """
 
     @pytest.fixture
     def client(self):
-        """Create client with monitoring enabled."""
+        """Creates a `TestClient` with monitoring enabled.
+
+        Yields:
+            A `TestClient` instance configured for metrics collection.
+        """
         test_settings = Settings(debug=False, enable_metrics=True, api_key=None)
 
-        with patch("app.config.get_settings", return_value=test_settings):
-            with patch("app.ml.sentiment.pipeline") as mock_pipeline:
+        with patch("app.core.config.get_settings", return_value=test_settings):
+            with patch("app.models.pytorch_sentiment.pipeline") as mock_pipeline:
                 mock_model = Mock()
                 mock_model.return_value = [{"label": "POSITIVE", "score": 0.95}]
                 mock_pipeline.return_value = mock_model
@@ -394,7 +470,7 @@ class TestMonitoringIntegration:
                 yield TestClient(app)
 
     def test_metrics_collection_flow(self, client):
-        """Test that metrics are properly collected during requests."""
+        """Tests that Prometheus metrics are correctly collected and exposed."""
         # Make some requests
         client.post("/predict", json={"text": "Test 1"})
         client.post("/predict", json={"text": "Test 2"})
@@ -416,7 +492,10 @@ class TestMonitoringIntegration:
         assert "sentiment_torch_version" in metrics_text
 
     def test_metrics_caching(self, client):
-        """Test metrics response caching."""
+        """Tests that the response from the `/metrics` endpoint is cached for performance.
+
+        This is an indirect test of the `CachedPrometheusMetrics` middleware.
+        """
         # First request
         start_time = time.time()
         response1 = client.get("/metrics")

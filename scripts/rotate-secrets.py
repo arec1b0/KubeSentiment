@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
-"""
-Script for automated secret rotation in HashiCorp Vault.
+"""A script for the automated rotation of secrets in HashiCorp Vault.
 
-This script implements blue-green secret rotation with zero-downtime:
-1. Generates new secrets with appropriate complexity
-2. Updates Vault with new secret versions
-3. Triggers rolling updates in Kubernetes
-4. Verifies rotation success
-5. Rolls back if verification fails
-
-Usage:
-    python scripts/rotate-secrets.py --vault-addr http://vault:8200 --environment prod --secret api_key
+This script implements a zero-downtime secret rotation strategy. It generates
+new secrets, updates them in Vault, and can trigger a rolling update of a
+Kubernetes deployment to ensure that applications pick up the new secrets
+without service interruption.
 """
 
 import argparse
@@ -37,7 +31,17 @@ logger = logging.getLogger(__name__)
 
 
 class SecretRotator:
-    """Handles automated secret rotation with zero-downtime."""
+    """Handles the automated rotation of secrets in Vault with zero downtime.
+
+    This class encapsulates the logic for connecting to Vault, generating new
+    secrets, updating them in Vault, and coordinating with Kubernetes to
+    perform a rolling update of deployments to apply the new secrets.
+
+    Attributes:
+        vault_addr: The address of the Vault server.
+        mount_point: The mount point of the KV v2 secrets engine in Vault.
+        client: The `hvac` client for communicating with Vault.
+    """
 
     def __init__(
         self,
@@ -46,7 +50,17 @@ class SecretRotator:
         mount_point: str = "mlops-sentiment",
         namespace: Optional[str] = None,
     ):
-        """Initialize the secret rotator."""
+        """Initializes the `SecretRotator`.
+
+        Args:
+            vault_addr: The address of the Vault server.
+            vault_token: The Vault token for authentication.
+            mount_point: The mount point for the KV v2 secrets engine.
+            namespace: The Vault namespace to use (for Enterprise versions).
+
+        Raises:
+            RuntimeError: If authentication with Vault fails.
+        """
         self.vault_addr = vault_addr
         self.mount_point = mount_point
 
@@ -58,14 +72,16 @@ class SecretRotator:
         logger.info(f"Connected to Vault at {vault_addr}")
 
     def generate_api_key(self, length: int = 32) -> str:
-        """
-        Generate a secure random API key.
+        """Generates a cryptographically secure, random API key.
+
+        The generated key is guaranteed to contain uppercase letters, lowercase
+        letters, and digits to meet common complexity requirements.
 
         Args:
-            length: Length of the key
+            length: The desired length of the API key.
 
         Returns:
-            Secure random API key
+            A new, randomly generated API key.
         """
         alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
         key = "".join(secrets.choice(alphabet) for _ in range(length))
@@ -81,14 +97,13 @@ class SecretRotator:
         return key
 
     def generate_password(self, length: int = 24) -> str:
-        """
-        Generate a secure random password.
+        """Generates a cryptographically secure, random password.
 
         Args:
-            length: Length of the password
+            length: The desired length of the password.
 
         Returns:
-            Secure random password
+            A new, randomly generated password.
         """
         alphabet = string.ascii_letters + string.digits + "!@#$%^&*()-_=+"
         password = "".join(secrets.choice(alphabet) for _ in range(length))
@@ -101,17 +116,21 @@ class SecretRotator:
         new_value: Optional[str] = None,
         secret_type: str = "api_key",
     ) -> bool:
-        """
-        Rotate a secret in Vault.
+        """Rotates a secret in Vault by creating a new version of it.
+
+        This method will auto-generate a new value for the secret if one is not
+        provided. It also backs up the current version of the secret before
+        overwriting it.
 
         Args:
-            environment: Environment name
-            secret_key: Secret key to rotate
-            new_value: New secret value (auto-generated if not provided)
-            secret_type: Type of secret for auto-generation
+            environment: The name of the environment (e.g., 'dev', 'prod').
+            secret_key: The key of the secret to be rotated.
+            new_value: An optional new value for the secret. If not provided,
+                a new value will be generated based on the `secret_type`.
+            secret_type: The type of the secret, used for auto-generation.
 
         Returns:
-            True if successful
+            `True` if the rotation is successful, `False` otherwise.
         """
         try:
             secret_path = f"mlops-sentiment/{environment}/{secret_key}"
@@ -154,15 +173,17 @@ class SecretRotator:
             return False
 
     def verify_secret_rotation(self, environment: str, secret_key: str) -> bool:
-        """
-        Verify that secret rotation was successful.
+        """Verifies that a secret has been successfully rotated.
+
+        This method checks that the secret exists in Vault and that it has been
+        recently updated.
 
         Args:
-            environment: Environment name
-            secret_key: Secret key to verify
+            environment: The name of the environment where the secret is stored.
+            secret_key: The key of the secret to be verified.
 
         Returns:
-            True if rotation was successful
+            `True` if the verification is successful, `False` otherwise.
         """
         try:
             secret_path = f"mlops-sentiment/{environment}/{secret_key}"
@@ -185,19 +206,23 @@ class SecretRotator:
             return False
 
     def trigger_kubernetes_rollout(self, namespace: str, deployment_name: str) -> bool:
-        """
-        Trigger a rolling update in Kubernetes.
+        """Triggers a rolling update for a Kubernetes deployment.
+
+        This is achieved by adding an annotation with the current timestamp to
+        the deployment's pod template, which causes Kubernetes to initiate a
+        rollout. The method then waits for the rollout to complete.
 
         Args:
-            namespace: Kubernetes namespace
-            deployment_name: Deployment name
+            namespace: The Kubernetes namespace of the deployment.
+            deployment_name: The name of the deployment to be updated.
 
         Returns:
-            True if successful
+            `True` if the rollout is triggered and completes successfully,
+            `False` otherwise.
         """
         try:
             config.load_incluster_config()
-        except:
+        except config.ConfigException:
             try:
                 config.load_kube_config()
             except Exception as e:
@@ -231,7 +256,20 @@ class SecretRotator:
             return False
 
     def _wait_for_rollout(self, namespace: str, deployment_name: str, timeout: int = 300) -> bool:
-        """Wait for deployment rollout to complete."""
+        """Waits for a Kubernetes deployment rollout to complete.
+
+        This method polls the status of the deployment until all of its
+        replicas have been updated and are available.
+
+        Args:
+            namespace: The Kubernetes namespace of the deployment.
+            deployment_name: The name of the deployment.
+            timeout: The maximum time in seconds to wait for the rollout.
+
+        Returns:
+            `True` if the rollout completes within the timeout, `False`
+            otherwise.
+        """
         apps_v1 = client.AppsV1Api()
         start_time = time.time()
 
@@ -261,7 +299,12 @@ class SecretRotator:
 
 
 def main():
-    """Main rotation script."""
+    """The main entry point for the secret rotation script.
+
+    This function handles command-line argument parsing, sets up the
+    `SecretRotator`, and orchestrates the secret rotation process, including
+    verification and optional Kubernetes rollouts.
+    """
     parser = argparse.ArgumentParser(
         description="Rotate secrets in HashiCorp Vault with zero-downtime"
     )

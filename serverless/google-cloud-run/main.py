@@ -1,22 +1,22 @@
-"""
-Google Cloud Run handler for ONNX sentiment analysis.
+"""Google Cloud Run handler for ONNX sentiment analysis.
 
 This module provides a serverless deployment option for the sentiment
-analysis model using Google Cloud Run with ONNX Runtime.
+analysis model using Google Cloud Run with ONNX Runtime. It includes a
+FastAPI application, a lightweight ONNX predictor, and an in-memory cache.
 """
 
 import os
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
+import numpy as np
+import onnxruntime as ort
+import structlog
+import torch
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-import onnxruntime as ort
 from transformers import AutoTokenizer
-import torch
-import numpy as np
-import structlog
 
 # Setup logging
 logger = structlog.get_logger()
@@ -29,13 +29,25 @@ app = FastAPI(
 
 
 class SentimentRequest(BaseModel):
-    """Request model for sentiment analysis."""
+    """Request model for sentiment analysis.
+
+    Attributes:
+        text: The input text to be analyzed.
+    """
 
     text: str = Field(..., min_length=1, max_length=5000)
 
 
 class SentimentResponse(BaseModel):
-    """Response model for sentiment analysis."""
+    """Response model for sentiment analysis.
+
+    Attributes:
+        label: The predicted sentiment label (e.g., "POSITIVE").
+        score: The confidence score of the prediction.
+        inference_time_ms: The time taken for model inference.
+        model_type: The type of the model used.
+        cached: A flag indicating if the response was served from cache.
+    """
 
     label: str
     score: float
@@ -45,16 +57,37 @@ class SentimentResponse(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    """Health check response."""
+    """Health check response model.
+
+    Attributes:
+        status: The health status of the service ("healthy" or "unhealthy").
+        model_loaded: A flag indicating if the model is loaded and ready.
+    """
 
     status: str
     model_loaded: bool
 
 
 class ONNXCloudRunPredictor:
-    """ONNX predictor optimized for Cloud Run."""
+    """An ONNX predictor optimized for Google Cloud Run.
+
+    This class handles loading the ONNX model and tokenizer, runs inference,
+    and includes a simple in-memory LRU cache to speed up responses for
+    frequently seen inputs.
+
+    Attributes:
+        model_path: The path to the directory containing the model.
+        tokenizer: The loaded Hugging Face tokenizer.
+        session: The ONNX Runtime inference session.
+        id2label: A dictionary mapping class IDs to their string labels.
+    """
 
     def __init__(self, model_path: str):
+        """Initializes the `ONNXCloudRunPredictor`.
+
+        Args:
+            model_path: The path to the directory containing the model files.
+        """
         self.model_path = Path(model_path)
         self.tokenizer: Optional[AutoTokenizer] = None
         self.session: Optional[ort.InferenceSession] = None
@@ -64,7 +97,11 @@ class ONNXCloudRunPredictor:
         self._load_model()
 
     def _load_model(self):
-        """Load ONNX model and tokenizer."""
+        """Loads the ONNX model, tokenizer, and configuration.
+
+        Raises:
+            Exception: If the model or tokenizer fails to load.
+        """
         try:
             start_time = time.time()
 
@@ -77,17 +114,11 @@ class ONNXCloudRunPredictor:
             onnx_model_file = self.model_path / "model.onnx"
 
             sess_options = ort.SessionOptions()
-            sess_options.graph_optimization_level = (
-                ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-            )
+            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
 
             # Cloud Run provides multiple CPUs
-            sess_options.intra_op_num_threads = int(
-                os.environ.get("OMP_NUM_THREADS", "4")
-            )
-            sess_options.inter_op_num_threads = int(
-                os.environ.get("OMP_NUM_THREADS", "4")
-            )
+            sess_options.intra_op_num_threads = int(os.environ.get("OMP_NUM_THREADS", "4"))
+            sess_options.inter_op_num_threads = int(os.environ.get("OMP_NUM_THREADS", "4"))
 
             self.session = ort.InferenceSession(
                 str(onnx_model_file), sess_options, providers=["CPUExecutionProvider"]
@@ -112,13 +143,28 @@ class ONNXCloudRunPredictor:
             raise
 
     def _get_cache_key(self, text: str) -> str:
-        """Generate cache key."""
+        """Generates a SHA256 hash for the input text to use as a cache key.
+
+        Args:
+            text: The input text.
+
+        Returns:
+            The SHA256 hash of the text.
+        """
         import hashlib
 
         return hashlib.sha256(text.encode()).hexdigest()
 
     def _cache_prediction(self, cache_key: str, result: Dict[str, Any]):
-        """Cache prediction result."""
+        """Caches a prediction result.
+
+        Implements a simple FIFO (First-In, First-Out) eviction strategy
+        when the cache reaches its maximum size.
+
+        Args:
+            cache_key: The key for the cached item.
+            result: The prediction result dictionary to cache.
+        """
         if len(self._prediction_cache) >= self._cache_max_size:
             # FIFO eviction
             oldest = next(iter(self._prediction_cache))
@@ -127,11 +173,30 @@ class ONNXCloudRunPredictor:
         self._prediction_cache[cache_key] = result
 
     def is_ready(self) -> bool:
-        """Check if model is ready."""
+        """Checks if the model and tokenizer are loaded and ready for inference.
+
+        Returns:
+            `True` if the model is ready, `False` otherwise.
+        """
         return self.session is not None and self.tokenizer is not None
 
     def predict(self, text: str) -> Dict[str, Any]:
-        """Run inference."""
+        """Runs sentiment analysis inference on the given text.
+
+        This method first checks the in-memory cache for a result. If not
+        found, it preprocesses the text, runs it through the ONNX model,
+        post-processes the output, and caches the result before returning it.
+
+        Args:
+            text: The input string to be analyzed.
+
+        Returns:
+            A dictionary containing the prediction details, including the
+            label, score, and whether the result was from the cache.
+
+        Raises:
+            Exception: If an error occurs during inference.
+        """
         # Check cache
         cache_key = self._get_cache_key(text)
         if cache_key in self._prediction_cache:
@@ -194,7 +259,14 @@ class ONNXCloudRunPredictor:
 
     @staticmethod
     def _softmax(x: np.ndarray) -> np.ndarray:
-        """Compute softmax."""
+        """Computes softmax values for a given array of scores.
+
+        Args:
+            x: A numpy array of scores.
+
+        Returns:
+            A numpy array with the computed softmax values.
+        """
         exp_x = np.exp(x - np.max(x))
         return exp_x / exp_x.sum()
 
@@ -204,7 +276,15 @@ predictor: Optional[ONNXCloudRunPredictor] = None
 
 
 def get_predictor() -> ONNXCloudRunPredictor:
-    """Get or create predictor."""
+    """Returns a singleton instance of the ONNX predictor.
+
+    This function ensures that the `ONNXCloudRunPredictor` is initialized
+    only once per container instance, allowing for model and cache reuse
+    across multiple requests.
+
+    Returns:
+        An instance of `ONNXCloudRunPredictor`.
+    """
     global predictor
     if predictor is None:
         model_path = os.environ.get("MODEL_PATH", "/app/model")
@@ -214,14 +294,22 @@ def get_predictor() -> ONNXCloudRunPredictor:
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize predictor on startup."""
+    """Initializes the predictor singleton when the application starts.
+
+    This leverages FastAPI's startup event to preload the model, ensuring it
+    is ready before the first request arrives.
+    """
     logger.info("Starting application")
     get_predictor()
 
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
+    """Provides a simple root endpoint to confirm the service is running.
+
+    Returns:
+        A dictionary with a welcome message and service version.
+    """
     return {
         "service": "Sentiment Analysis Cloud Run",
         "version": "1.0.0",
@@ -231,7 +319,14 @@ async def root():
 
 @app.get("/health", response_model=HealthResponse)
 async def health():
-    """Health check endpoint."""
+    """Performs a health check of the Cloud Run service.
+
+    This endpoint verifies that the model has been loaded successfully and
+    the service is ready to accept prediction requests.
+
+    Returns:
+        A `HealthResponse` object indicating the health status.
+    """
     try:
         pred = get_predictor()
         return HealthResponse(
@@ -245,7 +340,21 @@ async def health():
 
 @app.post("/predict", response_model=SentimentResponse)
 async def predict(request: SentimentRequest):
-    """Predict sentiment endpoint."""
+    """Handles sentiment prediction requests.
+
+    This endpoint takes a `SentimentRequest` with text and returns a
+    `SentimentResponse` with the prediction. It will return a 503 error if
+    the model is not yet ready.
+
+    Args:
+        request: The request body containing the text to be analyzed.
+
+    Returns:
+        A `SentimentResponse` with the prediction result.
+
+    Raises:
+        HTTPException: If the model is not ready or an error occurs.
+    """
     try:
         pred = get_predictor()
 

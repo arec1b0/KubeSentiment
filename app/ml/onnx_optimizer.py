@@ -5,41 +5,45 @@ This module handles conversion of Hugging Face transformers models to ONNX forma
 and provides optimized inference using ONNX Runtime.
 """
 
-import time
 import hashlib
-from pathlib import Path
-from typing import Dict, Optional, Any, List
-from collections import OrderedDict
 import logging
+import time
+from collections import OrderedDict
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-import torch
 import numpy as np
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from optimum.onnxruntime import ORTModelForSequenceClassification
 import onnxruntime as ort
+import torch
+from optimum.onnxruntime import ORTModelForSequenceClassification
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from ..config import get_settings
+from ..exceptions import ModelInferenceError, ModelNotLoadedError
 from ..logging_config import get_logger, log_model_operation
-from ..exceptions import ModelNotLoadedError, ModelInferenceError
 
 logger = get_logger(__name__)
 
 
 class ONNXModelOptimizer:
-    """
-    Convert and optimize Hugging Face models to ONNX format.
+    """Handles the conversion and optimization of Hugging Face models to ONNX.
 
-    This class provides methods to convert transformer models to ONNX format
-    with optional quantization and optimization for better inference performance.
+    This class provides a straightforward way to convert transformer models from
+    the Hugging Face Hub into the ONNX format. The conversion can include
+    optimizations that may improve inference performance.
+
+    Attributes:
+        model_name: The name of the Hugging Face model to be converted.
+        cache_dir: The directory where the converted ONNX models will be stored.
     """
 
     def __init__(self, model_name: str, cache_dir: Optional[str] = None):
-        """
-        Initialize the ONNX optimizer.
+        """Initializes the ONNX model optimizer.
 
         Args:
-            model_name: Name of the Hugging Face model
-            cache_dir: Directory to cache models
+            model_name: The name of the Hugging Face model to convert.
+            cache_dir: The directory to cache the converted models. If not
+                provided, a default directory will be used.
         """
         self.model_name = model_name
         self.cache_dir = Path(cache_dir) if cache_dir else Path("./onnx_models")
@@ -51,16 +55,24 @@ class ONNXModelOptimizer:
         optimize: bool = True,
         quantize: bool = False,
     ) -> Path:
-        """
-        Convert Hugging Face model to ONNX format.
+        """Converts a Hugging Face transformer model to the ONNX format.
+
+        This method uses the `optimum` library to handle the conversion. The
+        resulting ONNX model and its associated tokenizer configuration are
+        saved to a specified directory.
 
         Args:
-            export_path: Path to export ONNX model (default: cache_dir/model_name)
-            optimize: Whether to apply ONNX optimizations
-            quantize: Whether to apply quantization for smaller model size
+            export_path: The path where the ONNX model will be saved. If not
+                provided, a default path is constructed in the cache directory.
+            optimize: A flag to enable ONNX graph optimizations.
+            quantize: A flag to enable model quantization, which can reduce
+                model size and speed up inference at the cost of some precision.
 
         Returns:
-            Path: Path to the exported ONNX model
+            The path to the directory containing the exported ONNX model.
+
+        Raises:
+            ModelInferenceError: If the conversion process fails.
         """
         if export_path is None:
             export_path = self.cache_dir / self.model_name.replace("/", "_")
@@ -107,9 +119,7 @@ class ONNXModelOptimizer:
             return export_path
 
         except Exception as e:
-            logger.error(
-                "ONNX conversion failed", error=str(e), error_type=type(e).__name__
-            )
+            logger.error("ONNX conversion failed", error=str(e), error_type=type(e).__name__)
             raise ModelInferenceError(
                 message=f"ONNX conversion failed: {str(e)}",
                 model_name=self.model_name,
@@ -118,19 +128,26 @@ class ONNXModelOptimizer:
 
 
 class ONNXSentimentAnalyzer:
-    """
-    Optimized sentiment analyzer using ONNX Runtime.
+    """Performs sentiment analysis using an optimized ONNX model.
 
-    This class provides faster inference compared to PyTorch models
-    by using ONNX Runtime optimizations.
+    This class leverages ONNX Runtime for high-performance inference. It is
+    designed to be a faster alternative to PyTorch-based inference for
+    production environments. It also includes an in-memory LRU cache to
+    speed up predictions for repeated inputs.
+
+    Attributes:
+        settings: The application's configuration settings.
+        onnx_model_path: The path to the directory containing the ONNX model.
+        tokenizer: The tokenizer for the model.
+        model: The loaded ONNX model.
     """
 
     def __init__(self, onnx_model_path: str):
-        """
-        Initialize ONNX-based sentiment analyzer.
+        """Initializes the ONNX-based sentiment analyzer.
 
         Args:
-            onnx_model_path: Path to ONNX model directory
+            onnx_model_path: The path to the directory containing the ONNX
+                model and tokenizer configuration.
         """
         self.settings = get_settings()
         self.onnx_model_path = Path(onnx_model_path)
@@ -143,7 +160,14 @@ class ONNXSentimentAnalyzer:
         self._load_model()
 
     def _load_model(self) -> None:
-        """Load ONNX model and tokenizer."""
+        """Loads the ONNX model and tokenizer from the specified path.
+
+        This method initializes the ONNX Runtime session and loads the
+        tokenizer. It is called during the class's initialization.
+
+        Raises:
+            Exception: If the model or tokenizer fails to load.
+        """
         try:
             start_time = time.time()
             logger.info("Loading ONNX model", model_path=str(self.onnx_model_path))
@@ -162,26 +186,37 @@ class ONNXSentimentAnalyzer:
             logger.info("ONNX model loaded successfully", duration_ms=duration_ms)
 
         except Exception as e:
-            logger.error(
-                "ONNX model loading failed", error=str(e), error_type=type(e).__name__
-            )
+            logger.error("ONNX model loading failed", error=str(e), error_type=type(e).__name__)
             self._is_loaded = False
             raise
 
     def _get_cache_key(self, text: str) -> str:
-        """
-        Generate cache key for text.
+        """Generates a secure and efficient cache key for a given text.
 
-        Uses BLAKE2b for fast and secure cache key generation.
-        BLAKE2b is 8x faster than SHA-256 while providing equivalent security.
+        This method uses the BLAKE2b hashing algorithm, which is faster than
+        SHA-256 while providing a high level of security against collisions,
+        making it suitable for use in a caching system.
+
+        Args:
+            text: The input text to be hashed.
+
+        Returns:
+            A hexadecimal string representing the hash of the text.
         """
         return hashlib.blake2b(text.encode("utf-8"), digest_size=16).hexdigest()
 
     def _get_cached_prediction(self, cache_key: str) -> Optional[Dict[str, Any]]:
-        """
-        Retrieve cached prediction.
-        
-        Implements LRU behavior by moving accessed items to the end of the OrderedDict.
+        """Retrieves a prediction from the cache if it exists.
+
+        This method implements an LRU (Least Recently Used) caching policy by
+        moving any accessed item to the end of the `OrderedDict`, which marks
+        it as recently used.
+
+        Args:
+            cache_key: The cache key for the desired prediction.
+
+        Returns:
+            The cached prediction dictionary, or `None` if not found.
         """
         if cache_key in self._prediction_cache:
             # Move to end to mark as recently used (LRU)
@@ -190,10 +225,15 @@ class ONNXSentimentAnalyzer:
         return None
 
     def _cache_prediction(self, cache_key: str, result: Dict[str, Any]) -> None:
-        """
-        Cache prediction result with LRU eviction.
-        
-        Uses OrderedDict for O(1) eviction of least recently used items.
+        """Adds a prediction to the cache and handles eviction.
+
+        If the cache is full, this method evicts the least recently used item
+        before adding the new one. The `OrderedDict`'s behavior ensures that
+        the item at the beginning of the dictionary is the LRU item.
+
+        Args:
+            cache_key: The key under which to store the prediction.
+            result: The prediction dictionary to be cached.
         """
         if len(self._prediction_cache) >= self._cache_max_size:
             # Remove least recently used entry (first item in OrderedDict)
@@ -204,27 +244,35 @@ class ONNXSentimentAnalyzer:
         self._prediction_cache[cache_key] = result
 
     def is_ready(self) -> bool:
-        """Check if model is ready."""
+        """Checks if the model is loaded and ready for inference.
+
+        Returns:
+            `True` if the model is loaded, `False` otherwise.
+        """
         return self._is_loaded and self.model is not None
 
     def predict(self, text: str) -> Dict[str, Any]:
-        """
-        Perform sentiment analysis using ONNX model.
+        """Performs sentiment analysis on a text using the ONNX model.
+
+        This method first checks the prediction cache for the given text. If
+        a cached result is not found, it tokenizes the text, runs inference
+        with the ONNX model, and caches the result before returning it.
 
         Args:
-            text: Input text to analyze
+            text: The input text to be analyzed.
 
         Returns:
-            Dict containing prediction results
+            A dictionary containing the prediction results.
 
         Raises:
-            ModelNotLoadedError: If model is not loaded
-            ModelInferenceError: If prediction fails
+            ModelNotLoadedError: If the model is not loaded when this method
+                is called.
+            ModelInferenceError: If an error occurs during the inference
+                process.
+            ValueError: If the input text is empty.
         """
         if not self.is_ready():
-            raise ModelNotLoadedError(
-                model_name="ONNX Model", context={"operation": "prediction"}
-            )
+            raise ModelNotLoadedError(model_name="ONNX Model", context={"operation": "prediction"})
 
         if not text or not text.strip():
             raise ValueError("Empty text provided")
@@ -291,9 +339,7 @@ class ONNXSentimentAnalyzer:
             return result
 
         except Exception as e:
-            logger.error(
-                "ONNX inference failed", error=str(e), error_type=type(e).__name__
-            )
+            logger.error("ONNX inference failed", error=str(e), error_type=type(e).__name__)
             raise ModelInferenceError(
                 message=f"ONNX prediction failed: {str(e)}",
                 model_name="ONNX",
@@ -301,7 +347,12 @@ class ONNXSentimentAnalyzer:
             )
 
     def get_model_info(self) -> Dict[str, Any]:
-        """Get ONNX model information."""
+        """Retrieves metadata about the ONNX model.
+
+        Returns:
+            A dictionary containing information such as the model's type, path,
+            size, and the status of the prediction cache.
+        """
         onnx_file = self.onnx_model_path / "model.onnx"
         model_size_mb = 0
 
@@ -324,26 +375,27 @@ from functools import lru_cache
 
 @lru_cache(maxsize=1)
 def get_onnx_sentiment_analyzer(onnx_model_path: str) -> ONNXSentimentAnalyzer:
-    """
-    Get ONNX sentiment analyzer instance.
+    """Creates and retrieves a singleton instance of the ONNX sentiment analyzer.
 
-    Uses lru_cache to ensure a single instance per model path,
-    providing proper singleton behavior without global state.
-    This is thread-safe and can be easily mocked for testing.
+    This factory function uses `@lru_cache(maxsize=1)` to ensure that only one
+    instance of the `ONNXSentimentAnalyzer` is created for a given model path.
+    This approach provides thread-safe, singleton-like behavior, which is
+    efficient for managing a resource-intensive object like a model.
 
     Args:
-        onnx_model_path: Path to ONNX model directory
+        onnx_model_path: The path to the directory containing the ONNX model.
 
     Returns:
-        ONNXSentimentAnalyzer instance
+        A singleton instance of `ONNXSentimentAnalyzer`.
     """
     return ONNXSentimentAnalyzer(onnx_model_path)
 
 
 def reset_onnx_sentiment_analyzer() -> None:
-    """
-    Reset the ONNX analyzer instance (useful for testing).
+    """Resets the singleton instance of the ONNX sentiment analyzer.
 
-    Clears the lru_cache to allow a fresh instance to be created.
+    This function is primarily intended for use in testing scenarios where a
+    fresh instance of the analyzer is needed for different test cases. It
+    works by clearing the cache of the `get_onnx_sentiment_analyzer` function.
     """
     get_onnx_sentiment_analyzer.cache_clear()

@@ -1,7 +1,8 @@
-"""
-Tests for refactored config validators.
+"""Tests for Pydantic setting validators in `app.core.config`.
 
-Tests verify individual validator methods work correctly.
+This module contains test cases for the custom validators and properties
+defined in the `Settings` class. It ensures that the configuration logic is
+robust and correctly handles valid and invalid inputs.
 """
 
 import pytest
@@ -12,10 +13,15 @@ from app.core.config import Settings
 
 @pytest.mark.unit
 class TestConfigValidators:
-    """Test individual config validator methods."""
+    """A test suite for the individual validator methods in the `Settings` class.
+
+    These tests verify that each custom validation method behaves as expected,
+    raising `ValidationError` for invalid configurations and passing for
+    valid ones.
+    """
 
     def test_validate_model_in_allowed_list_success(self):
-        """Test model validation passes when model is in allowed list."""
+        """Tests that model validation passes when the model is in the allowed list."""
         settings = Settings(
             model_name="distilbert-base-uncased-finetuned-sst-2-english",
             allowed_models=[
@@ -23,12 +29,11 @@ class TestConfigValidators:
                 "other-model",
             ],
         )
-
-        # Should not raise
+        # Should not raise an exception.
         settings._validate_model_in_allowed_list()
 
     def test_validate_model_in_allowed_list_failure(self):
-        """Test model validation fails when model not in allowed list."""
+        """Tests that model validation fails if the model is not in the allowed list."""
         with pytest.raises(ValidationError) as exc_info:
             Settings(
                 model_name="unauthorized-model",
@@ -38,7 +43,7 @@ class TestConfigValidators:
         assert "must be in allowed_models list" in str(exc_info.value)
 
     def test_validate_worker_count_consistency_debug_mode(self):
-        """Test worker count validation in debug mode."""
+        """Tests that validation fails if multiple workers are set in debug mode."""
         with pytest.raises(ValidationError) as exc_info:
             Settings(
                 model_name="distilbert-base-uncased-finetuned-sst-2-english",
@@ -49,29 +54,27 @@ class TestConfigValidators:
         assert "Cannot use multiple workers in debug mode" in str(exc_info.value)
 
     def test_validate_worker_count_consistency_production(self):
-        """Test worker count validation in production mode."""
+        """Tests that validation passes with multiple workers in production mode."""
         settings = Settings(
             model_name="distilbert-base-uncased-finetuned-sst-2-english",
             debug=False,
             workers=4,
         )
-
-        # Should not raise
+        # Should not raise an exception.
         settings._validate_worker_count_consistency()
 
     def test_validate_cache_memory_usage_within_limits(self):
-        """Test cache memory validation passes within limits."""
+        """Tests that cache memory validation passes when usage is within limits."""
         settings = Settings(
             model_name="distilbert-base-uncased-finetuned-sst-2-english",
             prediction_cache_max_size=1000,
             max_text_length=512,
         )
-
-        # Should not raise
+        # Should not raise an exception.
         settings._validate_cache_memory_usage()
 
     def test_validate_cache_memory_usage_exceeds_limits(self):
-        """Test cache memory validation fails when exceeding limits."""
+        """Tests that cache memory validation fails if the estimated usage is too high."""
         with pytest.raises(ValidationError) as exc_info:
             Settings(
                 model_name="distilbert-base-uncased-finetuned-sst-2-english",
@@ -82,7 +85,7 @@ class TestConfigValidators:
         assert "may use too much memory" in str(exc_info.value)
 
     def test_cors_origins_validation_rejects_wildcard(self):
-        """Test CORS validation rejects wildcard origins."""
+        """Tests that CORS validation fails if a wildcard origin `"*"` is used."""
         with pytest.raises(ValidationError) as exc_info:
             Settings(
                 model_name="distilbert-base-uncased-finetuned-sst-2-english",
@@ -92,16 +95,15 @@ class TestConfigValidators:
         assert "Wildcard CORS origin" in str(exc_info.value)
 
     def test_cors_origins_validation_accepts_explicit_origins(self):
-        """Test CORS validation accepts explicit origins."""
+        """Tests that CORS validation passes with a list of explicit origins."""
         settings = Settings(
             model_name="distilbert-base-uncased-finetuned-sst-2-english",
             allowed_origins=["https://example.com", "https://api.example.com"],
         )
-
         assert len(settings.allowed_origins) == 2
 
     def test_api_key_validation_requires_minimum_length(self):
-        """Test API key validation requires minimum length."""
+        """Tests that API key validation fails if the key is too short."""
         import os
 
         # Set env var to trigger validation
@@ -119,7 +121,7 @@ class TestConfigValidators:
             os.environ.pop("MLOPS_API_KEY", None)
 
     def test_api_key_validation_requires_complexity(self):
-        """Test API key validation requires letters and numbers."""
+        """Tests that API key validation fails if the key lacks complexity."""
         with pytest.raises(ValidationError) as exc_info:
             Settings(
                 model_name="distilbert-base-uncased-finetuned-sst-2-english",
@@ -129,20 +131,18 @@ class TestConfigValidators:
         assert "must contain both letters and numbers" in str(exc_info.value)
 
     def test_api_key_validation_passes_with_valid_key(self):
-        """Test API key validation passes with valid key."""
+        """Tests that API key validation passes for a valid, complex key."""
         settings = Settings(
             model_name="distilbert-base-uncased-finetuned-sst-2-english",
             api_key="ValidKey123",
         )
-
         assert settings.api_key == "ValidKey123"
 
     def test_onnx_model_path_default_field(self):
-        """Test onnx_model_path_default field exists and has default."""
+        """Tests that the `onnx_model_path_default` field is correctly generated."""
         settings = Settings(
             model_name="distilbert-base-uncased-finetuned-sst-2-english",
         )
-
         assert hasattr(settings, "onnx_model_path_default")
         assert settings.onnx_model_path_default.endswith(
             "distilbert-base-uncased-finetuned-sst-2-english"
@@ -151,10 +151,14 @@ class TestConfigValidators:
 
 @pytest.mark.unit
 class TestConfigFieldValidators:
-    """Test individual field validators."""
+    """A test suite for the Pydantic `field_validator` decorators.
+
+    These tests ensure that validators attached directly to fields in the
+    `Settings` model correctly validate format, length, and other constraints.
+    """
 
     def test_allowed_models_format_validation(self):
-        """Test allowed_models validates format correctly."""
+        """Tests that the `allowed_models` validator rejects invalid model name formats."""
         with pytest.raises(ValidationError) as exc_info:
             Settings(
                 model_name="test",
@@ -164,7 +168,7 @@ class TestConfigFieldValidators:
         assert "Invalid model name format" in str(exc_info.value)
 
     def test_allowed_models_length_validation(self):
-        """Test allowed_models validates model name length."""
+        """Tests that the `allowed_models` validator rejects overly long model names."""
         with pytest.raises(ValidationError) as exc_info:
             Settings(
                 model_name="test",
@@ -174,7 +178,7 @@ class TestConfigFieldValidators:
         assert "Model name too long" in str(exc_info.value)
 
     def test_cors_origins_url_format_validation(self):
-        """Test CORS origins validates URL format."""
+        """Tests that the `allowed_origins` validator rejects invalid URL formats."""
         with pytest.raises(ValidationError) as exc_info:
             Settings(
                 model_name="distilbert-base-uncased-finetuned-sst-2-english",
@@ -184,7 +188,7 @@ class TestConfigFieldValidators:
         assert "Invalid CORS origin URL" in str(exc_info.value)
 
     def test_cors_origins_accepts_http_and_https(self):
-        """Test CORS origins accepts both HTTP and HTTPS."""
+        """Tests that the `allowed_origins` validator accepts various valid URL schemes."""
         settings = Settings(
             model_name="distilbert-base-uncased-finetuned-sst-2-english",
             allowed_origins=[
@@ -193,25 +197,27 @@ class TestConfigFieldValidators:
                 "https://api.example.com:8443",
             ],
         )
-
         assert len(settings.allowed_origins) == 3
 
 
 @pytest.mark.unit
 class TestConfigProperties:
-    """Test config properties and computed values."""
+    """A test suite for the computed properties of the `Settings` class.
+
+    These tests verify that computed properties and configurations derived
+    from other settings (like environment variable prefixes) are working correctly.
+    """
 
     def test_cors_origins_property(self):
-        """Test cors_origins property returns allowed_origins."""
+        """Tests that the `cors_origins` property correctly returns `allowed_origins`."""
         settings = Settings(
             model_name="distilbert-base-uncased-finetuned-sst-2-english",
             allowed_origins=["https://example.com"],
         )
-
         assert settings.cors_origins == settings.allowed_origins
 
     def test_config_env_prefix(self):
-        """Test config uses MLOPS_ prefix for env vars."""
+        """Tests that the Pydantic settings model correctly uses the 'MLOPS_' prefix for environment variables."""
         import os
 
         os.environ["MLOPS_DEBUG"] = "true"
@@ -221,7 +227,6 @@ class TestConfigProperties:
             settings = Settings(
                 model_name="distilbert-base-uncased-finetuned-sst-2-english",
             )
-
             assert settings.debug is True
             assert settings.log_level == "DEBUG"
         finally:

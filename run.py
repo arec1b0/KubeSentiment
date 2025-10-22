@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""
-Development launcher script for the MLOps sentiment analysis service.
+"""A development server launcher for the sentiment analysis service.
 
-This script provides an easy way to start the application in development mode
-with proper environment setup, configuration, and helpful information.
+This script provides a convenient way to start the application in a local
+development environment. It sets sensible default environment variables for
+development, such as enabling debug mode and hot reloading, and prints helpful
+information to the console upon startup.
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add the project root to the Python path
@@ -16,7 +17,11 @@ sys.path.insert(0, str(project_root))
 
 
 def print_startup_info():
-    """Print helpful startup information."""
+    """Prints a formatted banner with useful development information.
+
+    This includes the project directory, Python executable path, and a list of
+    available API endpoints with example `curl` commands.
+    """
     print("🚀 MLOps Sentiment Analysis Service")
     print("=" * 50)
     print(f"📁 Project Directory: {project_root}")
@@ -47,6 +52,7 @@ if __name__ == "__main__":
 
     try:
         import uvicorn
+
         from app.config import get_settings
 
         settings = get_settings()
@@ -66,10 +72,9 @@ if __name__ == "__main__":
         print("\n🛑 Server stopped by user")
     except ImportError as e:
         print(f"❌ Import Error: {e}")
-        print(
-            "💡 Make sure you've installed dependencies: pip install -r requirements.txt"
-        )
+        print("💡 Make sure you've installed dependencies: pip install -r requirements.txt")
         sys.exit(1)
     except Exception as e:
         print(f"❌ Error starting server: {e}")
+        sys.exit(1)
         sys.exit(1)

@@ -1,8 +1,9 @@
-"""
-Comprehensive input validation tests for the MLOps sentiment analysis service.
+"""Comprehensive input validation tests for the sentiment analysis service.
 
-Tests cover text input validation, model validation, and edge cases
-to ensure proper error handling and security.
+This module contains extensive test cases for input validation at different
+layers of the application, including Pydantic schema validation, model name
+security checks, API endpoint handling of invalid data, and various edge cases
+to ensure robust error handling and security.
 """
 
 from unittest.mock import Mock, patch
@@ -23,15 +24,20 @@ from app.utils.exceptions import (
 
 
 class TestTextInputValidation:
-    """Test text input validation in Pydantic models and endpoints."""
+    """A test suite for the `TextInput` Pydantic model validation.
+
+    These tests cover various scenarios for the text input field, ensuring
+    that validation logic for empty strings, length limits, and whitespace
+    stripping is working correctly.
+    """
 
     def test_valid_text_input(self):
-        """Test that valid text input passes validation."""
+        """Tests that a standard, valid text input passes validation."""
         valid_input = TextInput(text="This is a valid text input for sentiment analysis.")
         assert valid_input.text == "This is a valid text input for sentiment analysis."
 
     def test_empty_string_raises_error(self):
-        """Test that empty string raises TextEmptyError."""
+        """Tests that an empty string "" raises a `TextEmptyError`."""
         with pytest.raises(TextEmptyError) as exc_info:
             TextInput(text="")
 
@@ -39,20 +45,20 @@ class TestTextInputValidation:
         assert "cannot be empty" in str(exc_info.value)
 
     def test_whitespace_only_raises_error(self):
-        """Test that whitespace-only string raises TextEmptyError."""
+        """Tests that a string containing only whitespace raises a `TextEmptyError`."""
         with pytest.raises(TextEmptyError) as exc_info:
             TextInput(text="   \n\t  ")
 
         assert exc_info.value.code == "TEXT_EMPTY"
 
     def test_none_raises_error(self):
-        """Test that None value raises appropriate error."""
+        """Tests that a `None` value for the text field raises a validation error."""
         with pytest.raises(Exception):  # Pydantic validation error
             TextInput(text=None)
 
-    @patch("app.api.get_settings")
+    @patch("app.api.schemas.requests.get_settings")
     def test_text_too_long_raises_error(self, mock_get_settings):
-        """Test that text exceeding max length raises TextTooLongError."""
+        """Tests that text exceeding the configured max length raises a `TextTooLongError`."""
         # Mock settings with small max length for testing
         mock_settings = Mock()
         mock_settings.max_text_length = 10
@@ -67,7 +73,7 @@ class TestTextInputValidation:
         assert "exceeds maximum" in str(exc_info.value)
 
     def test_text_with_special_characters(self):
-        """Test that text with special characters is handled properly."""
+        """Tests that text containing special characters and emojis is handled correctly."""
         special_text = "Hello! 🎉 This has émojis & special chars: <script>alert('xss')</script>"
         valid_input = TextInput(text=special_text)
 
@@ -75,15 +81,15 @@ class TestTextInputValidation:
         assert valid_input.text == special_text
 
     def test_text_gets_stripped(self):
-        """Test that leading/trailing whitespace is stripped."""
+        """Tests that leading and trailing whitespace is stripped from the input text."""
         padded_text = "  \t\n  Valid text with padding  \n\t  "
         valid_input = TextInput(text=padded_text)
 
         assert valid_input.text == "Valid text with padding"
 
-    @patch("app.api.get_settings")
+    @patch("app.api.schemas.requests.get_settings")
     def test_edge_case_exact_max_length(self, mock_get_settings):
-        """Test text that is exactly at the max length limit."""
+        """Tests that text with a length exactly equal to the max limit passes."""
         mock_settings = Mock()
         mock_settings.max_text_length = 10
         mock_get_settings.return_value = mock_settings
@@ -95,11 +101,16 @@ class TestTextInputValidation:
 
 
 class TestModelValidation:
-    """Test model name validation and security checks."""
+    """A test suite for model name validation and security checks.
+
+    These tests ensure that the application only allows loading of models
+    that are explicitly listed in the configuration, preventing unauthorized
+    model loading.
+    """
 
     @patch("app.models.pytorch_sentiment.get_settings")
     def test_invalid_model_name_raises_error(self, mock_get_settings):
-        """Test that unauthorized model names raise InvalidModelError."""
+        """Tests that using an unauthorized model name raises an `InvalidModelError`."""
         from app.models.pytorch_sentiment import SentimentAnalyzer
 
         mock_settings = Mock()
@@ -118,7 +129,7 @@ class TestModelValidation:
     @patch("app.models.pytorch_sentiment.get_settings")
     @patch("app.models.pytorch_sentiment.pipeline")
     def test_valid_model_name_passes(self, mock_pipeline, mock_get_settings):
-        """Test that valid model names pass validation."""
+        """Tests that a valid, allowed model name passes validation and initializes."""
         from app.models.pytorch_sentiment import SentimentAnalyzer
 
         mock_settings = Mock()
@@ -136,19 +147,29 @@ class TestModelValidation:
 
 
 class TestAPIEndpointValidation:
-    """Test input validation through API endpoints."""
+    """A test suite for input validation at the API endpoint layer.
+
+    These tests use a `TestClient` to make requests to the API and verify
+    that the endpoints correctly handle invalid inputs, such as empty text or
+    text that is too long, returning the appropriate HTTP status codes and
+    error messages.
+    """
 
     @pytest.fixture
     def client(self):
-        """Create test client."""
+        """Creates a FastAPI `TestClient` for the application."""
         return TestClient(create_app())
 
     @pytest.fixture
     def mock_analyzer(self):
-        """Create mock analyzer."""
-        with patch("app.api.get_sentiment_analyzer") as mock:
+        """Mocks the sentiment analyzer dependency for API tests.
+
+        Yields:
+            A `Mock` object simulating the sentiment analyzer.
+        """
+        with patch("app.api.routes.predictions.get_prediction_service") as mock:
             analyzer = Mock()
-            analyzer.is_ready.return_value = True
+            analyzer.get_model_status.return_value = {"is_ready": True}
             analyzer.predict.return_value = {
                 "label": "POSITIVE",
                 "score": 0.95,
@@ -161,21 +182,21 @@ class TestAPIEndpointValidation:
             yield analyzer
 
     def test_predict_endpoint_empty_text(self, client, mock_analyzer):
-        """Test prediction endpoint with empty text."""
+        """Tests that the `/predict` endpoint returns a 400 error for empty text."""
         response = client.post("/predict", json={"text": ""})
 
         assert response.status_code == 400
         assert "TEXT_EMPTY" in response.json()["error_code"]
 
     def test_predict_endpoint_missing_text_field(self, client, mock_analyzer):
-        """Test prediction endpoint with missing text field."""
+        """Tests that the `/predict` endpoint returns a 422 error if the 'text' field is missing."""
         response = client.post("/predict", json={})
 
         assert response.status_code == 422  # Pydantic validation error
 
-    @patch("app.config.Settings.max_text_length", 20)
+    @patch("app.core.config.Settings.max_text_length", 20)
     def test_predict_endpoint_text_too_long(self, client, mock_analyzer):
-        """Test prediction endpoint with text that's too long."""
+        """Tests that the `/predict` endpoint returns a 400 error for text that is too long."""
         long_text = "This text is definitely much longer than 20 characters and should fail"
         response = client.post("/predict", json={"text": long_text})
 
@@ -183,20 +204,20 @@ class TestAPIEndpointValidation:
         assert "TEXT_TOO_LONG" in response.json()["error_code"]
 
     def test_predict_endpoint_valid_text(self, client, mock_analyzer):
-        """Test prediction endpoint with valid text."""
+        """Tests that the `/predict` endpoint returns a 200 OK for valid text."""
         response = client.post("/predict", json={"text": "This is valid text"})
 
         assert response.status_code == 200
         data = response.json()
-        assert "label" in data
-        assert "score" in data
+        assert "sentiment" in data and "label" in data["sentiment"]
+        assert "score" in data["sentiment"]
         assert "inference_time_ms" in data
 
     def test_predict_endpoint_model_not_loaded(self, client):
-        """Test prediction endpoint when model is not loaded."""
-        with patch("app.api.get_sentiment_analyzer") as mock:
+        """Tests that the `/predict` endpoint returns a 503 error if the model is not loaded."""
+        with patch("app.api.routes.predictions.get_prediction_service") as mock:
             analyzer = Mock()
-            analyzer.is_ready.return_value = False
+            analyzer.get_model_status.return_value = {"is_ready": False}
             mock.return_value = analyzer
 
             response = client.post("/predict", json={"text": "Test text"})
@@ -206,10 +227,15 @@ class TestAPIEndpointValidation:
 
 
 class TestSecurityInputValidation:
-    """Test security-related input validation."""
+    """A test suite for security-related input validation.
+
+    These tests ensure that potentially malicious inputs, such as XSS or SQL
+    injection payloads, are handled safely without being executed or
+    sanitized at the input validation layer.
+    """
 
     def test_potential_xss_in_text_input(self):
-        """Test that potential XSS content is handled safely."""
+        """Tests that text containing potential XSS payloads is accepted as-is."""
         xss_text = "<script>alert('XSS')</script>"
         valid_input = TextInput(text=xss_text)
 
@@ -218,28 +244,28 @@ class TestSecurityInputValidation:
         assert valid_input.text == xss_text
 
     def test_sql_injection_like_content(self):
-        """Test handling of SQL injection-like content."""
+        """Tests that text resembling SQL injection attacks is accepted as-is."""
         sql_text = "'; DROP TABLE users; --"
         valid_input = TextInput(text=sql_text)
 
         assert valid_input.text == sql_text
 
     def test_unicode_and_emoji_handling(self):
-        """Test proper handling of Unicode and emoji characters."""
+        """Tests that Unicode characters and emojis are handled correctly."""
         unicode_text = "Hello 世界! 🌍🚀 Testing üñíçødé"
         valid_input = TextInput(text=unicode_text)
 
         assert valid_input.text == unicode_text
 
     def test_very_long_single_word(self):
-        """Test handling of extremely long single words."""
-        long_word = "a" * 1000
+        """Tests that a single, extremely long word is correctly validated against the max length."""
+        long_word = "a" * 10000
 
         with pytest.raises(TextTooLongError):
             TextInput(text=long_word)
 
     def test_newlines_and_control_characters(self):
-        """Test handling of newlines and control characters."""
+        """Tests that newline and other control characters are preserved in the input."""
         text_with_controls = "Line 1\nLine 2\r\nLine 3\tTabbed\x00\x01\x02"
         valid_input = TextInput(text=text_with_controls)
 
@@ -248,16 +274,22 @@ class TestSecurityInputValidation:
 
 
 class TestEdgeCases:
-    """Test edge cases and boundary conditions."""
+    """A test suite for various edge cases and boundary conditions.
+
+    These tests cover scenarios like text that becomes empty after stripping,
+    graceful handling of configuration errors, and validation of diverse
+
+    international character sets.
+    """
 
     def test_zero_length_after_strip(self):
-        """Test text that becomes zero length after stripping."""
+        """Tests that text that becomes empty after whitespace stripping is rejected."""
         with pytest.raises(TextEmptyError):
             TextInput(text="   \n\t\r   ")
 
-    @patch("app.api.get_settings")
+    @patch("app.api.schemas.requests.get_settings")
     def test_settings_mock_error_handling(self, mock_get_settings):
-        """Test graceful handling when settings access fails."""
+        """Tests for graceful fallback when the settings dependency fails."""
         # Simulate settings access error
         mock_get_settings.side_effect = Exception("Settings error")
 
@@ -266,7 +298,7 @@ class TestEdgeCases:
         assert valid_input.text == "Test text"
 
     def test_international_characters(self):
-        """Test various international character sets."""
+        """Tests that various international character sets are handled correctly."""
         international_texts = [
             "こんにちは",  # Japanese
             "مرحبا",  # Arabic

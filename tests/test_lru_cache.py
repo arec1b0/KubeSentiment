@@ -1,7 +1,8 @@
-"""
-Tests for LRU cache implementation in sentiment analyzers.
+"""Tests for the LRU cache implementation in the sentiment analyzers.
 
-Tests verify proper LRU eviction behavior and cache hit/miss patterns.
+This module contains test cases to verify the correct behavior of the
+Least Recently Used (LRU) cache, including item eviction, cache hits and
+misses, and statistics reporting.
 """
 
 import pytest
@@ -21,23 +22,31 @@ except (ImportError, ModuleNotFoundError):
 
 @pytest.fixture
 def mock_settings(monkeypatch):
-    """Mock settings with small cache size for testing."""
+    """Provides a mocked `Settings` object with a small cache size for testing.
+
+    Args:
+        monkeypatch: The pytest `monkeypatch` fixture.
+
+    Returns:
+        A mocked `Settings` object.
+    """
     settings = Settings(
         model_name="distilbert-base-uncased-finetuned-sst-2-english",
         prediction_cache_max_size=3,  # Small cache for testing
         max_text_length=512,
     )
-    monkeypatch.setattr("app.ml.sentiment.get_settings", lambda: settings)
+    monkeypatch.setattr("app.models.pytorch_sentiment.get_settings", lambda: settings)
+    monkeypatch.setattr("app.models.onnx_sentiment.get_settings", lambda: settings, raising=False)
     return settings
 
 
 @pytest.mark.unit
 @pytest.mark.cache
 class TestLRUCache:
-    """Test LRU cache behavior in sentiment analyzer."""
+    """A test suite for the LRU cache behavior in the sentiment analyzer."""
 
     def test_cache_key_generation_blake2b(self, mock_settings):
-        """Test that cache keys are generated using BLAKE2b."""
+        """Tests that the cache keys are generated correctly and consistently."""
         analyzer = SentimentAnalyzer()
 
         key1 = analyzer._get_cache_key("test text")
@@ -52,7 +61,7 @@ class TestLRUCache:
         assert len(key1) == 32
 
     def test_lru_eviction_order(self, mock_settings, monkeypatch):
-        """Test that LRU cache evicts least recently used items."""
+        """Tests that the LRU cache correctly evicts the least recently used item."""
         analyzer = SentimentAnalyzer()
 
         # Mock the pipeline to avoid loading actual model
@@ -91,7 +100,7 @@ class TestLRUCache:
         assert key2 not in analyzer._prediction_cache
 
     def test_cache_move_to_end_on_access(self, mock_settings, monkeypatch):
-        """Test that accessing cached items moves them to end (most recent)."""
+        """Tests that accessing a cached item moves it to the end of the order (most recent)."""
         from collections import OrderedDict
 
         analyzer = SentimentAnalyzer()
@@ -114,7 +123,7 @@ class TestLRUCache:
         assert result is not None
 
     def test_cache_clear(self, mock_settings, monkeypatch):
-        """Test cache clearing functionality."""
+        """Tests the functionality of clearing the cache."""
         analyzer = SentimentAnalyzer()
 
         # Add some items to cache
@@ -129,7 +138,7 @@ class TestLRUCache:
         assert len(analyzer._prediction_cache) == 0
 
     def test_cache_hit_returns_copy(self, mock_settings, monkeypatch):
-        """Test that cache hits return a copy with cached=True."""
+        """Tests that a cache hit returns a copy of the stored result and sets the `cached` flag."""
         analyzer = SentimentAnalyzer()
 
         original_result = {
@@ -153,7 +162,12 @@ class TestLRUCache:
         assert original_result["cached"] is False
 
     def test_performance_blake2b_vs_sha256(self, mock_settings):
-        """Test that BLAKE2b is faster than SHA256 (informational)."""
+        """Performs an informational performance comparison of hashing algorithms.
+
+        This test is not a strict assertion but is used to demonstrate
+        the performance benefit of using BLAKE2b over SHA256 for generating
+        cache keys.
+        """
         import hashlib
         import time
 
@@ -183,10 +197,14 @@ class TestLRUCache:
 @pytest.mark.unit
 @pytest.mark.cache
 class TestCacheStats:
-    """Test cache statistics functionality."""
+    """A test suite for the cache statistics functionality."""
 
     def test_get_cache_stats(self, mock_settings, monkeypatch):
-        """Test cache statistics retrieval."""
+        """Tests the retrieval of cache statistics.
+
+        This test verifies that the `get_cache_stats` method returns the
+        correct cache size and other relevant metrics.
+        """
         analyzer = SentimentAnalyzer()
 
         # Add some items

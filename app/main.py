@@ -29,14 +29,14 @@ logger = get_logger(__name__)
 
 
 def create_app() -> FastAPI:
-    """
-    Application factory function.
+    """Creates and configures a FastAPI application instance.
 
-    Creates and configures the FastAPI application with all necessary
-    middleware, routers, and event handlers.
+    This factory function initializes the FastAPI application, sets up middleware,
+    registers routers, and defines event handlers. It centralizes the
+    application's construction, making it easier to manage and test.
 
     Returns:
-        FastAPI: The configured application instance
+        The configured FastAPI application instance.
     """
     settings = get_settings()
 
@@ -79,17 +79,18 @@ def create_app() -> FastAPI:
     # Global exception handler for unhandled errors
     @app.exception_handler(Exception)
     async def global_exception_handler(request, exc: Exception) -> JSONResponse:
-        """
-        Global exception handler for unhandled errors.
+        """Handles unexpected exceptions across the application.
 
-        Logs the error and returns a generic error response.
+        This global handler catches any unhandled exceptions, logs them, and
+        returns a standardized JSON error response. It distinguishes between
+        custom `ServiceError` exceptions and other unexpected errors.
 
         Args:
-            request: The request that caused the exception
-            exc: The exception that was raised
+            request: The incoming request that caused the exception.
+            exc: The exception instance that was raised.
 
         Returns:
-            JSONResponse: Error response
+            A JSONResponse containing the error details.
         """
         # Map known service errors to their status codes
         if isinstance(exc, ServiceError):
@@ -118,11 +119,13 @@ def create_app() -> FastAPI:
     # Add root endpoint
     @app.get("/", tags=["root"])
     async def root() -> dict:
-        """
-        Root endpoint providing basic service information.
+        """Provides basic service information at the root endpoint.
+
+        This endpoint serves as a simple health check and provides metadata
+        about the service, such as its name and version.
 
         Returns:
-            dict: Service information
+            A dictionary containing service information.
         """
         return {
             "service": settings.app_name,

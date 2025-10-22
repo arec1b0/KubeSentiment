@@ -21,14 +21,18 @@ logger = get_logger(__name__)
 
 
 class CorrelationIdMiddleware(BaseHTTPMiddleware):
-    """
-    Middleware to handle correlation IDs for request tracing.
+    """Manages correlation IDs for distributed tracing and request tracking.
 
-    This middleware:
-    1. Extracts correlation ID from request headers or generates a new one
-    2. Sets the correlation ID in the logging context
-    3. Adds the correlation ID to response headers
-    4. Clears the correlation ID after request completion
+    This middleware is responsible for ensuring that every request has a unique
+    correlation ID. It checks for an existing ID in the request headers; if one
+    is not found, it generates a new one. This ID is then available throughout
+    the request's lifecycle via a context variable and is included in the
+    response headers.
+
+    Attributes:
+        header_name: The name of the request header for the correlation ID.
+        response_header_name: The name of the response header for the
+            correlation ID.
     """
 
     def __init__(
@@ -37,28 +41,34 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
         header_name: str = "X-Correlation-ID",
         response_header_name: str = "X-Correlation-ID",
     ):
-        """
-        Initialize the correlation ID middleware.
+        """Initializes the correlation ID middleware.
 
         Args:
-            app: The ASGI application
-            header_name: Name of the request header to look for correlation ID
-            response_header_name: Name of the response header to set correlation ID
+            app: The ASGI application instance.
+            header_name: The name of the request header to check for the
+                correlation ID.
+            response_header_name: The name of the response header to which the
+                correlation ID will be added.
         """
         super().__init__(app)
         self.header_name = header_name
         self.response_header_name = response_header_name
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """
-        Process request with correlation ID handling.
+        """Processes a request to manage the correlation ID.
+
+        This method extracts or generates a correlation ID, sets it in the
+        current context, and ensures it is cleared after the request is
+        complete. It also adds the correlation ID to the response headers.
 
         Args:
-            request: The incoming request
-            call_next: The next middleware/handler in the chain
+            request: The incoming `Request` object.
+            call_next: A function to call to pass the request to the next
+                middleware or the application.
 
         Returns:
-            Response: The response with correlation ID header
+            The `Response` from the application, with the correlation ID header
+            added.
         """
         # Extract or generate correlation ID
         correlation_id = request.headers.get(self.header_name)
@@ -108,25 +118,36 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """
-    Enhanced request logging middleware with correlation ID support.
+    """Logs detailed information about each incoming HTTP request.
 
-    Logs request start, completion, and timing information with correlation IDs.
+    This middleware provides structured logging for every request, capturing
+    details such as the method, path, duration, and status code. It ensures
+    that request processing is observable and that failures are logged with
+    sufficient context for debugging.
     """
 
     def __init__(self, app):
+        """Initializes the request logging middleware.
+
+        Args:
+            app: The ASGI application instance.
+        """
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """
-        Process request with enhanced logging.
+        """Logs the start and completion of a request.
+
+        This method records the start time of a request, forwards it to the
+        application, and then logs the completion details, including the total
+        duration and response status.
 
         Args:
-            request: The incoming request
-            call_next: The next middleware/handler in the chain
+            request: The incoming `Request` object.
+            call_next: A function to call to pass the request to the next
+                middleware or the application.
 
         Returns:
-            Response: The processed response
+            The `Response` from the application.
         """
         import time
 

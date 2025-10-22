@@ -21,15 +21,18 @@ async def get_model_info(
     model=Depends(get_model_service),
     backend: str = Depends(get_model_backend),
 ) -> Dict[str, Any]:
-    """
-    Get information about the loaded model.
+    """Retrieves detailed information about the currently loaded model.
+
+    This endpoint provides metadata about the machine learning model that is
+    serving predictions, such as its name, version, and other relevant
+    details.
 
     Args:
-        model: The model service instance
-        backend: The backend being used
+        model: The model service instance, injected as a dependency.
+        backend: The name of the model backend in use.
 
     Returns:
-        Dict[str, Any]: Model information
+        A dictionary containing detailed information about the model.
     """
     try:
         info = model.get_model_info()
@@ -37,4 +40,3 @@ async def get_model_info(
         return info
     except Exception as e:
         handle_model_info_error(e)
-

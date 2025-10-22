@@ -17,25 +17,36 @@ logger = get_logger(__name__)
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """
-    Enhanced request logging middleware with correlation ID support.
+    """Logs detailed information about each incoming HTTP request.
 
-    Logs request start, completion, and timing information with correlation IDs.
+    This middleware provides structured logging for every request, capturing
+    details such as the method, path, duration, and status code. It ensures
+    that request processing is observable and that failures are logged with
+    sufficient context for debugging.
     """
 
     def __init__(self, app):
+        """Initializes the request logging middleware.
+
+        Args:
+            app: The ASGI application instance.
+        """
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """
-        Process request with enhanced logging.
+        """Logs the start and completion of a request.
+
+        This method records the start time of a request, forwards it to the
+        application, and then logs the completion details, including the total
+        duration and response status.
 
         Args:
-            request: The incoming request
-            call_next: The next middleware/handler in the chain
+            request: The incoming `Request` object.
+            call_next: A function to call to pass the request to the next
+                middleware or the application.
 
         Returns:
-            Response: The processed response
+            The `Response` from the application.
         """
         start_time = time.time()
 
@@ -87,4 +98,3 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             )
 
             raise
-

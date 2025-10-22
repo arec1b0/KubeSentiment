@@ -65,16 +65,25 @@ vault_policy_violations = Counter(
 
 
 class VaultHealthMonitor:
-    """
-    Monitor Vault health and track secret-related metrics.
+    """Monitors the health of a Vault instance and tracks related metrics.
+
+    This class provides a comprehensive suite of tools for monitoring a
+    HashiCorp Vault secret manager. It periodically checks Vault's health,
+    tracks secret access patterns, monitors for secret expirations, and
+    provides detailed status information about the Vault instance.
+
+    Attributes:
+        secret_manager: An instance of a secret manager to be monitored.
+        last_health_check: The timestamp of the last health check.
+        health_check_interval: The interval in seconds between health checks.
     """
 
     def __init__(self, secret_manager):
-        """
-        Initialize Vault health monitor.
+        """Initializes the Vault health monitor.
 
         Args:
-            secret_manager: SecretManager instance to monitor
+            secret_manager: An instance of a `SecretManager` to monitor.
+                This should typically be a `VaultSecretManager`.
         """
         self.secret_manager = secret_manager
         self.last_health_check: Optional[datetime] = None
@@ -85,11 +94,13 @@ class VaultHealthMonitor:
         self._alert_callbacks = []
 
     def check_vault_health(self) -> Dict[str, Any]:
-        """
-        Perform health check on Vault connection.
+        """Performs a health check on the Vault connection.
+
+        This method queries the secret manager for its health status. To avoid
+        excessive requests, the result is cached for a configurable interval.
 
         Returns:
-            Dictionary with health status and details
+            A dictionary containing the health status and other details.
         """
         now = datetime.now()
 
@@ -130,14 +141,16 @@ class VaultHealthMonitor:
     def track_secret_access(
         self, secret_key: str, duration: float, success: bool, cached: bool = False
     ):
-        """
-        Track a secret access operation.
+        """Tracks metrics for a single secret access operation.
+
+        This method updates several Prometheus metrics related to secret
+        access, including the total count, duration, and cache hit/miss rates.
 
         Args:
-            secret_key: Key of the accessed secret
-            duration: Duration of the operation in seconds
-            success: Whether the operation succeeded
-            cached: Whether the result was from cache
+            secret_key: The key of the secret that was accessed.
+            duration: The duration of the access operation in seconds.
+            success: A flag indicating whether the access was successful.
+            cached: A flag indicating whether the result was from the cache.
         """
         # Track access count
         status = "success" if success else "failure"
@@ -153,12 +166,14 @@ class VaultHealthMonitor:
             vault_secret_cache_misses.inc()
 
     def check_secret_expiration(self, secret_key: str, expiration_time: Optional[datetime] = None):
-        """
-        Monitor secret expiration time.
+        """Monitors the expiration time of a secret.
+
+        If a secret is nearing its expiration, this method will log a warning.
+        It also updates a Prometheus gauge with the time until expiration.
 
         Args:
-            secret_key: Key of the secret
-            expiration_time: Expected expiration time
+            secret_key: The key of the secret to check.
+            expiration_time: The expiration time of the secret.
         """
         if expiration_time:
             seconds_until_expiration = (expiration_time - datetime.now()).total_seconds()
@@ -175,11 +190,11 @@ class VaultHealthMonitor:
                 )
 
     def check_mounts_and_policies(self) -> Dict[str, Any]:
-        """
-        Check the status of Vault mounts and policies.
+        """Checks the status of mounts and lists policies in Vault.
 
         Returns:
-            Dictionary with mount and policy status information
+            A dictionary containing information about the enabled and disabled
+            mounts, as well as a list of all policies.
         """
         try:
             if hasattr(self.secret_manager, "client"):
@@ -216,11 +231,10 @@ class VaultHealthMonitor:
             return {"error": str(e)}
 
     def check_authentication_methods(self) -> Dict[str, Any]:
-        """
-        Check available authentication methods.
+        """Checks the enabled authentication methods in Vault.
 
         Returns:
-            Dictionary with authentication method information
+            A dictionary listing the available authentication methods.
         """
         try:
             if hasattr(self.secret_manager, "client"):
@@ -240,11 +254,13 @@ class VaultHealthMonitor:
             return {"error": str(e)}
 
     def check_token_status(self) -> Dict[str, Any]:
-        """
-        Check the status of the current token.
+        """Checks the status of the current Vault authentication token.
+
+        This method provides information about the current token, such as its
+        expiration time and whether it needs to be renewed.
 
         Returns:
-            Dictionary with token information
+            A dictionary containing the token's status information.
         """
         try:
             if hasattr(self.secret_manager, "client"):
@@ -281,22 +297,21 @@ class VaultHealthMonitor:
             return {"error": str(e)}
 
     def register_alert_callback(self, callback):
-        """
-        Register a callback function for alerts.
+        """Registers a callback function to be called when an alert is triggered.
 
         Args:
-            callback: Function to call with alert information
+            callback: A function that accepts a dictionary as its single
+                argument. This dictionary will contain the alert data.
         """
         self._alert_callbacks.append(callback)
 
     def _trigger_alert(self, alert_type: str, message: str, **kwargs):
-        """
-        Trigger an alert via registered callbacks.
+        """Triggers an alert and notifies all registered callbacks.
 
         Args:
-            alert_type: Type of alert (error, warning, info)
-            message: Alert message
-            **kwargs: Additional alert data
+            alert_type: The type of the alert (e.g., 'error', 'warning').
+            message: The alert message.
+            **kwargs: Additional data to include in the alert.
         """
         alert_data = {
             "type": alert_type,
@@ -314,11 +329,13 @@ class VaultHealthMonitor:
                 logger.error("Alert callback failed", error=str(e), exc_info=True)
 
     def check_secret_rotation_status(self) -> Dict[str, Any]:
-        """
-        Check the rotation status of secrets.
+        """Checks the rotation status of all tracked secrets.
+
+        If a secret is nearing its expiration, this method will trigger a
+        warning alert.
 
         Returns:
-            Dictionary with rotation status information
+            A dictionary containing the rotation status of each tracked secret.
         """
         try:
             rotation_info = {}
@@ -351,22 +368,24 @@ class VaultHealthMonitor:
             return {"error": str(e)}
 
     def set_secret_expiration(self, secret_key: str, expiration_time: datetime):
-        """
-        Set the expiration time for a secret.
+        """Sets the expiration time for a secret to be monitored.
 
         Args:
-            secret_key: Key of the secret
-            expiration_time: When the secret expires
+            secret_key: The key of the secret.
+            expiration_time: The `datetime` object representing when the
+                secret will expire.
         """
         self._secret_expiration_times[secret_key] = expiration_time
         self.check_secret_expiration(secret_key, expiration_time)
 
     def get_comprehensive_status(self) -> Dict[str, Any]:
-        """
-        Get comprehensive Vault status including health, mounts, auth, and tokens.
+        """Provides a comprehensive status report of the Vault integration.
+
+        This method aggregates the results from several other check methods to
+        give a complete overview of the Vault's status.
 
         Returns:
-            Dictionary with comprehensive status information
+            A dictionary containing a detailed status report.
         """
         health_info = self.check_vault_health()
         mounts_info = self.check_mounts_and_policies()
@@ -391,11 +410,10 @@ class VaultHealthMonitor:
         }
 
     def get_metrics_summary(self) -> Dict[str, Any]:
-        """
-        Get a summary of Vault metrics.
+        """Provides a summary of key metrics related to the Vault integration.
 
         Returns:
-            Dictionary with metric summaries
+            A dictionary containing a summary of Vault metrics.
         """
         health_info = self.check_vault_health()
 
@@ -410,11 +428,13 @@ class VaultHealthMonitor:
 
 
 def get_vault_monitor():
-    """
-    Get or create the global Vault health monitor instance.
+    """Retrieves a singleton instance of the `VaultHealthMonitor`.
+
+    This factory function ensures that only one instance of the monitor is
+    created and used throughout the application.
 
     Returns:
-        VaultHealthMonitor instance
+        The singleton `VaultHealthMonitor` instance.
     """
     from app.core.config import get_settings
 

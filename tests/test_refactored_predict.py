@@ -1,7 +1,9 @@
-"""
-Tests for refactored predict() method in sentiment analyzer.
+"""Tests for the refactored `predict()` method in `SentimentAnalyzer`.
 
-Tests verify that the broken-down helper methods work correctly.
+This module contains test cases for the helper methods that make up the
+refactored `predict()` method. Each test class focuses on a specific part of
+the prediction workflow, such as input validation, caching, text preprocessing,
+model inference, and metrics recording.
 """
 
 from unittest.mock import Mock, patch
@@ -10,28 +12,42 @@ import pytest
 
 from app.core.config import Settings
 from app.models.pytorch_sentiment import SentimentAnalyzer
-from app.utils.exceptions import (
-    ModelInferenceError,
-    ModelNotLoadedError,
-    TextEmptyError,
-)
+from app.utils.exceptions import ModelInferenceError, ModelNotLoadedError, TextEmptyError
 
 
 @pytest.fixture
 def mock_settings(monkeypatch):
-    """Mock settings for testing."""
+    """Provides a mocked `Settings` object for testing.
+
+    Args:
+        monkeypatch: The pytest `monkeypatch` fixture.
+
+    Returns:
+        A mocked `Settings` object.
+    """
     settings = Settings(
         model_name="distilbert-base-uncased-finetuned-sst-2-english",
         prediction_cache_max_size=100,
         max_text_length=512,
     )
-    monkeypatch.setattr("app.ml.sentiment.get_settings", lambda: settings)
+    monkeypatch.setattr("app.models.pytorch_sentiment.get_settings", lambda: settings)
     return settings
 
 
 @pytest.fixture
 def analyzer_with_mock_pipeline(mock_settings, monkeypatch):
-    """Create analyzer with mocked pipeline."""
+    """Creates a `SentimentAnalyzer` instance with a mocked inference pipeline.
+
+    This fixture allows for testing the analyzer's logic without loading the
+    actual machine learning model.
+
+    Args:
+        mock_settings: The mocked settings fixture.
+        monkeypatch: The pytest `monkeypatch` fixture.
+
+    Returns:
+        A `SentimentAnalyzer` instance with a mocked pipeline.
+    """
     analyzer = SentimentAnalyzer()
 
     # Mock pipeline
@@ -44,7 +60,7 @@ def analyzer_with_mock_pipeline(mock_settings, monkeypatch):
     # Mock get_contextual_logger to avoid dependency
     mock_logger = Mock()
     monkeypatch.setattr(
-        "app.ml.sentiment.get_contextual_logger", lambda *args, **kwargs: mock_logger
+        "app.models.pytorch_sentiment.get_contextual_logger", lambda *args, **kwargs: mock_logger
     )
 
     return analyzer
@@ -52,10 +68,10 @@ def analyzer_with_mock_pipeline(mock_settings, monkeypatch):
 
 @pytest.mark.unit
 class TestValidateInputText:
-    """Test _validate_input_text method."""
+    """A test suite for the `_validate_input_text` method."""
 
     def test_validate_with_ready_model(self, analyzer_with_mock_pipeline):
-        """Test validation passes when model is ready and text is valid."""
+        """Tests that validation passes when the model is ready and the text is valid."""
         analyzer = analyzer_with_mock_pipeline
         mock_logger = Mock()
 
@@ -63,7 +79,7 @@ class TestValidateInputText:
         analyzer._validate_input_text("valid text", mock_logger)
 
     def test_validate_raises_when_model_not_ready(self, mock_settings):
-        """Test validation raises ModelNotLoadedError when model not ready."""
+        """Tests that `ModelNotLoadedError` is raised if the model is not ready."""
         analyzer = SentimentAnalyzer()
         analyzer._is_loaded = False
         mock_logger = Mock()
@@ -72,7 +88,7 @@ class TestValidateInputText:
             analyzer._validate_input_text("text", mock_logger)
 
     def test_validate_raises_on_empty_text(self, analyzer_with_mock_pipeline):
-        """Test validation raises TextEmptyError on empty text."""
+        """Tests that `TextEmptyError` is raised for empty or whitespace-only text."""
         analyzer = analyzer_with_mock_pipeline
         mock_logger = Mock()
 
@@ -85,10 +101,10 @@ class TestValidateInputText:
 
 @pytest.mark.unit
 class TestTryGetCachedResult:
-    """Test _try_get_cached_result method."""
+    """A test suite for the `_try_get_cached_result` method."""
 
     def test_returns_none_when_not_cached(self, analyzer_with_mock_pipeline):
-        """Test returns None when result not in cache."""
+        """Tests that `None` is returned if the result is not in the cache."""
         analyzer = analyzer_with_mock_pipeline
         mock_logger = Mock()
 
@@ -97,7 +113,7 @@ class TestTryGetCachedResult:
         assert result is None
 
     def test_returns_cached_result_with_flag(self, analyzer_with_mock_pipeline):
-        """Test returns cached result with cached=True flag."""
+        """Tests that a cached result is returned with the `cached` flag set to `True`."""
         analyzer = analyzer_with_mock_pipeline
         mock_logger = Mock()
 
@@ -118,10 +134,10 @@ class TestTryGetCachedResult:
 
 @pytest.mark.unit
 class TestPreprocessText:
-    """Test _preprocess_text method."""
+    """A test suite for the `_preprocess_text` method."""
 
     def test_no_truncation_for_short_text(self, analyzer_with_mock_pipeline):
-        """Test no truncation when text is within limit."""
+        """Tests that short text is not truncated."""
         analyzer = analyzer_with_mock_pipeline
         mock_logger = Mock()
 
@@ -133,7 +149,7 @@ class TestPreprocessText:
         assert truncated is False
 
     def test_truncation_for_long_text(self, analyzer_with_mock_pipeline, mock_settings):
-        """Test truncation when text exceeds max length."""
+        """Tests that long text is correctly truncated to the maximum length."""
         analyzer = analyzer_with_mock_pipeline
         mock_logger = Mock()
 
@@ -150,10 +166,10 @@ class TestPreprocessText:
 
 @pytest.mark.unit
 class TestRunModelInference:
-    """Test _run_model_inference method."""
+    """A test suite for the `_run_model_inference` method."""
 
     def test_successful_inference(self, analyzer_with_mock_pipeline):
-        """Test successful model inference."""
+        """Tests a successful model inference call."""
         analyzer = analyzer_with_mock_pipeline
         mock_logger = Mock()
 
@@ -168,7 +184,7 @@ class TestRunModelInference:
         assert result["cached"] is False
 
     def test_inference_error_raises_exception(self, analyzer_with_mock_pipeline):
-        """Test that inference errors are properly wrapped."""
+        """Tests that a runtime error during inference is wrapped in a `ModelInferenceError`."""
         analyzer = analyzer_with_mock_pipeline
         mock_logger = Mock()
 
@@ -186,15 +202,15 @@ class TestRunModelInference:
 
 @pytest.mark.unit
 class TestRecordPredictionMetrics:
-    """Test _record_prediction_metrics method."""
+    """A test suite for the `_record_prediction_metrics` method."""
 
     def test_metrics_recorded_when_available(self, analyzer_with_mock_pipeline, monkeypatch):
-        """Test metrics are recorded when monitoring is available."""
+        """Tests that metrics are recorded when the monitoring utility is available."""
         analyzer = analyzer_with_mock_pipeline
 
         mock_metrics = Mock()
-        monkeypatch.setattr("app.ml.sentiment.MONITORING_AVAILABLE", True)
-        monkeypatch.setattr("app.ml.sentiment.get_metrics", lambda: mock_metrics)
+        monkeypatch.setattr("app.models.pytorch_sentiment.MONITORING_AVAILABLE", True)
+        monkeypatch.setattr("app.models.pytorch_sentiment.get_metrics", lambda: mock_metrics)
 
         analyzer._record_prediction_metrics(0.95, 100, 45.5)
 
@@ -203,10 +219,10 @@ class TestRecordPredictionMetrics:
         mock_metrics.record_prediction_metrics.assert_called_once_with(0.95, 100)
 
     def test_metrics_skipped_when_unavailable(self, analyzer_with_mock_pipeline, monkeypatch):
-        """Test no error when monitoring unavailable."""
+        """Tests that no error occurs when metrics are recorded but monitoring is unavailable."""
         analyzer = analyzer_with_mock_pipeline
 
-        monkeypatch.setattr("app.ml.sentiment.MONITORING_AVAILABLE", False)
+        monkeypatch.setattr("app.models.pytorch_sentiment.MONITORING_AVAILABLE", False)
 
         # Should not raise
         analyzer._record_prediction_metrics(0.95, 100, 45.5)
@@ -214,14 +230,19 @@ class TestRecordPredictionMetrics:
 
 @pytest.mark.unit
 class TestPredictOrchestration:
-    """Test the main predict() orchestration method."""
+    """A test suite for the main `predict()` orchestration method.
+
+    These tests verify that the `predict` method correctly calls the helper
+    methods in sequence and handles the overall workflow, including caching
+    and text processing.
+    """
 
     def test_predict_full_workflow(self, analyzer_with_mock_pipeline, monkeypatch):
-        """Test complete prediction workflow through orchestrator."""
+        """Tests the complete prediction workflow through the main `predict` method."""
         analyzer = analyzer_with_mock_pipeline
 
         # Mock monitoring
-        monkeypatch.setattr("app.ml.sentiment.MONITORING_AVAILABLE", False)
+        monkeypatch.setattr("app.models.pytorch_sentiment.MONITORING_AVAILABLE", False)
 
         result = analyzer.predict("This is a test")
 
@@ -231,9 +252,9 @@ class TestPredictOrchestration:
         assert result["inference_time_ms"] > 0
 
     def test_predict_uses_cache_on_second_call(self, analyzer_with_mock_pipeline, monkeypatch):
-        """Test that second prediction uses cache."""
+        """Tests that a second call with the same text uses the cache."""
         analyzer = analyzer_with_mock_pipeline
-        monkeypatch.setattr("app.ml.sentiment.MONITORING_AVAILABLE", False)
+        monkeypatch.setattr("app.models.pytorch_sentiment.MONITORING_AVAILABLE", False)
 
         # First call
         result1 = analyzer.predict("Same text")
@@ -245,9 +266,9 @@ class TestPredictOrchestration:
         assert result2["label"] == result1["label"]
 
     def test_predict_handles_whitespace_stripping(self, analyzer_with_mock_pipeline, monkeypatch):
-        """Test that whitespace is properly stripped."""
+        """Tests that input text with leading/trailing whitespace is handled correctly by the cache."""
         analyzer = analyzer_with_mock_pipeline
-        monkeypatch.setattr("app.ml.sentiment.MONITORING_AVAILABLE", False)
+        monkeypatch.setattr("app.models.pytorch_sentiment.MONITORING_AVAILABLE", False)
 
         result1 = analyzer.predict("  text  ")
         result2 = analyzer.predict("text")
