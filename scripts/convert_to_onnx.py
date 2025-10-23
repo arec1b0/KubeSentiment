@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
-from app.ml.onnx_optimizer import ONNXModelOptimizer
+from app.models.onnx_sentiment import ONNXModelOptimizer
 
 logger = get_logger(__name__)
 

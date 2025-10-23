@@ -54,7 +54,7 @@ def get_model_service(
         An instance of the model service corresponding to the backend.
     """
     # Import here to avoid circular imports
-    from app.ml.factory import ModelFactory
+    from app.models.factory import ModelFactory
 
     return ModelFactory.create_model(backend)
 
