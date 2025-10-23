@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Initialize models
     try:
-        from app.models.factory import ModelFactory
+        from app.ml.factory import ModelFactory
 
         # Pre-load default model
         default_backend = "onnx" if settings.onnx_model_path else "pytorch"
