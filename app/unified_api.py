@@ -14,10 +14,10 @@ from pydantic import BaseModel, Field
 
 from .core.config import Settings, get_settings
 from .core.logging import get_contextual_logger, get_logger
-from .utils.error_codes import ErrorCode, raise_validation_error
 from .ml.model_strategy import ModelBackend, ModelStrategy
 from .ml.onnx_optimizer import ONNXSentimentAnalyzer, get_onnx_sentiment_analyzer
 from .ml.sentiment import SentimentAnalyzer, get_sentiment_analyzer
+from .utils.error_codes import ErrorCode, raise_validation_error
 from .utils.exceptions import ModelNotLoadedError, TextEmptyError, TextTooLongError
 
 logger = get_logger(__name__)

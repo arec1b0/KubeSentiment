@@ -13,8 +13,8 @@ from pydantic import BaseModel, Field, validator
 
 from .core.config import Settings, get_settings
 from .core.logging import get_contextual_logger, get_logger, log_api_request
-from .error_codes import ErrorCode, raise_validation_error
 from .ml.sentiment import SentimentAnalyzer, get_sentiment_analyzer
+from .utils.error_codes import ErrorCode, raise_validation_error
 from .utils.exceptions import ModelNotLoadedError, TextEmptyError, TextTooLongError
 
 logger = get_logger(__name__)
