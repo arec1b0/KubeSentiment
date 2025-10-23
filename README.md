@@ -49,7 +49,7 @@ graph TD
 
         subgraph "Sentiment Analysis Pod"
             direction LR
-            I[FastAPI App] --> J[Sentiment Model (ONNX/PyTorch)];
+            I[FastAPI App] --> J["Sentiment Model - ONNX/PyTorch"];
         end
 
         F ----> I;
