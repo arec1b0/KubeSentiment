@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from .core.config import get_settings
 from .core.logging import get_logger
 from .correlation_middleware import CorrelationIDMiddleware
-from .exceptions import ModelInferenceError, ModelNotLoadedError, TextEmptyError
+from .utils.exceptions import ModelInferenceError, ModelNotLoadedError, TextEmptyError
 from .middleware import (
     ErrorHandlingMiddleware,
     RateLimitMiddleware,
@@ -58,7 +58,7 @@ app.add_middleware(CorrelationIDMiddleware)
 # Global exception handler for ServiceError and subclasses
 from fastapi.responses import JSONResponse
 
-from .exceptions import ServiceError
+from .utils.exceptions import ServiceError
 
 
 @app.exception_handler(ServiceError)
@@ -168,7 +168,7 @@ async def health_check(analyzer: ONNXSentimentAnalyzer = Depends(get_analyzer)):
         )
     except Exception as e:
         logger.error(f"Health check failed: {e}")
-        from .exceptions import ServiceUnavailableError
+        from .utils.exceptions import ServiceUnavailableError
 
         raise ServiceUnavailableError(
             message="Health check failed", context={"error": str(e)}
@@ -183,7 +183,7 @@ async def readiness_check(analyzer: ONNXSentimentAnalyzer = Depends(get_analyzer
     Returns 200 if the service is ready to accept traffic.
     """
     if not analyzer.is_ready():
-        from .exceptions import ServiceUnavailableError
+        from .utils.exceptions import ServiceUnavailableError
 
         raise ServiceUnavailableError(
             message="Service not ready", context={"model_loaded": analyzer._is_loaded}
@@ -204,7 +204,7 @@ async def get_model_info(analyzer: ONNXSentimentAnalyzer = Depends(get_analyzer)
         return ModelInfoResponse(**info)
     except Exception as e:
         logger.error(f"Failed to get model info: {e}")
-        from .exceptions import InternalError
+        from .utils.exceptions import InternalError
 
         raise InternalError(
             message="Failed to retrieve model info", context={"error": str(e)}
@@ -261,7 +261,7 @@ async def predict_sentiment(
 
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
-        from .exceptions import InternalError
+        from .utils.exceptions import InternalError
 
         raise InternalError(
             message=f"Unexpected error during prediction: {str(e)}",

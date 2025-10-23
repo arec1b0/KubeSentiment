@@ -6,21 +6,19 @@ and provides optimized inference using ONNX Runtime.
 """
 
 import hashlib
-import logging
 import time
 from collections import OrderedDict
+from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-import numpy as np
-import onnxruntime as ort
 import torch
 from optimum.onnxruntime import ORTModelForSequenceClassification
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoTokenizer
 
 from ..core.config import get_settings
-from ..core.logging import get_logger, log_model_operation
-from ..exceptions import ModelInferenceError, ModelNotLoadedError
+from ..core.logging import get_logger
+from ..utils.exceptions import ModelInferenceError, ModelNotLoadedError
 
 logger = get_logger(__name__)
 
@@ -368,9 +366,6 @@ class ONNXSentimentAnalyzer:
             "cache_size": len(self._prediction_cache),
             "cache_max_size": self._cache_max_size,
         }
-
-
-from functools import lru_cache
 
 
 @lru_cache(maxsize=1)

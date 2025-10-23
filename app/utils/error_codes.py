@@ -136,4 +136,3 @@ def raise_validation_error(
     """
     error_response = create_error_response(error_code, detail, status_code, **additional_context)
     raise HTTPException(status_code=status_code, detail=error_response)
-    raise HTTPException(status_code=status_code, detail=error_response)
