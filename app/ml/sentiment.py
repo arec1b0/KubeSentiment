@@ -549,8 +549,3 @@ def reset_sentiment_analyzer() -> None:
     works by clearing the cache of the `get_sentiment_analyzer` function.
     """
     get_sentiment_analyzer.cache_clear()
-    This function is primarily intended for use in testing scenarios where a
-    fresh instance of the analyzer is needed for different test cases. It
-    works by clearing the cache of the `get_sentiment_analyzer` function.
-    """
-    get_sentiment_analyzer.cache_clear()
