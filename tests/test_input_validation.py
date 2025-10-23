@@ -312,5 +312,39 @@ class TestEdgeCases:
             assert valid_input.text == text
 
 
+class TestPredictionServiceValidation:
+    """A test suite for the `PredictionService` validation logic."""
+
+    @pytest.fixture
+    def mock_model(self):
+        """Mocks the model strategy."""
+        model = Mock()
+        model.is_ready.return_value = True
+        return model
+
+    @pytest.fixture
+    def mock_settings(self):
+        """Mocks the application settings."""
+        settings = Mock()
+        settings.max_text_length = 512
+        return settings
+
+    def test_text_too_long_raises_error_in_service(self, mock_model, mock_settings):
+        """Tests that `PredictionService` raises `TextTooLongError` for oversized input."""
+        from app.services.prediction import PredictionService
+
+        mock_settings.max_text_length = 20
+        service = PredictionService(model=mock_model, settings=mock_settings)
+        long_text = "This text is well over the twenty-character limit."
+
+        with pytest.raises(TextTooLongError) as exc_info:
+            service.predict(long_text)
+
+        assert exc_info.value.code == "TEXT_TOO_LONG"
+        assert "exceeds maximum" in str(exc_info.value)
+        assert exc_info.value.text_length == len(long_text)
+        assert exc_info.value.max_length == mock_settings.max_text_length
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

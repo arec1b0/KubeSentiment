@@ -10,7 +10,7 @@ from typing import Any, Dict
 from app.core.config import Settings
 from app.core.logging import get_contextual_logger, get_logger
 from app.models.base import ModelStrategy
-from app.utils.exceptions import ModelNotLoadedError, TextEmptyError
+from app.utils.exceptions import ModelNotLoadedError, TextEmptyError, TextTooLongError
 
 logger = get_logger(__name__)
 
@@ -73,6 +73,10 @@ class PredictionService:
         # Validate input
         if not text or not text.strip():
             raise TextEmptyError(context={"text_length": len(text) if text else 0})
+        if len(text) > self.settings.max_text_length:
+            raise TextTooLongError(
+                text_length=len(text), max_length=self.settings.max_text_length
+            )
 
         # Check model readiness
         if not self.model.is_ready():
