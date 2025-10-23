@@ -20,7 +20,12 @@ from ..core.logging import (
     log_model_operation,
     log_security_event,
 )
-from ..utils.exceptions import InvalidModelError, ModelInferenceError, ModelNotLoadedError, TextEmptyError
+from ..utils.exceptions import (
+    InvalidModelError,
+    ModelInferenceError,
+    ModelNotLoadedError,
+    TextEmptyError,
+)
 
 # Import monitoring at module level to avoid circular imports
 try:

@@ -15,7 +15,6 @@ from pydantic import BaseModel, Field
 from .core.config import get_settings
 from .core.logging import get_logger
 from .correlation_middleware import CorrelationIDMiddleware
-from .utils.exceptions import ModelInferenceError, ModelNotLoadedError, TextEmptyError
 from .middleware import (
     ErrorHandlingMiddleware,
     RateLimitMiddleware,
@@ -24,6 +23,7 @@ from .middleware import (
 )
 from .ml.onnx_optimizer import ONNXSentimentAnalyzer, get_onnx_sentiment_analyzer
 from .monitoring import get_metrics
+from .utils.exceptions import ModelInferenceError, ModelNotLoadedError, TextEmptyError
 
 logger = get_logger(__name__)
 settings = get_settings()
@@ -170,9 +170,7 @@ async def health_check(analyzer: ONNXSentimentAnalyzer = Depends(get_analyzer)):
         logger.error(f"Health check failed: {e}")
         from .utils.exceptions import ServiceUnavailableError
 
-        raise ServiceUnavailableError(
-            message="Health check failed", context={"error": str(e)}
-        )
+        raise ServiceUnavailableError(message="Health check failed", context={"error": str(e)})
 
 
 @app.get("/ready", tags=["Health"])
@@ -206,9 +204,7 @@ async def get_model_info(analyzer: ONNXSentimentAnalyzer = Depends(get_analyzer)
         logger.error(f"Failed to get model info: {e}")
         from .utils.exceptions import InternalError
 
-        raise InternalError(
-            message="Failed to retrieve model info", context={"error": str(e)}
-        )
+        raise InternalError(message="Failed to retrieve model info", context={"error": str(e)})
 
 
 @app.post("/predict", response_model=SentimentResponse, tags=["Prediction"])
@@ -317,7 +313,5 @@ if __name__ == "__main__":
         "app.api_onnx:app",
         host="0.0.0.0",
         port=8000,
-        reload=settings.environment == "development",
-    )
         reload=settings.environment == "development",
     )
