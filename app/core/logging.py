@@ -127,9 +127,9 @@ def log_model_operation(
     logger,
     operation: str,
     model_name: str,
-    duration_ms: float = None,
+    duration_ms: Optional[float] = None,
     success: bool = True,
-    error: str = None,
+    error: Optional[str] = None,
 ) -> None:
     """Logs a standardized message for a model operation.
 
