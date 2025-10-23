@@ -8,17 +8,10 @@ the sentiment analysis service performance and health.
 import time
 from typing import Optional
 
-from prometheus_client import (
-    Counter,
-    Histogram,
-    Gauge,
-    Info,
-    generate_latest,
-    CONTENT_TYPE_LATEST,
-)
 import torch
-from .config import get_settings
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, Info, generate_latest
 
+from .core.config import get_settings
 
 # Prometheus metrics
 REQUEST_COUNT = Counter(
@@ -37,9 +30,7 @@ INFERENCE_DURATION = Histogram(
     "sentiment_inference_duration_seconds", "Model inference duration in seconds"
 )
 
-ACTIVE_REQUESTS = Gauge(
-    "sentiment_active_requests", "Number of active requests being processed"
-)
+ACTIVE_REQUESTS = Gauge("sentiment_active_requests", "Number of active requests being processed")
 
 MODEL_LOADED = Gauge(
     "sentiment_model_loaded", "Whether the sentiment model is loaded (1) or not (0)"
@@ -47,9 +38,7 @@ MODEL_LOADED = Gauge(
 
 TORCH_VERSION = Info("sentiment_torch_version", "PyTorch version information")
 
-CUDA_AVAILABLE = Gauge(
-    "sentiment_cuda_available", "Whether CUDA is available (1) or not (0)"
-)
+CUDA_AVAILABLE = Gauge("sentiment_cuda_available", "Whether CUDA is available (1) or not (0)")
 
 CUDA_MEMORY_ALLOCATED = Gauge(
     "sentiment_cuda_memory_allocated_bytes", "CUDA memory allocated in bytes"
@@ -59,9 +48,7 @@ CUDA_MEMORY_RESERVED = Gauge(
     "sentiment_cuda_memory_reserved_bytes", "CUDA memory reserved in bytes"
 )
 
-CUDA_DEVICE_COUNT = Gauge(
-    "sentiment_cuda_device_count", "Number of CUDA devices available"
-)
+CUDA_DEVICE_COUNT = Gauge("sentiment_cuda_device_count", "Number of CUDA devices available")
 
 PREDICTION_SCORE = Histogram(
     "sentiment_prediction_score",
@@ -95,17 +82,13 @@ class PrometheusMetrics:
         TORCH_VERSION.info(
             {
                 "version": torch.__version__,
-                "cuda_version": torch.version.cuda
-                if torch.cuda.is_available()
-                else "N/A",
+                "cuda_version": torch.version.cuda if torch.cuda.is_available() else "N/A",
             }
         )
 
         # Set CUDA availability
         CUDA_AVAILABLE.set(1 if torch.cuda.is_available() else 0)
-        CUDA_DEVICE_COUNT.set(
-            torch.cuda.device_count() if torch.cuda.is_available() else 0
-        )
+        CUDA_DEVICE_COUNT.set(torch.cuda.device_count() if torch.cuda.is_available() else 0)
 
     def update_system_metrics(self):
         """Update dynamic system metrics."""
@@ -115,9 +98,7 @@ class PrometheusMetrics:
 
     def record_request(self, endpoint: str, method: str, status_code: int):
         """Record a completed request."""
-        REQUEST_COUNT.labels(
-            endpoint=endpoint, method=method, status_code=str(status_code)
-        ).inc()
+        REQUEST_COUNT.labels(endpoint=endpoint, method=method, status_code=str(status_code)).inc()
 
     def record_request_duration(self, endpoint: str, method: str, duration: float):
         """Record request duration."""
@@ -149,11 +130,7 @@ class PrometheusMetrics:
         # Serve cached metrics when TTL hasn't expired
         now = time.time()
         ttl = getattr(self.settings, "metrics_cache_ttl", 5)
-        if (
-            self._metrics_cache
-            and self._metrics_cache_ts
-            and (now - self._metrics_cache_ts) < ttl
-        ):
+        if self._metrics_cache and self._metrics_cache_ts and (now - self._metrics_cache_ts) < ttl:
             return self._metrics_cache
 
         # Update dynamic metrics before export and refresh cache

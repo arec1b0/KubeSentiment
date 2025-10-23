@@ -14,8 +14,8 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.config import get_settings
-from app.logging_config import get_logger
+from app.core.config import get_settings
+from app.core.logging import get_logger
 from app.ml.onnx_optimizer import ONNXModelOptimizer
 
 logger = get_logger(__name__)

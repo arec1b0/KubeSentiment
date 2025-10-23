@@ -7,7 +7,7 @@ and improve maintainability across API endpoints.
 
 from fastapi import HTTPException
 
-from ..logging_config import get_logger
+from ..core.logging import get_logger
 
 logger = get_logger(__name__)
 

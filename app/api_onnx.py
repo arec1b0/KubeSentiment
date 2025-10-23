@@ -5,23 +5,24 @@ This module provides an optimized API endpoint for sentiment analysis
 using ONNX Runtime for faster inference.
 """
 
+import time
 from typing import Optional
-from fastapi import FastAPI, HTTPException, Depends, Request
+
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-import time
 
-from .config import get_settings
-from .logging_config import get_logger
-from .exceptions import ModelNotLoadedError, ModelInferenceError, TextEmptyError
-from .ml.onnx_optimizer import ONNXSentimentAnalyzer, get_onnx_sentiment_analyzer
+from .core.config import get_settings
+from .core.logging import get_logger
+from .correlation_middleware import CorrelationIDMiddleware
+from .exceptions import ModelInferenceError, ModelNotLoadedError, TextEmptyError
 from .middleware import (
-    RequestLoggingMiddleware,
     ErrorHandlingMiddleware,
     RateLimitMiddleware,
+    RequestLoggingMiddleware,
     SecurityHeadersMiddleware,
 )
-from .correlation_middleware import CorrelationIDMiddleware
+from .ml.onnx_optimizer import ONNXSentimentAnalyzer, get_onnx_sentiment_analyzer
 from .monitoring import get_metrics
 
 logger = get_logger(__name__)
@@ -56,6 +57,7 @@ app.add_middleware(CorrelationIDMiddleware)
 
 # Global exception handler for ServiceError and subclasses
 from fastapi.responses import JSONResponse
+
 from .exceptions import ServiceError
 
 
@@ -274,8 +276,8 @@ async def metrics():
 
     Returns metrics in Prometheus exposition format.
     """
-    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
     from fastapi.responses import Response
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
     metrics_data = generate_latest()
     return Response(content=metrics_data, media_type=CONTENT_TYPE_LATEST)
@@ -315,5 +317,7 @@ if __name__ == "__main__":
         "app.api_onnx:app",
         host="0.0.0.0",
         port=8000,
+        reload=settings.environment == "development",
+    )
         reload=settings.environment == "development",
     )

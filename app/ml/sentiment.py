@@ -13,14 +13,14 @@ from typing import Any, Dict, Optional
 import torch
 from transformers import Pipeline, pipeline
 
-from ..config import get_settings
-from ..exceptions import InvalidModelError, ModelInferenceError, ModelNotLoadedError, TextEmptyError
-from ..logging_config import (
+from ..core.config import get_settings
+from ..core.logging import (
     get_contextual_logger,
     get_logger,
     log_model_operation,
     log_security_event,
 )
+from ..exceptions import InvalidModelError, ModelInferenceError, ModelNotLoadedError, TextEmptyError
 
 # Import monitoring at module level to avoid circular imports
 try:
@@ -539,6 +539,11 @@ def get_sentiment_analyzer() -> SentimentAnalyzer:
 def reset_sentiment_analyzer() -> None:
     """Resets the singleton instance of the sentiment analyzer.
 
+    This function is primarily intended for use in testing scenarios where a
+    fresh instance of the analyzer is needed for different test cases. It
+    works by clearing the cache of the `get_sentiment_analyzer` function.
+    """
+    get_sentiment_analyzer.cache_clear()
     This function is primarily intended for use in testing scenarios where a
     fresh instance of the analyzer is needed for different test cases. It
     works by clearing the cache of the `get_sentiment_analyzer` function.

@@ -1,10 +1,11 @@
 import secrets
+
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from .config import get_settings
-from .logging_config import get_logger, log_security_event
+from .core.config import get_settings
+from .core.logging import get_logger, log_security_event
 
 logger = get_logger(__name__)
 
@@ -48,4 +49,5 @@ class APIKeyAuthMiddleware(BaseHTTPMiddleware):
             )
             return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
+        return await call_next(request)
         return await call_next(request)

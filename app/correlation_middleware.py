@@ -6,14 +6,15 @@ and ensures they are available throughout the request lifecycle.
 """
 
 from typing import Callable
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from .logging_config import (
-    set_correlation_id,
-    generate_correlation_id,
+from .core.logging import (
     clear_correlation_id,
+    generate_correlation_id,
     get_logger,
+    set_correlation_id,
 )
 
 logger = get_logger(__name__)
@@ -178,4 +179,5 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 exc_info=True,
             )
 
+            raise
             raise

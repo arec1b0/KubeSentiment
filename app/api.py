@@ -6,16 +6,16 @@ for better modularity and maintainability.
 """
 
 import time
-from typing import Dict, Any
+from typing import Any, Dict
 
-from fastapi import APIRouter, HTTPException, Response, Depends
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, validator
 
-from .config import get_settings, Settings
-from .ml.sentiment import get_sentiment_analyzer, SentimentAnalyzer
-from .logging_config import get_logger, log_api_request, get_contextual_logger
+from .core.config import Settings, get_settings
+from .core.logging import get_contextual_logger, get_logger, log_api_request
 from .error_codes import ErrorCode, raise_validation_error
-from .exceptions import TextEmptyError, TextTooLongError, ModelNotLoadedError
+from .exceptions import ModelNotLoadedError, TextEmptyError, TextTooLongError
+from .ml.sentiment import SentimentAnalyzer, get_sentiment_analyzer
 
 logger = get_logger(__name__)
 
@@ -50,7 +50,7 @@ class TextInput(BaseModel):
             max_len = int(getattr(settings, "max_text_length", None))
         except Exception:
             # Fallback to default defined on Settings
-            from .config import Settings
+            from .core.config import Settings
 
             max_len = Settings().max_text_length
 
@@ -69,9 +69,7 @@ class PredictionResponse(BaseModel):
 
     label: str = Field(..., description="Predicted sentiment label")
     score: float = Field(..., description="Confidence score (0.0 to 1.0)")
-    inference_time_ms: float = Field(
-        ..., description="Model inference time in milliseconds"
-    )
+    inference_time_ms: float = Field(..., description="Model inference time in milliseconds")
     model_name: str = Field(..., description="Name of the model used")
     text_length: int = Field(..., description="Length of processed text")
 
@@ -90,12 +88,8 @@ class MetricsResponse(BaseModel):
 
     torch_version: str = Field(..., description="PyTorch version")
     cuda_available: bool = Field(..., description="CUDA availability")
-    cuda_memory_allocated_mb: float = Field(
-        ..., description="CUDA memory allocated in MB"
-    )
-    cuda_memory_reserved_mb: float = Field(
-        ..., description="CUDA memory reserved in MB"
-    )
+    cuda_memory_allocated_mb: float = Field(..., description="CUDA memory allocated in MB")
+    cuda_memory_reserved_mb: float = Field(..., description="CUDA memory reserved in MB")
     cuda_device_count: int = Field(..., description="Number of CUDA devices")
 
 

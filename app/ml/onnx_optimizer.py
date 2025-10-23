@@ -18,9 +18,9 @@ import torch
 from optimum.onnxruntime import ORTModelForSequenceClassification
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from ..config import get_settings
+from ..core.config import get_settings
+from ..core.logging import get_logger, log_model_operation
 from ..exceptions import ModelInferenceError, ModelNotLoadedError
-from ..logging_config import get_logger, log_model_operation
 
 logger = get_logger(__name__)
 
