@@ -9,7 +9,7 @@ from typing import Any, Dict
 
 from app.core.config import Settings
 from app.core.logging import get_contextual_logger, get_logger
-from app.models.base import ModelStrategy
+from app.ml.model_strategy import ModelStrategy
 from app.utils.exceptions import ModelNotLoadedError, TextEmptyError, TextTooLongError
 
 logger = get_logger(__name__)
