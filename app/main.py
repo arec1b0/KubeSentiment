@@ -18,6 +18,7 @@ from app.api.middleware import (
     MetricsMiddleware,
     RequestLoggingMiddleware,
 )
+from app.monitoring.routes import router as monitoring_router
 from app.core.config import get_settings
 from app.core.events import lifespan
 from app.core.logging import get_logger, setup_structured_logging
@@ -115,6 +116,11 @@ def create_app() -> FastAPI:
 
     # Include API router
     app.include_router(router, prefix="/api/v1" if not settings.debug else "")
+    app.include_router(
+        monitoring_router,
+        prefix="/api/v1" if not settings.debug else "",
+        tags=["Monitoring"],
+    )
 
     # Add root endpoint
     @app.get("/", tags=["root"])
