@@ -67,7 +67,7 @@ The application is a FastAPI service with a modular, domain-oriented structure. 
 - **`app/api`**: Defines the API layer, with sub-modules for routes, request/response schemas (Pydantic), and middleware (correlation IDs, logging, authentication).
 - **`app/models`**: Manages the machine learning models. It uses a **Factory and Strategy pattern** (`factory.py`, `base.py`) to allow for interchangeable model backends (e.g., `pytorch_sentiment.py`, `onnx_sentiment.py`).
 - **`app/services`**: Implements the business logic, acting as an intermediary between the API routes and the models.
-- **`app/monitoring`**: Handles observability, exposing Prometheus metrics and health check endpoints.
+- **`app/monitoring`**: Handles observability, exposing Prometheus metrics and health check endpoints. It includes a `routes.py` file that consolidates all monitoring-related API endpoints.
 - **`app/utils`**: Contains shared utilities like custom exception classes and error handlers.
 
 ## 4. Containerization (`Dockerfile` & `docker-compose.yml`)
