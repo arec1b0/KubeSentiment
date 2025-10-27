@@ -154,6 +154,25 @@ The service exposes several key endpoints:
 
 The application is configured via environment variables, which are documented in our **[Deployment Guide](docs/setup/deployment-guide.md)**. For Kubernetes deployments, these are managed via `ConfigMap` and `Secret` objects, which are defined in the Helm chart.
 
+> **Note:** `.env` files are intentionally _not_ baked into the container image. Provide any sensitive or environment-specific settings at runtime using the mechanisms supported by your orchestrator.
+
+#### Supplying configuration at runtime
+
+- **Docker / Docker Compose:** pass variables with `--env-file` or individual `-e` flags when running the container.
+- **Kubernetes:** mount configuration with `envFrom` or `env` entries sourced from a `ConfigMap` or `Secret`. Sensitive values (API keys, credentials) should be stored in a `Secret`, while non-sensitive defaults can live in a `ConfigMap`.
+
+Example Kubernetes manifest snippet:
+
+```yaml
+envFrom:
+  - configMapRef:
+      name: mlops-sentiment-config
+  - secretRef:
+      name: mlops-sentiment-secrets
+```
+
+This approach keeps secrets out of the image and allows you to tailor configuration per environment (dev/staging/prod) without rebuilding the container.
+
 ## 📊 Benchmarking
 
 A key part of this project is its ability to measure performance and cost-effectiveness. The `benchmarking/` directory contains a powerful suite for running load tests against the service on different hardware configurations.
