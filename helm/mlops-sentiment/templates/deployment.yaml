@@ -30,6 +30,27 @@ spec:
       serviceAccountName: {{ include "mlops-sentiment.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.modelPersistence.initContainer.enabled }}
+      initContainers:
+        - name: model-preloader
+          image: {{ .Values.modelPersistence.initContainer.image }}
+          imagePullPolicy: {{ .Values.modelPersistence.initContainer.pullPolicy }}
+          command: ["python3", "/scripts/init-models.py"]
+          env:
+            - name: MODEL_NAME
+              value: {{ .Values.modelPersistence.initContainer.modelName | quote }}
+            - name: MODEL_CACHE_DIR
+              value: "/models"
+            - name: ENABLE_ONNX_OPTIMIZATION
+              value: {{ .Values.modelPersistence.initContainer.enableOnnx | quote }}
+          volumeMounts:
+            - name: model-cache
+              mountPath: /models
+            - name: init-scripts
+              mountPath: /scripts
+          resources:
+            {{- toYaml .Values.modelPersistence.initContainer.resources | nindent 12 }}
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
@@ -53,11 +74,27 @@ spec:
               mountPath: /tmp
             - name: cache
               mountPath: /app/.cache
+            {{- if .Values.modelPersistence.enabled }}
+            - name: model-cache
+              mountPath: /models
+              readOnly: false
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
         - name: cache
           emptyDir: {}
+        {{- if .Values.modelPersistence.enabled }}
+        - name: model-cache
+          persistentVolumeClaim:
+            claimName: {{ include "mlops-sentiment.fullname" . }}-model-cache
+        {{- end }}
+        {{- if .Values.modelPersistence.initContainer.enabled }}
+        - name: init-scripts
+          configMap:
+            name: {{ include "mlops-sentiment.fullname" . }}-model-init-script
+            defaultMode: 0755
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

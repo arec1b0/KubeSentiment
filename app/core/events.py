@@ -40,9 +40,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         debug=settings.debug,
     )
 
-    # Initialize models
+    # Initialize models with warm-up
     try:
         from app.models.factory import ModelFactory
+        from app.monitoring.model_warmup import get_warmup_manager
 
         # Pre-load default model
         default_backend = "onnx" if settings.onnx_model_path else "pytorch"
@@ -50,6 +51,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         if model.is_ready():
             logger.info("Model loaded successfully", backend=default_backend)
+
+            # Warm up the model for optimal cold-start performance
+            try:
+                warmup_manager = get_warmup_manager()
+                warmup_stats = await warmup_manager.warmup_model(model, num_iterations=10)
+
+                logger.info(
+                    "Model warm-up completed",
+                    avg_inference_ms=warmup_stats.get("avg_inference_time_ms"),
+                    p95_inference_ms=warmup_stats.get("p95_inference_time_ms"),
+                    total_warmup_ms=warmup_stats.get("total_warmup_time_ms"),
+                )
+            except Exception as warmup_error:
+                logger.warning(
+                    "Model warm-up failed - continuing without warm-up",
+                    error=str(warmup_error),
+                )
         else:
             logger.warning(
                 "Model failed to load - running in degraded mode",
@@ -63,8 +81,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     kafka_consumer = None
     if settings.kafka_enabled:
         try:
-            from app.services.stream_processor import StreamProcessor
             from app.services.kafka_consumer import HighThroughputKafkaConsumer
+            from app.services.stream_processor import StreamProcessor
 
             # Create stream processor with the loaded model
             stream_processor = StreamProcessor(model)
@@ -89,11 +107,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize async batch service
     async_batch_service = None
     try:
-        from app.services.stream_processor import StreamProcessor
         from app.services.async_batch_service import AsyncBatchService
 
         # Create prediction service with the loaded model
         from app.services.prediction import PredictionService
+        from app.services.stream_processor import StreamProcessor
+
         prediction_svc = PredictionService(model, settings)
 
         # Create stream processor
@@ -122,7 +141,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Application shutdown initiated")
 
     # Shutdown Kafka consumer
-    if hasattr(app.state, 'kafka_consumer') and app.state.kafka_consumer:
+    if hasattr(app.state, "kafka_consumer") and app.state.kafka_consumer:
         try:
             await app.state.kafka_consumer.stop()
             logger.info("Kafka consumer stopped successfully")
@@ -130,7 +149,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.error("Error stopping Kafka consumer", error=str(e), exc_info=True)
 
     # Shutdown async batch service
-    if hasattr(app.state, 'async_batch_service') and app.state.async_batch_service:
+    if hasattr(app.state, "async_batch_service") and app.state.async_batch_service:
         try:
             await app.state.async_batch_service.stop()
             logger.info("Async batch service stopped successfully")

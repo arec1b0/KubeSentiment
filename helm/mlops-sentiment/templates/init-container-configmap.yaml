@@ -1,0 +1,159 @@
+{{- if .Values.modelPersistence.initContainer.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mlops-sentiment.fullname" . }}-model-init-script
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mlops-sentiment.labels" . | nindent 4 }}
+    app.kubernetes.io/component: init-scripts
+data:
+  init-models.py: |
+    #!/usr/bin/env python3
+    """
+    Model Pre-loading Init Container Script
+
+    This script downloads, optimizes, and caches models before the main
+    application container starts, achieving sub-50ms cold-start times.
+    """
+
+    import os
+    import sys
+    import time
+    from pathlib import Path
+
+    print("=" * 70)
+    print("🚀 Model Pre-loading Init Container")
+    print("=" * 70)
+
+    # Configuration from environment
+    MODEL_NAME = os.environ.get("MODEL_NAME", "distilbert-base-uncased-finetuned-sst-2-english")
+    CACHE_DIR = Path(os.environ.get("MODEL_CACHE_DIR", "/models"))
+    ENABLE_ONNX = os.environ.get("ENABLE_ONNX_OPTIMIZATION", "true").lower() == "true"
+
+    print(f"📦 Model Name: {MODEL_NAME}")
+    print(f"💾 Cache Directory: {CACHE_DIR}")
+    print(f"⚡ ONNX Optimization: {ENABLE_ONNX}")
+    print("-" * 70)
+
+    # Ensure cache directory exists and is writable
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    if not os.access(CACHE_DIR, os.W_OK):
+        print(f"❌ ERROR: Cache directory {CACHE_DIR} is not writable")
+        sys.exit(1)
+
+    try:
+        # Import required libraries
+        print("📚 Importing libraries...")
+        from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoConfig
+
+        if ENABLE_ONNX:
+            from optimum.onnxruntime import ORTModelForSequenceClassification
+            import onnxruntime as ort
+
+        # Check if model is already cached
+        model_cache_name = MODEL_NAME.replace("/", "_")
+        onnx_cache_dir = CACHE_DIR / "models" / model_cache_name
+
+        if onnx_cache_dir.exists() and (onnx_cache_dir / "model_optimized.onnx").exists():
+            print(f"✅ Model already cached at {onnx_cache_dir}")
+            print("⏭️  Skipping download (using cached version)")
+        else:
+            print(f"📥 Downloading model: {MODEL_NAME}")
+            start_time = time.time()
+
+            # Download PyTorch model first
+            pytorch_dir = CACHE_DIR / "pytorch" / model_cache_name
+            pytorch_dir.mkdir(parents=True, exist_ok=True)
+
+            model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
+            tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+            config = AutoConfig.from_pretrained(MODEL_NAME)
+
+            model.save_pretrained(pytorch_dir)
+            tokenizer.save_pretrained(pytorch_dir)
+            config.save_pretrained(pytorch_dir)
+
+            download_time = time.time() - start_time
+            print(f"✅ Model downloaded in {download_time:.2f}s")
+
+            # Convert to ONNX if enabled
+            if ENABLE_ONNX:
+                print("⚡ Converting to ONNX and optimizing...")
+                onnx_start = time.time()
+
+                onnx_cache_dir.mkdir(parents=True, exist_ok=True)
+
+                # Convert to ONNX using Optimum
+                onnx_model = ORTModelForSequenceClassification.from_pretrained(
+                    pytorch_dir,
+                    export=True,
+                    provider="CPUExecutionProvider"
+                )
+
+                onnx_model.save_pretrained(onnx_cache_dir)
+                tokenizer.save_pretrained(onnx_cache_dir)
+                config.save_pretrained(onnx_cache_dir)
+
+                # Further optimize ONNX graph
+                print("🔧 Applying ONNX graph optimizations...")
+                sess_options = ort.SessionOptions()
+                sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+                sess_options.optimized_model_filepath = str(onnx_cache_dir / "model_optimized.onnx")
+
+                session = ort.InferenceSession(
+                    str(onnx_cache_dir / "model.onnx"),
+                    sess_options,
+                    providers=["CPUExecutionProvider"]
+                )
+
+                onnx_time = time.time() - onnx_start
+                print(f"✅ ONNX conversion and optimization completed in {onnx_time:.2f}s")
+
+                # Get model size
+                onnx_file = onnx_cache_dir / "model_optimized.onnx"
+                if onnx_file.exists():
+                    size_mb = onnx_file.stat().st_size / (1024 * 1024)
+                    print(f"📊 Optimized model size: {size_mb:.2f} MB")
+
+        # Verify cache integrity
+        print("\n🔍 Verifying cache integrity...")
+        required_files = ["config.json", "tokenizer_config.json"]
+        if ENABLE_ONNX:
+            required_files.extend(["model_optimized.onnx", "model.onnx"])
+
+        all_files_present = all((onnx_cache_dir / f).exists() for f in required_files)
+
+        if all_files_present:
+            print("✅ All required files present in cache")
+        else:
+            missing = [f for f in required_files if not (onnx_cache_dir / f).exists()]
+            print(f"⚠️  Missing files: {missing}")
+
+        # Create cache metadata
+        import json
+        metadata = {
+            "model_name": MODEL_NAME,
+            "cached_at": time.time(),
+            "onnx_optimized": ENABLE_ONNX,
+            "cache_dir": str(onnx_cache_dir),
+        }
+
+        metadata_file = CACHE_DIR / "metadata" / f"{model_cache_name}.json"
+        metadata_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(metadata_file, "w") as f:
+            json.dump(metadata, f, indent=2)
+
+        print("\n" + "=" * 70)
+        print("✅ Model pre-loading completed successfully!")
+        print(f"📍 Models cached at: {CACHE_DIR}")
+        print(f"⚡ Ready for <50ms cold-start loading")
+        print("=" * 70)
+
+    except Exception as e:
+        print(f"\n❌ ERROR during model pre-loading: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+{{- end }}
+

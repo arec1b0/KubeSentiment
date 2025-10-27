@@ -1,0 +1,63 @@
+{{- if .Values.modelPersistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "mlops-sentiment.fullname" . }}-model-cache
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mlops-sentiment.labels" . | nindent 4 }}
+    app.kubernetes.io/component: model-cache
+spec:
+  accessModes:
+    - ReadWriteMany  # Multiple pods can share the same model cache
+  {{- if .Values.modelPersistence.storageClassName }}
+  storageClassName: {{ .Values.modelPersistence.storageClassName }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.modelPersistence.size }}
+  {{- if .Values.modelPersistence.volumeName }}
+  volumeName: {{ .Values.modelPersistence.volumeName }}
+  {{- end }}
+
+---
+# Optional: Pre-provisioned PersistentVolume (for on-prem/manual provisioning)
+{{- if .Values.modelPersistence.createPV }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "mlops-sentiment.fullname" . }}-model-pv
+  labels:
+    {{- include "mlops-sentiment.labels" . | nindent 4 }}
+    app.kubernetes.io/component: model-storage
+spec:
+  capacity:
+    storage: {{ .Values.modelPersistence.size }}
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  {{- if .Values.modelPersistence.storageClassName }}
+  storageClassName: {{ .Values.modelPersistence.storageClassName }}
+  {{- end }}
+  {{- if .Values.modelPersistence.nfs }}
+  nfs:
+    path: {{ .Values.modelPersistence.nfs.path }}
+    server: {{ .Values.modelPersistence.nfs.server }}
+  {{- else if .Values.modelPersistence.hostPath }}
+  hostPath:
+    path: {{ .Values.modelPersistence.hostPath }}
+    type: DirectoryOrCreate
+  {{- else if .Values.modelPersistence.csi }}
+  csi:
+    driver: {{ .Values.modelPersistence.csi.driver }}
+    volumeHandle: {{ .Values.modelPersistence.csi.volumeHandle }}
+    {{- if .Values.modelPersistence.csi.volumeAttributes }}
+    volumeAttributes:
+      {{- toYaml .Values.modelPersistence.csi.volumeAttributes | nindent 6 }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}
+

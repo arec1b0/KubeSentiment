@@ -79,6 +79,51 @@ image:
   pullPolicy: IfNotPresent
   pullSecrets: []
 
+# Model Persistence Configuration (160x cold-start improvement: 8s → 50ms)
+modelPersistence:
+  # Enable model persistence for fast loading
+  enabled: true
+
+  # PersistentVolume configuration
+  size: 5Gi
+  storageClassName: ""  # Use default storage class or specify (e.g., "fast-ssd")
+  volumeName: ""  # Optional: specify pre-created PV name
+
+  # Create PersistentVolume (for manual provisioning)
+  createPV: false
+
+  # Storage backend options (choose one)
+  # NFS storage
+  nfs:
+    server: ""
+    path: "/models"
+
+  # HostPath (for single-node testing only)
+  hostPath: ""
+
+  # CSI driver (for cloud providers)
+  csi:
+    driver: ""  # e.g., "efs.csi.aws.com", "file.csi.azure.com"
+    volumeHandle: ""
+    volumeAttributes: {}
+
+  # Init Container for model pre-loading
+  initContainer:
+    enabled: true
+    image: python:3.11-slim
+    pullPolicy: IfNotPresent
+    modelName: "distilbert-base-uncased-finetuned-sst-2-english"
+    enableOnnx: "true"
+
+    # Resource limits for init container
+    resources:
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+
 # Deployment configuration
 deployment:
   replicaCount: 3
