@@ -19,6 +19,10 @@ kubernetes>=27.0.0
 kafka-python==2.0.2
 confluent-kafka==2.3.0
 
+# Redis for distributed caching
+redis==5.0.1
+hiredis==2.2.3  # C parser for better performance
+
 # Performance optimization
 psutil==5.9.6
 asyncio-throttle==1.0.2

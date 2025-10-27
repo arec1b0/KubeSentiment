@@ -211,6 +211,61 @@ ASYNC_BATCH_CACHE_MISSES = Counter(
     "Total number of async batch cache misses",
 )
 
+# Anomaly buffer metrics
+ANOMALY_DETECTED = Counter(
+    "anomaly_detected_total",
+    "Total number of anomalies detected",
+    ["anomaly_type"],
+)
+
+ANOMALY_BUFFER_SIZE = Gauge(
+    "anomaly_buffer_size",
+    "Current size of the anomaly buffer",
+)
+
+ANOMALY_BUFFER_EVICTIONS = Counter(
+    "anomaly_buffer_evictions_total",
+    "Total number of anomaly buffer evictions",
+    ["eviction_reason"],
+)
+
+# Redis cache metrics
+REDIS_CACHE_HITS = Counter(
+    "redis_cache_hits_total",
+    "Total number of Redis cache hits",
+    ["cache_type"],
+)
+
+REDIS_CACHE_MISSES = Counter(
+    "redis_cache_misses_total",
+    "Total number of Redis cache misses",
+    ["cache_type"],
+)
+
+REDIS_CACHE_ERRORS = Counter(
+    "redis_cache_errors_total",
+    "Total number of Redis cache errors",
+    ["operation", "error_type"],
+)
+
+REDIS_OPERATION_DURATION = Histogram(
+    "redis_operation_duration_seconds",
+    "Redis operation duration in seconds",
+    ["operation"],
+    buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.5, 1.0],
+)
+
+REDIS_CONNECTIONS_ACTIVE = Gauge(
+    "redis_connections_active",
+    "Number of active Redis connections",
+)
+
+REDIS_CACHE_SIZE = Gauge(
+    "redis_cache_size_bytes",
+    "Approximate size of Redis cache in bytes",
+    ["cache_type"],
+)
+
 
 class PrometheusMetrics:
     """Manages the collection and exposure of Prometheus metrics.
@@ -550,3 +605,50 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
         finally:
             self.metrics.decrement_active_requests()
+
+
+# Helper functions for anomaly buffer metrics
+def record_anomaly_detected(anomaly_type: str):
+    """Record an anomaly detection event."""
+    ANOMALY_DETECTED.labels(anomaly_type=anomaly_type).inc()
+
+
+def record_anomaly_buffer_size(size: int):
+    """Record the current size of the anomaly buffer."""
+    ANOMALY_BUFFER_SIZE.set(size)
+
+
+def record_anomaly_buffer_eviction(eviction_reason: str):
+    """Record an anomaly buffer eviction event."""
+    ANOMALY_BUFFER_EVICTIONS.labels(eviction_reason=eviction_reason).inc()
+
+
+# Helper functions for Redis cache metrics
+def record_redis_cache_hit(cache_type: str = "prediction"):
+    """Record a Redis cache hit."""
+    REDIS_CACHE_HITS.labels(cache_type=cache_type).inc()
+
+
+def record_redis_cache_miss(cache_type: str = "prediction"):
+    """Record a Redis cache miss."""
+    REDIS_CACHE_MISSES.labels(cache_type=cache_type).inc()
+
+
+def record_redis_cache_error(operation: str, error_type: str):
+    """Record a Redis cache error."""
+    REDIS_CACHE_ERRORS.labels(operation=operation, error_type=error_type).inc()
+
+
+def record_redis_operation_duration(operation: str, duration: float):
+    """Record Redis operation duration."""
+    REDIS_OPERATION_DURATION.labels(operation=operation).observe(duration)
+
+
+def set_redis_connections_active(count: int):
+    """Set the number of active Redis connections."""
+    REDIS_CONNECTIONS_ACTIVE.set(count)
+
+
+def set_redis_cache_size(cache_type: str, size_bytes: int):
+    """Set the Redis cache size in bytes."""
+    REDIS_CACHE_SIZE.labels(cache_type=cache_type).set(size_bytes)
