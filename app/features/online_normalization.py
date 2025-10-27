@@ -1,14 +1,16 @@
 """
 Online Normalization for Streaming Data.
 
-This module implements online standardization using Welford's algorithm for numerically
-stable computation of running mean and variance. It supports state persistence to maintain
-statistics across application restarts, making it suitable for production streaming ML pipelines.
+This module implements an online standard scaler using Welford's algorithm,
+which allows for the numerically stable computation of a running mean and
+variance. This is particularly useful in streaming scenarios where the entire
+dataset is not available at once. The scaler supports state persistence to
+maintain statistics across application restarts.
 """
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Optional
 
 import numpy as np
 
@@ -18,164 +20,127 @@ logger = get_logger(__name__)
 
 
 class OnlineStandardScaler:
-    """
-    Performs online standardization of features using Welford's algorithm.
+    """Performs online standardization of features using Welford's algorithm.
 
-    This class maintains running statistics (mean and variance) that can be updated
-    incrementally with new batches of data. It uses numerically stable algorithms
-    to avoid precision issues with large datasets or streaming scenarios.
-
-    The scaler supports state persistence, allowing it to maintain statistics across
-    application restarts. This is crucial for production streaming ML pipelines.
+    This class maintains running statistics (mean and variance) that are
+    updated incrementally as new batches of data arrive. This approach is
+    well-suited for streaming data and large datasets, as it does not require
+    holding all data in memory. The use of Welford's algorithm ensures
+    numerical stability.
 
     Attributes:
-        mean_: np.ndarray or None
-            Running mean of each feature. None until first batch is processed.
-        var_: np.ndarray or None
-            Running variance of each feature. None until first batch is processed.
-        n_samples_seen_: int
-            Number of samples seen so far across all batches.
-        n_features_: int or None
-            Number of features. Determined from first batch.
+        mean_: The running mean of each feature.
+        var_: The running variance of each feature.
+        n_samples_seen_: The total number of samples seen so far.
+        n_features_: The number of features in the data.
     """
 
     def __init__(self):
-        """Initialize the online standard scaler."""
+        """Initializes the `OnlineStandardScaler`."""
         self.mean_: Optional[np.ndarray] = None
         self.var_: Optional[np.ndarray] = None
         self.n_samples_seen_: int = 0
         self.n_features_: Optional[int] = None
 
     def partial_fit(self, X: np.ndarray) -> "OnlineStandardScaler":
-        """
-        Update running mean and variance with a new batch of data.
+        """Updates the running mean and variance with a new batch of data.
 
-        Uses Welford's algorithm for numerically stable online computation of
-        mean and variance. This method can be called repeatedly with new batches
-        of data to update the running statistics.
+        This method implements Welford's algorithm for a numerically stable,
+        one-pass computation of mean and variance. It can be called repeatedly
+        with new batches of data to update the running statistics.
 
         Args:
-            X: Input array of shape (n_samples, n_features).
+            X: A numpy array of shape `(n_samples, n_features)` containing the
+                new batch of data.
 
         Returns:
-            Self for method chaining.
+            The scaler instance, allowing for method chaining.
 
         Raises:
-            ValueError: If input array has inconsistent number of features.
+            ValueError: If the input array has an inconsistent number of
+                features compared to previous batches.
         """
         X = np.asarray(X)
-
         if X.ndim == 1:
             X = X.reshape(-1, 1)
-        elif X.ndim != 2:
-            raise ValueError(f"Input must be 1D or 2D array, got {X.ndim}D")
 
         n_samples, n_features = X.shape
-
         if n_samples == 0:
             return self
 
-        # Initialize on first batch
         if self.mean_ is None:
             self.mean_ = np.zeros(n_features, dtype=np.float64)
             self.var_ = np.zeros(n_features, dtype=np.float64)
             self.n_features_ = n_features
         elif n_features != self.n_features_:
-            raise ValueError(
-                f"Number of features {n_features} does not match "
-                f"previous batches ({self.n_features_})"
-            )
+            raise ValueError("Inconsistent number of features")
 
-        # Welford's algorithm for online mean and variance
         for i in range(n_samples):
             self.n_samples_seen_ += 1
-
-            # Update mean
             delta = X[i] - self.mean_
             self.mean_ += delta / self.n_samples_seen_
-
-            # Update variance
             delta2 = X[i] - self.mean_
             self.var_ += delta * delta2
 
-        logger.debug(
-            "Updated scaler statistics",
-            n_samples_processed=n_samples,
-            total_samples_seen=self.n_samples_seen_,
-            n_features=n_features,
-        )
-
         return self
 
-    def transform(self, X: np.ndarray):
-        """
-        Standardize features using current running statistics.
+    def transform(self, X: np.ndarray) -> np.ndarray:
+        """Standardizes features using the current running statistics.
+
+        This method scales the input data `X` by subtracting the running mean
+        and dividing by the running standard deviation.
 
         Args:
-            X: Input array of shape (n_samples, n_features).
+            X: A numpy array of shape `(n_samples, n_features)` to be
+                standardized.
 
         Returns:
-            Standardized array of same shape as input.
+            A standardized numpy array of the same shape as the input.
 
         Raises:
-            ValueError: If scaler has not been fitted or input shape is invalid.
+            ValueError: If the scaler has not been fitted yet or if the input
+                data has an incorrect shape.
         """
         if self.mean_ is None or self.var_ is None:
             raise ValueError("Scaler must be fitted before transform")
 
         X = np.asarray(X)
-
         if X.ndim == 1:
             X = X.reshape(-1, 1)
-        elif X.ndim != 2:
-            raise ValueError(f"Input must be 1D or 2D array, got {X.ndim}D")
 
-        n_samples, n_features = X.shape
+        if X.shape[1] != self.n_features_:
+            raise ValueError("Inconsistent number of features")
 
-        if n_features != self.n_features_:
-            raise ValueError(
-                f"Number of features {n_features} does not match "
-                f"fitted features ({self.n_features_})"
-            )
-
-        # Avoid division by zero for features with zero variance
         std = np.sqrt(self.var_ / max(1, self.n_samples_seen_ - 1))
-        std = np.where(std == 0, 1.0, std)  # Replace zero std with 1 to avoid NaN
+        std = np.where(std == 0, 1.0, std)
 
-        # Standardize: (X - mean) / std
-        X_scaled = (X - self.mean_) / std
-
-        logger.debug(
-            "Transformed features",
-            input_shape=X.shape,
-            output_shape=X_scaled.shape,
-            mean_range=(float(self.mean_.min()), float(self.mean_.max())),
-            std_range=(float(std.min()), float(std.max())),
-        )
-
-        return X_scaled
+        return (X - self.mean_) / std
 
     def fit_transform(self, X: np.ndarray) -> np.ndarray:
-        """
-        Fit the scaler and transform the data in one step.
+        """Fits the scaler to the data and then transforms it.
+
+        This is a convenience method that combines `partial_fit` and
+        `transform` in a single call.
 
         Args:
-            X: Input array of shape (n_samples, n_features).
+            X: A numpy array of shape `(n_samples, n_features)`.
 
         Returns:
-            Standardized array of same shape as input.
+            A standardized numpy array of the same shape as the input.
         """
         return self.partial_fit(X).transform(X)
 
     def save_state(self, path: str) -> None:
-        """
-        Save scaler state to a JSON file for persistence.
+        """Saves the scaler's state to a JSON file for persistence.
+
+        This allows the running statistics to be preserved across application
+        restarts, which is crucial for stateful streaming applications.
 
         Args:
-            path: File path where state will be saved.
+            path: The file path where the state will be saved.
 
         Raises:
-            IOError: If file cannot be written.
+            IOError: If the file cannot be written.
         """
         state = {
             "mean": self.mean_.tolist() if self.mean_ is not None else None,
@@ -184,76 +149,42 @@ class OnlineStandardScaler:
             "n_features": self.n_features_,
             "version": "1.0",
         }
-
-        path_obj = Path(path)
-        path_obj.parent.mkdir(parents=True, exist_ok=True)
-
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
         try:
             with open(path, "w") as f:
                 json.dump(state, f, indent=2)
-
-            logger.info(
-                "Scaler state saved",
-                path=str(path),
-                n_samples_seen=self.n_samples_seen_,
-                n_features=self.n_features_,
-            )
-
+            logger.info("Scaler state saved", path=path)
         except Exception as e:
-            logger.error("Failed to save scaler state", error=str(e), path=str(path))
             raise IOError(f"Failed to save scaler state: {e}")
 
     def load_state(self, path: str) -> None:
-        """
-        Load scaler state from a JSON file.
+        """Loads the scaler's state from a JSON file.
+
+        This allows the scaler to resume from a previously saved state,
+        maintaining a consistent normalization context across sessions.
 
         Args:
-            path: File path from where state will be loaded.
+            path: The file path from which the state will be loaded.
 
         Raises:
-            IOError: If file cannot be read or contains invalid data.
-            FileNotFoundError: If state file does not exist.
+            IOError: If the file cannot be read or contains invalid data.
         """
-        path_obj = Path(path)
-
-        if not path_obj.exists():
-            logger.info("Scaler state file does not exist, starting fresh", path=str(path))
+        if not Path(path).exists():
+            logger.info("Scaler state file not found, starting fresh", path=path)
             return
-
         try:
             with open(path, "r") as f:
                 state = json.load(f)
-
-            # Validate version compatibility
-            version = state.get("version", "1.0")
-            if version != "1.0":
-                logger.warning("Scaler state version mismatch", loaded_version=version)
-
-            # Load state
-            self.mean_ = np.array(state["mean"]) if state["mean"] is not None else None
-            self.var_ = np.array(state["var"]) if state["var"] is not None else None
+            self.mean_ = np.array(state["mean"]) if state["mean"] else None
+            self.var_ = np.array(state["var"]) if state["var"] else None
             self.n_samples_seen_ = state["n_samples_seen"]
             self.n_features_ = state["n_features"]
-
-            logger.info(
-                "Scaler state loaded",
-                path=str(path),
-                n_samples_seen=self.n_samples_seen_,
-                n_features=self.n_features_,
-            )
-
-        except json.JSONDecodeError as e:
-            logger.error("Invalid JSON in scaler state file", error=str(e), path=str(path))
-            raise IOError(f"Invalid JSON in scaler state file: {e}")
-        except KeyError as e:
-            logger.error("Missing required key in scaler state", missing_key=str(e), path=str(path))
-            raise IOError(f"Missing required key in scaler state: {e}")
-        except Exception as e:
-            logger.error("Failed to load scaler state", error=str(e), path=str(path))
-            raise IOError(f"Failed to load scaler state: {e}")
+            logger.info("Scaler state loaded", path=path)
+        except (json.JSONDecodeError, KeyError) as e:
+            raise IOError(f"Invalid scaler state file: {e}")
 
     def reset(self) -> None:
-        """Reset the scaler to its initial state."""
+        """Resets the scaler to its initial, unfitted state."""
         self.mean_ = None
         self.var_ = None
         self.n_samples_seen_ = 0
@@ -261,31 +192,37 @@ class OnlineStandardScaler:
         logger.info("Scaler state reset")
 
     def get_stats(self) -> Dict[str, Any]:
-        """
-        Get current statistics of the scaler.
+        """Returns the current statistics of the scaler.
+
+        This includes the number of samples seen, the number of features, and
+        the current mean, variance, and standard deviation.
 
         Returns:
-            Dictionary containing scaler statistics.
+            A dictionary containing the scaler's statistics.
         """
+        std = None
+        if self.var_ is not None:
+            std = np.sqrt(self.var_ / max(1, self.n_samples_seen_ - 1)).tolist()
         return {
             "n_samples_seen": self.n_samples_seen_,
             "n_features": self.n_features_,
             "mean": self.mean_.tolist() if self.mean_ is not None else None,
             "variance": self.var_.tolist() if self.var_ is not None else None,
-            "std": (
-                np.sqrt(self.var_ / max(1, self.n_samples_seen_ - 1)).tolist()
-                if self.var_ is not None
-                else None
-            ),
+            "std": std,
             "is_fitted": self.mean_ is not None,
         }
 
     def __repr__(self) -> str:
-        """String representation of the scaler."""
+        """Returns a string representation of the scaler's state.
+
+        Returns:
+            A string showing the scaler's current state, including whether it
+            has been fitted.
+        """
         fitted = "fitted" if self.mean_ is not None else "unfitted"
         return (
             f"OnlineStandardScaler("
             f"n_samples_seen={self.n_samples_seen_}, "
             f"n_features={self.n_features_}, "
-            f"{fitted})"
+            f"status='{fitted}')"
         )

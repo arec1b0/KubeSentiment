@@ -7,16 +7,17 @@ Kafka consumer implementation that achieves 10x throughput improvement.
 
 import asyncio
 import json
-import pytest
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from app.services.kafka_consumer import (
+    ConsumerMetrics,
+    DeadLetterQueue,
     HighThroughputKafkaConsumer,
     MessageBatch,
     MessageMetadata,
-    DeadLetterQueue,
-    ConsumerMetrics,
     ProcessingResult,
 )
 from app.services.stream_processor import StreamProcessor
@@ -27,9 +28,9 @@ class MockModel:
 
     def __init__(self):
         self.predictions = [
-            {'label': 'POSITIVE', 'score': 0.9, 'inference_time_ms': 10.0},
-            {'label': 'NEGATIVE', 'score': 0.8, 'inference_time_ms': 12.0},
-            {'label': 'NEUTRAL', 'score': 0.7, 'inference_time_ms': 8.0},
+            {"label": "POSITIVE", "score": 0.9, "inference_time_ms": 10.0},
+            {"label": "NEGATIVE", "score": 0.8, "inference_time_ms": 12.0},
+            {"label": "NEUTRAL", "score": 0.7, "inference_time_ms": 8.0},
         ]
         self.call_count = 0
 
@@ -39,10 +40,10 @@ class MockModel:
         for text in texts:
             result = self.predictions[self.call_count % len(self.predictions)]
             result = result.copy()
-            result['text_length'] = len(text)
-            result['model_name'] = 'test_model'
-            result['backend'] = 'test'
-            result['cached'] = False
+            result["text_length"] = len(text)
+            result["model_name"] = "test_model"
+            result["backend"] = "test"
+            result["cached"] = False
             results.append(result)
             self.call_count += 1
         return results
@@ -51,7 +52,7 @@ class MockModel:
         return True
 
     def get_model_info(self):
-        return {'name': 'test_model', 'version': '1.0.0'}
+        return {"name": "test_model", "version": "1.0.0"}
 
 
 class MockSettings:
@@ -59,10 +60,10 @@ class MockSettings:
 
     def __init__(self):
         self.kafka_enabled = True
-        self.kafka_bootstrap_servers = ['localhost:9092']
-        self.kafka_consumer_group = 'test_consumer'
-        self.kafka_topic = 'test_topic'
-        self.kafka_auto_offset_reset = 'earliest'
+        self.kafka_bootstrap_servers = ["localhost:9092"]
+        self.kafka_consumer_group = "test_consumer"
+        self.kafka_topic = "test_topic"
+        self.kafka_auto_offset_reset = "earliest"
         self.kafka_max_poll_records = 100
         self.kafka_session_timeout_ms = 30000
         self.kafka_heartbeat_interval_ms = 3000
@@ -73,15 +74,15 @@ class MockSettings:
         self.kafka_batch_size = 10
         self.kafka_processing_timeout_ms = 30000
         self.kafka_buffer_size = 1000
-        self.kafka_dlq_topic = 'test_dlq'
+        self.kafka_dlq_topic = "test_dlq"
         self.kafka_dlq_enabled = True
         self.kafka_max_retries = 3
-        self.kafka_producer_bootstrap_servers = ['localhost:9092']
-        self.kafka_producer_acks = 'all'
+        self.kafka_producer_bootstrap_servers = ["localhost:9092"]
+        self.kafka_producer_acks = "all"
         self.kafka_producer_retries = 3
         self.kafka_producer_batch_size = 16384
         self.kafka_producer_linger_ms = 5
-        self.kafka_producer_compression_type = 'lz4'
+        self.kafka_producer_compression_type = "lz4"
 
 
 @pytest.fixture
@@ -156,12 +157,12 @@ class TestKafkaConsumerInitialization:
         """Test metrics initialization."""
         metrics = kafka_consumer.get_metrics()
 
-        assert metrics['messages_consumed'] == 0
-        assert metrics['messages_processed'] == 0
-        assert metrics['messages_failed'] == 0
-        assert metrics['throughput_tps'] == 0.0
-        assert not metrics['running']
-        assert metrics['consumer_threads'] == 0  # Not started yet
+        assert metrics["messages_consumed"] == 0
+        assert metrics["messages_processed"] == 0
+        assert metrics["messages_failed"] == 0
+        assert metrics["throughput_tps"] == 0.0
+        assert not metrics["running"]
+        assert metrics["consumer_threads"] == 0  # Not started yet
 
 
 class TestMessageProcessing:
@@ -183,21 +184,20 @@ class TestMessageProcessing:
         # Process batch
         start_time = time.time()
         results = await kafka_consumer._process_batch_async(
-            [msg["text"] for msg in messages],
-            [msg["id"] for msg in messages]
+            [msg["text"] for msg in messages], [msg["id"] for msg in messages]
         )
         processing_time = time.time() - start_time
 
         # Verify results
         assert len(results) == 3
         for result in results:
-            assert result['success'] is True
-            assert 'result' in result
-            assert 'message_id' in result
+            assert result["success"] is True
+            assert "result" in result
+            assert "message_id" in result
 
         # Verify metrics updated
         metrics = kafka_consumer.get_metrics()
-        assert metrics['messages_processed'] >= 3
+        assert metrics["messages_processed"] >= 3
 
     def test_duplicate_message_detection(self, kafka_consumer):
         """Test duplicate message detection."""
@@ -272,7 +272,7 @@ class TestPerformanceOptimizations:
 
         # Verify all messages were processed
         metrics = kafka_consumer.get_metrics()
-        assert metrics['messages_processed'] >= 9  # 3 batches * 3 messages
+        assert metrics["messages_processed"] >= 9  # 3 batches * 3 messages
 
         # Processing should be relatively fast due to batching
         assert processing_time < 5.0  # Should complete within 5 seconds
@@ -312,11 +312,11 @@ class TestMetricsAndMonitoring:
 
         metrics = kafka_consumer.get_metrics()
 
-        assert metrics['messages_consumed'] == 1000
-        assert metrics['messages_processed'] == 950
-        assert metrics['messages_failed'] == 50
-        assert metrics['avg_processing_time_ms'] == 50.0  # 50000ms / 1000 messages
-        assert metrics['throughput_tps'] == 0.0  # Not calculated yet
+        assert metrics["messages_consumed"] == 1000
+        assert metrics["messages_processed"] == 950
+        assert metrics["messages_failed"] == 50
+        assert metrics["avg_processing_time_ms"] == 50.0  # 50000ms / 1000 messages
+        assert metrics["throughput_tps"] == 0.0  # Not calculated yet
 
     def test_prometheus_metrics_integration(self, kafka_consumer):
         """Test Prometheus metrics integration."""
@@ -349,7 +349,7 @@ class TestMetricsAndMonitoring:
                 )
 
         metrics = kafka_consumer.get_metrics()
-        assert metrics['throughput_tps'] == 500.0  # 5000 messages / 10 seconds
+        assert metrics["throughput_tps"] == 500.0  # 5000 messages / 10 seconds
 
 
 class TestErrorHandling:
@@ -409,9 +409,9 @@ class TestIntegration:
         # and verify it processes messages correctly
 
         metrics = kafka_consumer.get_metrics()
-        assert 'messages_consumed' in metrics
-        assert 'throughput_tps' in metrics
-        assert 'running' in metrics
+        assert "messages_consumed" in metrics
+        assert "throughput_tps" in metrics
+        assert "running" in metrics
 
 
 # Performance benchmarks
@@ -424,10 +424,14 @@ class TestPerformanceBenchmarks:
 
         # Create large batch
         batch_size = 100
-        texts = [f"Test message {i} with some content to analyze sentiment" for i in range(batch_size)]
+        texts = [
+            f"Test message {i} with some content to analyze sentiment" for i in range(batch_size)
+        ]
 
         start_time = time.time()
-        results = kafka_consumer._process_batch_async(texts, [f"test_{i}" for i in range(batch_size)])
+        results = kafka_consumer._process_batch_async(
+            texts, [f"test_{i}" for i in range(batch_size)]
+        )
         processing_time = time.time() - start_time
 
         # Should process 100 messages quickly due to batching
@@ -436,8 +440,9 @@ class TestPerformanceBenchmarks:
 
     def test_memory_usage_batch_processing(self, kafka_consumer):
         """Test memory usage doesn't grow excessively."""
-        import psutil
         import os
+
+        import psutil
 
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
@@ -471,13 +476,12 @@ if __name__ == "__main__":
 
     # Run pytest with performance metrics
     import subprocess
-    result = subprocess.run([
-        "pytest",
-        "tests/test_kafka_consumer.py",
-        "-v",
-        "--tb=short",
-        "--durations=10"
-    ], capture_output=True, text=True)
+
+    result = subprocess.run(
+        ["pytest", "tests/test_kafka_consumer.py", "-v", "--tb=short", "--durations=10"],
+        capture_output=True,
+        text=True,
+    )
 
     print("Test Results:")
     print(result.stdout)

@@ -1,5 +1,8 @@
 """
 Model information endpoints.
+
+This module provides endpoints for retrieving metadata and information
+about the machine learning models used by the service.
 """
 
 from typing import Any, Dict
@@ -24,15 +27,18 @@ async def get_model_info(
     """Retrieves detailed information about the currently loaded model.
 
     This endpoint provides metadata about the machine learning model that is
-    serving predictions, such as its name, version, and other relevant
-    details.
+    currently serving predictions. This can be useful for debugging, monitoring,
+    and verifying that the correct model version is deployed.
 
     Args:
-        model: The model service instance, injected as a dependency.
-        backend: The name of the model backend in use.
+        model: The model service instance, injected as a dependency. This
+            provides an abstraction over the actual model implementation.
+        backend: The name of the model backend in use (e.g., 'pytorch', 'onnx'),
+            injected as a dependency.
 
     Returns:
-        A dictionary containing detailed information about the model.
+        A dictionary containing detailed information about the model, such as
+        its name, version, and the backend it's running on.
     """
     try:
         info = model.get_model_info()

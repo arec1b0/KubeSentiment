@@ -35,4 +35,3 @@ __all__ = [
     "handle_model_info_error",
     "handle_prometheus_metrics_error",
 ]
-

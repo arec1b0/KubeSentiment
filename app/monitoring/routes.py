@@ -1,5 +1,10 @@
 """
-Monitoring endpoints.
+Monitoring endpoints for the MLOps sentiment analysis service.
+
+This module provides a set of API endpoints for monitoring the health,
+performance, and status of the application and its components. These
+endpoints are essential for observability and are typically used by monitoring
+systems, orchestration platforms (like Kubernetes), and for debugging.
 """
 import time
 
@@ -15,14 +20,12 @@ from app.api.schemas.responses import (
     MetricsResponse,
 )
 from app.core.config import Settings, get_settings
-from app.core.dependencies import get_model_backend, get_model_service
+from app.core.dependencies import get_model_service
 from app.core.logging import get_logger
 from app.core.secrets import get_secret_manager
 from app.monitoring.health import HealthChecker
 from app.services.async_batch_service import AsyncBatchService
-from app.utils.error_handlers import (
-    handle_prometheus_metrics_error,
-)
+from app.utils.error_handlers import handle_prometheus_metrics_error
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -32,7 +35,7 @@ async def get_async_batch_service_dependency(
     request: Request,
     settings: Settings = Depends(get_settings),
 ) -> AsyncBatchService:
-    """Get the async batch service instance for monitoring endpoints.
+    """Dependency to get the async batch service instance for monitoring endpoints.
 
     Args:
         request: The FastAPI request object.
@@ -42,22 +45,23 @@ async def get_async_batch_service_dependency(
         The async batch service instance.
 
     Raises:
-        HTTPException: If the service is not available.
+        HTTPException: If the service is not available or disabled.
     """
     if not settings.async_batch_enabled:
         raise HTTPException(status_code=404, detail="Async batch processing is disabled")
-
-    if not hasattr(request.app.state, 'async_batch_service') or not request.app.state.async_batch_service:
-        raise HTTPException(status_code=404, detail="Async batch service not initialized")
-
-    return request.app.state.async_batch_service  # type: ignore
+    if (
+        not hasattr(request.app.state, "async_batch_service")
+        or not request.app.state.async_batch_service
+    ):
+        raise HTTPException(status_code=503, detail="Async batch service not initialized")
+    return request.app.state.async_batch_service
 
 
 @router.get(
     "/health/details",
     response_model=DetailedHealthResponse,
     summary="Detailed service health check",
-    description="Get a detailed health status of the service and its dependencies.",
+    description="Provides a detailed health status of the service and its dependencies.",
 )
 async def detailed_health_check(
     request: Request,
@@ -65,37 +69,47 @@ async def detailed_health_check(
     model=Depends(get_model_service),
     secret_manager=Depends(get_secret_manager),
 ) -> DetailedHealthResponse:
-    """Performs a detailed health check of all components."""
-    health_checker = HealthChecker()
+    """Performs a detailed health check of all major components.
 
+    This endpoint aggregates health information from various parts of the
+    system, including the model, system resources, and external dependencies,
+    to provide a comprehensive overview of the service's health.
+
+    Args:
+        request: The FastAPI request object.
+        settings: Application settings.
+        model: The ML model service.
+        secret_manager: The secret management service.
+
+    Returns:
+        A `DetailedHealthResponse` with the overall status and a breakdown
+        of each component's health.
+    """
+    health_checker = HealthChecker()
     checks = {
         "model": health_checker.check_model_health(model),
         "system": health_checker.check_system_health(),
-        "secrets_backend": health_checker.check_secrets_backend_health(
-            secret_manager
-        ),
+        "secrets_backend": health_checker.check_secrets_backend_health(secret_manager),
     }
-
-    # Add Kafka health check if enabled
-    if settings.kafka_enabled and hasattr(request.app.state, 'kafka_consumer') and request.app.state.kafka_consumer:
-        checks["kafka"] = health_checker.check_kafka_health(request.app.state.kafka_consumer)
-
-    # Add async batch health check if enabled
-    if settings.async_batch_enabled and hasattr(request.app.state, 'async_batch_service') and request.app.state.async_batch_service:
-        checks["async_batch"] = health_checker.check_async_batch_health(request.app.state.async_batch_service)
+    # Optional components
+    if settings.kafka_enabled:
+        checks["kafka"] = health_checker.check_kafka_health(
+            getattr(request.app.state, "kafka_consumer", None)
+        )
+    if settings.async_batch_enabled:
+        checks["async_batch"] = health_checker.check_async_batch_health(
+            getattr(request.app.state, "async_batch_service", None)
+        )
 
     overall_status = "healthy"
     dependencies = []
-
-    for component, result in checks.items():
+    for name, result in checks.items():
         status = result.get("status", "unhealthy")
         if status != "healthy":
             overall_status = "unhealthy"
-
         dependencies.append(
             ComponentHealth(
-                component_name=component,
-                details=HealthDetail(status=status, error=result.get("error")),
+                component_name=name, details=HealthDetail(status=status, error=result.get("error"))
             )
         )
 
@@ -111,91 +125,85 @@ async def detailed_health_check(
     "/health",
     response_model=HealthResponse,
     summary="Service health check",
-    description="Check the health status of the service and model availability.",
+    description="Provides a high-level health status of the service, suitable for liveness probes.",
 )
 async def health_check(
-    request: Request,
     model=Depends(get_model_service),
-    backend: str = Depends(get_model_backend),
-    settings: Settings = Depends(get_settings),
     secret_manager=Depends(get_secret_manager),
 ) -> HealthResponse:
-    """Performs a comprehensive health check of the service."""
-    model_status = "available" if model.is_ready() else "unavailable"
+    """Performs a high-level health check of the service.
+
+    This endpoint checks the basic readiness of the service, primarily focusing
+    on the model's availability. It's intended for use as a liveness probe in
+    orchestration systems like Kubernetes.
+
+    Args:
+        model: The ML model service.
+        secret_manager: The secret management service.
+
+    Returns:
+        A `HealthResponse` indicating the overall status of the service.
+    """
+    model_ready = model.is_ready()
     secrets_healthy = secret_manager.is_healthy()
-
-    # Check Kafka health if enabled
-    kafka_status = "disabled"
-    kafka_healthy = True
-    if settings.kafka_enabled and hasattr(request.app.state, 'kafka_consumer') and request.app.state.kafka_consumer:
-        kafka_health = HealthChecker().check_kafka_health(request.app.state.kafka_consumer)
-        kafka_status = kafka_health.get("status", "unknown")
-        kafka_healthy = kafka_status == "healthy"
-
-    # Check async batch health if enabled
-    async_batch_status = "disabled"
-    async_batch_healthy = True
-    if settings.async_batch_enabled and hasattr(request.app.state, 'async_batch_service') and request.app.state.async_batch_service:
-        async_batch_health = HealthChecker().check_async_batch_health(request.app.state.async_batch_service)
-        async_batch_status = async_batch_health.get("status", "unknown")
-        async_batch_healthy = async_batch_status == "healthy"
-
-    overall_status = "healthy"
-    if not model.is_ready() or not secrets_healthy or not kafka_healthy or not async_batch_healthy:
-        overall_status = "unhealthy"
-
-    return HealthResponse(
-        status=overall_status,
-        model_status=model_status,
-        version=settings.app_version,
-        backend=backend,
-        timestamp=time.time(),
-        kafka_status=kafka_status if settings.kafka_enabled else None,
-        async_batch_status=async_batch_status if settings.async_batch_enabled else None,
-    )
+    status = "healthy" if model_ready and secrets_healthy else "unhealthy"
+    return HealthResponse(status=status, model_status="available" if model_ready else "unavailable")
 
 
 @router.get(
     "/ready",
     summary="Readiness check",
-    description="Kubernetes readiness probe endpoint.",
+    description="Checks if the service is ready to accept traffic, suitable for readiness probes.",
 )
-async def readiness_check(
-    model=Depends(get_model_service),
-):
-    """Checks if the service is ready to accept incoming traffic."""
+async def readiness_check(model=Depends(get_model_service)):
+    """Checks if the service is fully initialized and ready to accept traffic.
+
+    This endpoint is intended for use as a readiness probe in Kubernetes. It
+    verifies that the machine learning model is loaded and ready for inference.
+
+    Args:
+        model: The ML model service.
+
+    Returns:
+        A dictionary with a "ready" status if the service is ready.
+
+    Raises:
+        ServiceUnavailableError: If the model is not ready, returning a 503 status.
+    """
     if not model.is_ready():
         from app.utils.exceptions import ServiceUnavailableError
 
-        raise ServiceUnavailableError(
-            message="Service not ready",
-            context={"model_loaded": getattr(model, "_is_loaded", False)},
-        )
-
+        raise ServiceUnavailableError("Model not ready for inference.")
     return {"status": "ready"}
 
 
 @router.get(
     "/metrics",
     summary="Prometheus metrics",
-    description="Get metrics in Prometheus format for monitoring and alerting.",
+    description="Exposes performance and health metrics in Prometheus format.",
 )
-async def get_prometheus_metrics(
-    settings: Settings = Depends(get_settings),
-):
-    """Exposes application and model metrics in Prometheus format."""
+async def get_prometheus_metrics(settings: Settings = Depends(get_settings)):
+    """Exposes application and model metrics in Prometheus format.
+
+    This endpoint is designed to be scraped by a Prometheus server for
+    monitoring and alerting. It provides a wide range of metrics, including
+    request counts, latencies, and model-specific performance indicators.
+
+    Args:
+        settings: Application settings.
+
+    Returns:
+        A `Response` object with the metrics in Prometheus text format.
+    """
     if not settings.enable_metrics:
         raise HTTPException(status_code=404, detail="Metrics endpoint is disabled")
-
     try:
         from app.monitoring.prometheus import get_metrics
 
         metrics = get_metrics()
-        content = metrics.get_metrics()
-        content_type = metrics.get_metrics_content_type()
-
-        return Response(content=content, media_type=content_type)
-
+        return Response(
+            content=metrics.get_metrics(), media_type=metrics.get_metrics_content_type()
+        )
     except Exception as e:
         handle_prometheus_metrics_error(e)
 
@@ -204,22 +212,24 @@ async def get_prometheus_metrics(
     "/metrics-json",
     response_model=MetricsResponse,
     summary="Service metrics (JSON)",
-    description="Get performance metrics and system information in JSON format (legacy endpoint).",
+    description="Provides performance metrics in JSON format (legacy endpoint).",
 )
-async def get_metrics_json(
-    model=Depends(get_model_service),
-    settings: Settings = Depends(get_settings),
-) -> MetricsResponse:
-    """Provides service and model performance metrics in JSON format."""
-    if not settings.enable_metrics:
-        raise HTTPException(status_code=404, detail="Metrics endpoint is disabled")
+async def get_metrics_json(model=Depends(get_model_service)):
+    """Provides service and model performance metrics in JSON format.
 
+    This endpoint serves as an alternative to the Prometheus metrics endpoint,
+    providing a structured JSON response with key performance indicators.
+
+    Args:
+        model: The ML model service.
+
+    Returns:
+        A `MetricsResponse` object with performance metrics.
+    """
     try:
-        metrics = model.get_performance_metrics()
-        return MetricsResponse(**metrics)
-
+        return MetricsResponse(**model.get_performance_metrics())
     except Exception as e:
-        logger.error(f"Error retrieving metrics: {e}", exc_info=True)
+        logger.error(f"Error retrieving JSON metrics: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to retrieve metrics")
 
 
@@ -227,52 +237,45 @@ async def get_metrics_json(
     "/kafka-metrics",
     response_model=KafkaMetricsResponse,
     summary="Kafka consumer metrics",
-    description="Get detailed metrics about the Kafka consumer performance and health.",
+    description="Provides detailed metrics about the Kafka consumer's performance.",
 )
-async def get_kafka_metrics(
-    request: Request,
-    settings: Settings = Depends(get_settings),
-) -> KafkaMetricsResponse:
-    """Get Kafka consumer metrics if Kafka is enabled."""
+async def get_kafka_metrics(request: Request, settings: Settings = Depends(get_settings)):
+    """Retrieves detailed metrics about the Kafka consumer's performance.
+
+    Args:
+        request: The FastAPI request object.
+        settings: Application settings.
+
+    Returns:
+        A `KafkaMetricsResponse` with consumer performance data.
+    """
     if not settings.kafka_enabled:
         raise HTTPException(status_code=404, detail="Kafka consumer is disabled")
-
-    if not hasattr(request.app.state, 'kafka_consumer') or not request.app.state.kafka_consumer:
-        raise HTTPException(status_code=404, detail="Kafka consumer not initialized")
-
-    try:
-        metrics = request.app.state.kafka_consumer.get_metrics()
-        return KafkaMetricsResponse(**metrics)
-
-    except Exception as e:
-        logger.error(f"Error retrieving metrics: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to retrieve metrics")
+    consumer = getattr(request.app.state, "kafka_consumer", None)
+    if not consumer:
+        raise HTTPException(status_code=503, detail="Kafka consumer not initialized")
+    return KafkaMetricsResponse(**consumer.get_metrics())
 
 
 @router.get(
     "/async-batch-metrics",
     response_model=AsyncBatchMetricsResponse,
     summary="Async batch processing metrics",
-    description="Get comprehensive metrics for async batch processing performance.",
+    description="Provides comprehensive metrics for the async batch processing service.",
 )
 async def get_async_batch_metrics(
     async_batch_service: AsyncBatchService = Depends(get_async_batch_service_dependency),
-) -> AsyncBatchMetricsResponse:
-    """Get async batch processing metrics.
+):
+    """Retrieves performance metrics for the asynchronous batch processing service.
 
     Args:
         async_batch_service: The async batch service dependency.
 
     Returns:
-        AsyncBatchMetricsResponse with comprehensive metrics.
-
-    Raises:
-        HTTPException: If async batch processing is not enabled or available.
+        An `AsyncBatchMetricsResponse` with detailed batch processing metrics.
     """
     try:
-        metrics = await async_batch_service.get_batch_metrics()
-        return metrics  # type: ignore
-
+        return await async_batch_service.get_batch_metrics()
     except Exception as e:
-        logger.error(f"Error retrieving metrics: {e}", exc_info=True)
+        logger.error(f"Error retrieving async batch metrics: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to retrieve metrics")

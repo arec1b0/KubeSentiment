@@ -1,7 +1,9 @@
 """
-Application lifecycle events.
+Application lifecycle event handlers for the MLOps sentiment analysis service.
 
-This module handles startup and shutdown events for proper resource management.
+This module defines the startup and shutdown logic for the application,
+ensuring that resources such as machine learning models, Kafka consumers, and
+batch processing services are properly initialized and gracefully terminated.
 """
 
 from contextlib import asynccontextmanager
@@ -21,18 +23,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     This asynchronous context manager is used by FastAPI to handle application
     lifecycle events. The code before the `yield` statement is executed on
-    startup, and the code after is executed on shutdown. It ensures that
-    resources like model connections are properly initialized and released.
+    startup, and the code after is executed on shutdown. This ensures that
+    resources like model connections, background tasks, and service connections
+    are properly initialized and released.
 
     Args:
-        app: The FastAPI application instance.
+        app: The FastAPI application instance, which can be used to store state
+            (e.g., `app.state.model = model`).
 
     Yields:
-        Control back to the application, which runs until it's terminated.
+        Control back to the application, which runs until it is terminated.
     """
     settings = get_settings()
 
-    # Startup
+    # Startup logic
     logger.info(
         "Starting application",
         app_name=settings.app_name,
@@ -40,107 +44,67 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         debug=settings.debug,
     )
 
-    # Initialize models with warm-up
+    # Initialize and warm up the machine learning model
     try:
         from app.models.factory import ModelFactory
         from app.monitoring.model_warmup import get_warmup_manager
 
-        # Pre-load default model
         default_backend = "onnx" if settings.onnx_model_path else "pytorch"
         model = ModelFactory.create_model(default_backend)
 
         if model.is_ready():
             logger.info("Model loaded successfully", backend=default_backend)
-
-            # Warm up the model for optimal cold-start performance
-            try:
-                warmup_manager = get_warmup_manager()
-                warmup_stats = await warmup_manager.warmup_model(model, num_iterations=10)
-
-                logger.info(
-                    "Model warm-up completed",
-                    avg_inference_ms=warmup_stats.get("avg_inference_time_ms"),
-                    p95_inference_ms=warmup_stats.get("p95_inference_time_ms"),
-                    total_warmup_ms=warmup_stats.get("total_warmup_time_ms"),
-                )
-            except Exception as warmup_error:
-                logger.warning(
-                    "Model warm-up failed - continuing without warm-up",
-                    error=str(warmup_error),
-                )
-        else:
-            logger.warning(
-                "Model failed to load - running in degraded mode",
-                backend=default_backend,
+            warmup_manager = get_warmup_manager()
+            warmup_stats = await warmup_manager.warmup_model(model, num_iterations=10)
+            logger.info(
+                "Model warm-up completed",
+                avg_inference_ms=warmup_stats.get("avg_inference_time_ms"),
+                p95_inference_ms=warmup_stats.get("p95_inference_time_ms"),
             )
+        else:
+            logger.warning("Model failed to load", backend=default_backend)
 
     except Exception as e:
         logger.error("Model initialization failed", error=str(e), exc_info=True)
 
-    # Initialize Kafka consumer if enabled
-    kafka_consumer = None
+    # Initialize and start the Kafka consumer if enabled
     if settings.kafka_enabled:
         try:
             from app.services.kafka_consumer import HighThroughputKafkaConsumer
             from app.services.stream_processor import StreamProcessor
 
-            # Create stream processor with the loaded model
             stream_processor = StreamProcessor(model)
-
-            # Create and start Kafka consumer
             kafka_consumer = HighThroughputKafkaConsumer(stream_processor, settings)
             await kafka_consumer.start()
-
-            logger.info(
-                "Kafka consumer started successfully",
-                topic=settings.kafka_topic,
-                consumer_group=settings.kafka_consumer_group,
-                threads=settings.kafka_consumer_threads,
-            )
+            app.state.kafka_consumer = kafka_consumer
+            logger.info("Kafka consumer started successfully")
 
         except Exception as e:
             logger.error("Kafka consumer initialization failed", error=str(e), exc_info=True)
 
-    # Store consumer in app state for access by other components
-    app.state.kafka_consumer = kafka_consumer
-
-    # Initialize async batch service
-    async_batch_service = None
+    # Initialize and start the async batch service
     try:
         from app.services.async_batch_service import AsyncBatchService
-
-        # Create prediction service with the loaded model
         from app.services.prediction import PredictionService
         from app.services.stream_processor import StreamProcessor
 
         prediction_svc = PredictionService(model, settings)
-
-        # Create stream processor
         stream_processor = StreamProcessor(model)
-
-        # Create async batch service
         async_batch_service = AsyncBatchService(prediction_svc, stream_processor)
-
-        # Start the service
         await async_batch_service.start()
-
+        app.state.async_batch_service = async_batch_service
         logger.info("Async batch service started successfully")
 
     except Exception as e:
         logger.error("Async batch service initialization failed", error=str(e), exc_info=True)
 
-    # Store async batch service in app state
-    app.state.async_batch_service = async_batch_service
-
-    # Application is ready
-    logger.info("Application startup complete", host=settings.host, port=settings.port)
+    logger.info("Application startup complete")
 
     yield
 
-    # Shutdown
+    # Shutdown logic
     logger.info("Application shutdown initiated")
 
-    # Shutdown Kafka consumer
     if hasattr(app.state, "kafka_consumer") and app.state.kafka_consumer:
         try:
             await app.state.kafka_consumer.stop()
@@ -148,7 +112,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as e:
             logger.error("Error stopping Kafka consumer", error=str(e), exc_info=True)
 
-    # Shutdown async batch service
     if hasattr(app.state, "async_batch_service") and app.state.async_batch_service:
         try:
             await app.state.async_batch_service.stop()
@@ -156,5 +119,4 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as e:
             logger.error("Error stopping async batch service", error=str(e), exc_info=True)
 
-    # Add any other cleanup logic here if needed
     logger.info("Application shutdown complete")

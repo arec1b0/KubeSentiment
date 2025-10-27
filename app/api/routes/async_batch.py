@@ -3,7 +3,9 @@ Async batch prediction endpoints.
 
 This module provides async batch processing endpoints that achieve 85%
 performance improvement (10s → 1.5s response time) through background
-processing, intelligent queuing, and result caching.
+processing, intelligent queuing, and result caching. These endpoints are
+designed for high-throughput scenarios where immediate results are not
+required.
 """
 
 import asyncio
@@ -30,20 +32,23 @@ async def get_async_batch_service(
     request: Request,
     prediction_service: PredictionService = Depends(get_prediction_service),
 ) -> AsyncBatchService:
-    """Get the async batch service instance.
+    """Provides a dependency-injected instance of the async batch service.
 
-    This dependency ensures the async batch service is properly initialized
-    and available for processing requests.
+    This function ensures that the `AsyncBatchService` is properly initialized
+    and available to the API endpoints that require it. It retrieves the service
+    instance from the application state.
 
     Args:
-        request: The FastAPI request object.
-        prediction_service: The prediction service dependency.
+        request: The FastAPI `Request` object, used to access the application
+            state.
+        prediction_service: The prediction service, injected as a dependency.
 
     Returns:
-        The async batch service instance.
+        An instance of the `AsyncBatchService`.
 
     Raises:
-        HTTPException: If the service is not available.
+        HTTPException: If the async batch service is not available, which
+            might occur if it failed to initialize on startup.
     """
     if (
         not hasattr(request.app.state, "async_batch_service")
@@ -68,23 +73,28 @@ async def submit_batch_prediction(
     backend: str = Depends(get_model_backend),
     settings: Settings = Depends(get_settings),
 ) -> BatchJobResponse:
-    """Submit a batch of texts for async sentiment analysis.
+    """Submits a batch of texts for asynchronous sentiment analysis.
 
-    This endpoint provides 85% performance improvement by processing texts
-    asynchronously in the background. The response is immediate and includes
-    a job ID for tracking progress and retrieving results.
+    This endpoint is designed for high-throughput scenarios, allowing clients
+    to submit a large number of texts for analysis without waiting for the
+    results. The response is immediate and contains a `job_id` that can be
+    used to track the progress of the batch and retrieve the results once
+    they are available.
 
     Args:
-        payload: Batch text input with processing options.
-        async_batch_service: The async batch service dependency.
-        backend: The model backend to use.
-        settings: Application settings.
+        payload: A `BatchTextInput` object containing the texts to be analyzed
+            and optional processing parameters.
+        async_batch_service: The async batch service, injected as a dependency.
+        backend: The name of the model backend to use for the prediction.
+        settings: The application's configuration settings.
 
     Returns:
-        BatchJobResponse with job status and tracking information.
+        A `BatchJobResponse` object with information about the submitted job,
+        including its ID, status, and an estimated completion time.
 
     Raises:
-        HTTPException: If batch processing is not available or validation fails.
+        HTTPException: If the async batch service is not available or if an
+            error occurs during the submission of the job.
     """
     logger = get_contextual_logger(
         __name__,
@@ -148,18 +158,24 @@ async def get_batch_job_status(
     async_batch_service: AsyncBatchService = Depends(get_async_batch_service),
     settings: Settings = Depends(get_settings),
 ) -> BatchJobStatus:
-    """Get the status of an async batch job.
+    """Retrieves the current status of an asynchronous batch job.
+
+    This endpoint allows clients to poll for the status of a batch job that
+    was previously submitted. It provides information about the job's progress,
+    including the number of texts that have been processed and the current
+    status (e.g., 'pending', 'processing', 'completed').
 
     Args:
         job_id: The unique identifier of the batch job.
-        async_batch_service: The async batch service dependency.
-        settings: Application settings.
+        async_batch_service: The async batch service, injected as a dependency.
+        settings: The application's configuration settings.
 
     Returns:
-        BatchJobStatus with current job information.
+        A `BatchJobStatus` object with detailed information about the job's
+        current state.
 
     Raises:
-        HTTPException: If job is not found or service is unavailable.
+        HTTPException: If a job with the specified ID is not found.
     """
     logger = get_contextual_logger(__name__, endpoint="batch_status", job_id=job_id)
 
@@ -214,20 +230,25 @@ async def get_batch_results(
     async_batch_service: AsyncBatchService = Depends(get_async_batch_service),
     settings: Settings = Depends(get_settings),
 ) -> BatchPredictionResults:
-    """Get paginated results for a completed batch job.
+    """Retrieves the results of a completed batch job, with pagination.
+
+    Once a batch job has been completed, this endpoint can be used to fetch
+    the sentiment analysis results. The results are paginated to allow for
+    efficient retrieval of large batches.
 
     Args:
         job_id: The unique identifier of the batch job.
-        page: Page number for pagination (1-based).
-        page_size: Number of results per page.
-        async_batch_service: The async batch service dependency.
-        settings: Application settings.
+        page: The page number of the results to retrieve (1-based).
+        page_size: The number of results to include on each page.
+        async_batch_service: The async batch service, injected as a dependency.
+        settings: The application's configuration settings.
 
     Returns:
-        BatchPredictionResults with paginated prediction results.
+        A `BatchPredictionResults` object containing the paginated results
+        and metadata about the job.
 
     Raises:
-        HTTPException: If job is not found, not completed, or service is unavailable.
+        HTTPException: If the job is not found or has not yet been completed.
     """
     logger = get_contextual_logger(__name__, endpoint="batch_results", job_id=job_id)
 
@@ -277,18 +298,23 @@ async def cancel_batch_job(
     async_batch_service: AsyncBatchService = Depends(get_async_batch_service),
     settings: Settings = Depends(get_settings),
 ):
-    """Cancel an async batch job.
+    """Cancels a pending or in-progress asynchronous batch job.
+
+    This endpoint allows clients to cancel a job that is no longer needed.
+    A job can only be cancelled if it is in the 'pending' or 'processing'
+    state.
 
     Args:
-        job_id: The unique identifier of the batch job.
-        async_batch_service: The async batch service dependency.
-        settings: Application settings.
+        job_id: The unique identifier of the batch job to be cancelled.
+        async_batch_service: The async batch service, injected as a dependency.
+        settings: The application's configuration settings.
 
     Returns:
-        Success message.
+        A dictionary with a success message if the job was cancelled.
 
     Raises:
-        HTTPException: If job is not found or cannot be cancelled.
+        HTTPException: If the job is not found or is in a state that cannot
+            be cancelled (e.g., 'completed' or 'failed').
     """
     logger = get_contextual_logger(__name__, endpoint="cancel_batch", job_id=job_id)
 
@@ -335,18 +361,23 @@ async def get_batch_metrics(
     prediction_service: PredictionService = Depends(get_prediction_service),
     settings: Settings = Depends(get_settings),
 ) -> AsyncBatchMetricsResponse:
-    """Get async batch processing metrics.
+    """Retrieves performance metrics for the asynchronous batch processing service.
+
+    This endpoint provides a snapshot of the batch service's performance,
+    including the number of active and completed jobs, the average processing
+    time, and the overall throughput.
 
     Args:
-        request: The FastAPI request object.
-        prediction_service: The prediction service dependency.
-        settings: Application settings.
+        request: The FastAPI `Request` object.
+        prediction_service: The prediction service, injected as a dependency.
+        settings: The application's configuration settings.
 
     Returns:
-        AsyncBatchMetricsResponse with comprehensive metrics.
+        An `AsyncBatchMetricsResponse` object containing detailed performance
+        metrics.
 
     Raises:
-        HTTPException: If metrics are not available.
+        HTTPException: If the metrics are not available.
     """
     logger = get_contextual_logger(__name__, endpoint="batch_metrics")
 
@@ -386,17 +417,21 @@ async def get_batch_queue_status(
     async_batch_service: AsyncBatchService = Depends(get_async_batch_service),
     settings: Settings = Depends(get_settings),
 ):
-    """Get the status of batch processing queues.
+    """Retrieves the current status of the batch processing queues.
+
+    This endpoint provides insight into the current load on the batch processing
+    service by showing the number of jobs waiting in each of the priority
+    queues (high, medium, and low).
 
     Args:
-        async_batch_service: The async batch service dependency.
-        settings: Application settings.
+        async_batch_service: The async batch service, injected as a dependency.
+        settings: The application's configuration settings.
 
     Returns:
-        Dictionary with queue status for each priority level.
+        A dictionary containing the number of jobs in each priority queue.
 
     Raises:
-        HTTPException: If queue status is not available.
+        HTTPException: If the queue status is not available.
     """
     logger = get_contextual_logger(__name__, endpoint="queue_status")
 

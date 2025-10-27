@@ -8,4 +8,3 @@ and coordinate between models and API layers.
 from app.services.prediction import PredictionService
 
 __all__ = ["PredictionService"]
-

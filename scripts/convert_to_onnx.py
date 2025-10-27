@@ -11,12 +11,12 @@ import argparse
 import sys
 from pathlib import Path
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.models.onnx_sentiment import ONNXModelOptimizer
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 logger = get_logger(__name__)
 
@@ -65,7 +65,7 @@ def main():
 
         logger.info("ONNX conversion successful", onnx_path=str(onnx_path))
 
-        print(f"\n✓ Model successfully converted to ONNX format")
+        print("\n✓ Model successfully converted to ONNX format")
         print(f"  Location: {onnx_path}")
         print(f"  Model: {model_name}")
 
