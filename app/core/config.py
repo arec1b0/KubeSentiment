@@ -173,6 +173,140 @@ class Settings(BaseSettings):
         exclude=True,  # Don't include in API responses
     )
 
+    # Kafka streaming settings
+    kafka_enabled: bool = Field(default=False, description="Enable Kafka streaming")
+    kafka_bootstrap_servers: List[str] = Field(
+        default_factory=lambda: ["localhost:9092"],
+        description="Kafka bootstrap servers",
+        min_length=1,
+    )
+    kafka_consumer_group: str = Field(
+        default="kubesentiment_consumer",
+        description="Kafka consumer group ID",
+        min_length=1,
+    )
+    kafka_topic: str = Field(
+        default="sentiment_requests",
+        description="Kafka topic to consume from",
+        min_length=1,
+    )
+    kafka_auto_offset_reset: str = Field(
+        default="latest",
+        description="Auto offset reset strategy",
+        pattern=r"^(earliest|latest|none)$",
+    )
+    kafka_max_poll_records: int = Field(
+        default=500,
+        description="Maximum records to poll per request",
+        ge=1,
+        le=10000,
+    )
+    kafka_session_timeout_ms: int = Field(
+        default=30000,
+        description="Session timeout in milliseconds",
+        ge=1000,
+        le=300000,
+    )
+    kafka_heartbeat_interval_ms: int = Field(
+        default=3000,
+        description="Heartbeat interval in milliseconds",
+        ge=1000,
+        le=30000,
+    )
+    kafka_max_poll_interval_ms: int = Field(
+        default=300000,
+        description="Maximum poll interval in milliseconds",
+        ge=10000,
+        le=2147483647,
+    )
+    kafka_enable_auto_commit: bool = Field(
+        default=False,
+        description="Enable automatic offset commits",
+    )
+    kafka_auto_commit_interval_ms: int = Field(
+        default=5000,
+        description="Auto commit interval in milliseconds",
+        ge=1000,
+        le=60000,
+    )
+
+    # High-throughput consumer settings
+    kafka_consumer_threads: int = Field(
+        default=4,
+        description="Number of consumer threads for parallel processing",
+        ge=1,
+        le=32,
+    )
+    kafka_batch_size: int = Field(
+        default=100,
+        description="Batch size for processing messages",
+        ge=1,
+        le=1000,
+    )
+    kafka_processing_timeout_ms: int = Field(
+        default=30000,
+        description="Processing timeout per batch in milliseconds",
+        ge=1000,
+        le=300000,
+    )
+    kafka_buffer_size: int = Field(
+        default=10000,
+        description="Internal buffer size for message queuing",
+        ge=1000,
+        le=100000,
+    )
+
+    # Dead letter queue settings
+    kafka_dlq_topic: str = Field(
+        default="sentiment_requests_dlq",
+        description="Dead letter queue topic for failed messages",
+    )
+    kafka_dlq_enabled: bool = Field(
+        default=True,
+        description="Enable dead letter queue for failed messages",
+    )
+    kafka_max_retries: int = Field(
+        default=3,
+        description="Maximum number of retries before sending to DLQ",
+        ge=1,
+        le=10,
+    )
+
+    # Producer settings for DLQ
+    kafka_producer_bootstrap_servers: List[str] = Field(
+        default_factory=lambda: ["localhost:9092"],
+        description="Kafka bootstrap servers for producer (DLQ)",
+        min_length=1,
+    )
+    kafka_producer_acks: str = Field(
+        default="all",
+        description="Producer acknowledgment level",
+        pattern=r"^(0|1|all)$",
+    )
+    kafka_producer_retries: int = Field(
+        default=3,
+        description="Number of producer retries",
+        ge=0,
+        le=10,
+    )
+    kafka_producer_batch_size: int = Field(
+        default=16384,
+        description="Producer batch size in bytes",
+        ge=0,
+        le=1048576,
+    )
+    kafka_producer_linger_ms: int = Field(
+        default=5,
+        description="Producer linger time in milliseconds",
+        ge=0,
+        le=100,
+    )
+    kafka_producer_compression_type: str = Field(
+        default="lz4",
+        description="Producer compression type",
+        pattern=r"^(none|gzip|snappy|lz4|zstd)$",
+    )
+
     @field_validator("allowed_models")
     @classmethod
     def validate_model_names(cls, v):

@@ -59,6 +59,33 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.error("Model initialization failed", error=str(e), exc_info=True)
 
+    # Initialize Kafka consumer if enabled
+    kafka_consumer = None
+    if settings.kafka_enabled:
+        try:
+            from app.services.stream_processor import StreamProcessor
+            from app.services.kafka_consumer import HighThroughputKafkaConsumer
+
+            # Create stream processor with the loaded model
+            stream_processor = StreamProcessor(model)
+
+            # Create and start Kafka consumer
+            kafka_consumer = HighThroughputKafkaConsumer(stream_processor, settings)
+            await kafka_consumer.start()
+
+            logger.info(
+                "Kafka consumer started successfully",
+                topic=settings.kafka_topic,
+                consumer_group=settings.kafka_consumer_group,
+                threads=settings.kafka_consumer_threads,
+            )
+
+        except Exception as e:
+            logger.error("Kafka consumer initialization failed", error=str(e), exc_info=True)
+
+    # Store consumer in app state for access by other components
+    app.state.kafka_consumer = kafka_consumer
+
     # Application is ready
     logger.info("Application startup complete", host=settings.host, port=settings.port)
 
@@ -66,5 +93,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Shutdown
     logger.info("Application shutdown initiated")
-    # Add any cleanup logic here if needed
+
+    # Shutdown Kafka consumer
+    if hasattr(app.state, 'kafka_consumer') and app.state.kafka_consumer:
+        try:
+            await app.state.kafka_consumer.stop()
+            logger.info("Kafka consumer stopped successfully")
+        except Exception as e:
+            logger.error("Error stopping Kafka consumer", error=str(e), exc_info=True)
+
+    # Add any other cleanup logic here if needed
     logger.info("Application shutdown complete")

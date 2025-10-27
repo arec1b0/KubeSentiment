@@ -50,6 +50,44 @@ class HealthResponse(BaseModel):
     version: str = Field(..., description="Application version")
     backend: str = Field(..., description="Model backend in use")
     timestamp: float = Field(..., description="Health check timestamp")
+    kafka_status: Optional[str] = Field(None, description="Kafka consumer status (if enabled)")
+
+
+class KafkaMetricsResponse(BaseModel):
+    """Defines the schema for Kafka consumer metrics response.
+
+    This model provides detailed metrics about the Kafka consumer performance,
+    including throughput, processing statistics, and health indicators.
+
+    Attributes:
+        messages_consumed: Total number of messages consumed from Kafka.
+        messages_processed: Total number of messages successfully processed.
+        messages_failed: Total number of messages that failed processing.
+        messages_retried: Total number of messages that were retried.
+        messages_sent_to_dlq: Total number of messages sent to dead letter queue.
+        total_processing_time_ms: Total processing time in milliseconds.
+        avg_processing_time_ms: Average processing time per message in milliseconds.
+        throughput_tps: Current throughput in transactions per second.
+        consumer_group_lag: Current consumer group lag.
+        running: Whether the Kafka consumer is currently running.
+        consumer_threads: Number of consumer threads.
+        pending_batches: Number of pending message batches.
+        batch_queue_size: Current size of the batch processing queue.
+    """
+
+    messages_consumed: int = Field(..., description="Total messages consumed")
+    messages_processed: int = Field(..., description="Total messages successfully processed")
+    messages_failed: int = Field(..., description="Total messages that failed processing")
+    messages_retried: int = Field(..., description="Total messages retried")
+    messages_sent_to_dlq: int = Field(..., description="Total messages sent to DLQ")
+    total_processing_time_ms: float = Field(..., description="Total processing time (ms)")
+    avg_processing_time_ms: float = Field(..., description="Average processing time per message (ms)")
+    throughput_tps: float = Field(..., description="Current throughput (TPS)")
+    consumer_group_lag: int = Field(..., description="Current consumer group lag")
+    running: bool = Field(..., description="Whether consumer is running")
+    consumer_threads: int = Field(..., description="Number of consumer threads")
+    pending_batches: int = Field(..., description="Number of pending message batches")
+    batch_queue_size: int = Field(..., description="Current batch queue size")
 
 
 class MetricsResponse(BaseModel):

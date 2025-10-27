@@ -14,3 +14,29 @@ structlog==23.2.0
 httpx==0.25.1
 hvac>=1.2.0
 kubernetes>=27.0.0
+
+# Kafka dependencies for high-throughput streaming
+kafka-python==2.0.2
+confluent-kafka==2.3.0
+
+# Performance optimization
+psutil==5.9.6
+asyncio-throttle==1.0.2
+
+# Data validation and processing
+great-expectations==0.17.23
+pandera==0.17.2
+
+# Configuration management
+hydra-core==1.3.2
+dynaconf==3.2.4
+
+# Model optimization
+onnx==1.15.0
+onnxruntime==1.16.3
+
+# Development and testing
+black==23.11.0
+ruff==0.1.6
+isort==5.12.0
+pre-commit==3.5.0

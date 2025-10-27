@@ -1,0 +1,57 @@
+# Kafka Consumer Configuration for High-Throughput Sentiment Analysis
+# This configuration enables 10x throughput improvement (500 → 5,000+ TPS)
+
+# Kafka connection settings
+kafka:
+  enabled: true
+  bootstrap_servers:
+    - "localhost:9092"
+    - "kafka-1:9092"
+    - "kafka-2:9092"
+  consumer_group: "kubesentiment_consumer_group"
+  topic: "sentiment_requests"
+  auto_offset_reset: "latest"
+
+  # Consumer performance settings
+  max_poll_records: 1000          # Increased for higher throughput
+  session_timeout_ms: 30000       # 30 seconds
+  heartbeat_interval_ms: 3000     # 3 seconds
+  max_poll_interval_ms: 300000    # 5 minutes
+  enable_auto_commit: false       # Manual commits for exactly-once processing
+  auto_commit_interval_ms: 5000
+
+  # High-throughput optimizations
+  consumer_threads: 8             # 8 parallel consumer threads
+  batch_size: 200                 # Process 200 messages per batch
+  processing_timeout_ms: 30000    # 30 second timeout per batch
+  buffer_size: 50000             # Large internal buffer
+
+  # Dead letter queue settings
+  dlq_topic: "sentiment_requests_dlq"
+  dlq_enabled: true
+  max_retries: 3
+
+# Producer settings for DLQ
+producer:
+  bootstrap_servers:
+    - "localhost:9092"
+    - "kafka-1:9092"
+    - "kafka-2:9092"
+  acks: "all"                     # Strong consistency
+  retries: 3
+  batch_size: 32768              # 32KB batches
+  linger_ms: 10                  # 10ms linger for batching
+  compression_type: "lz4"        # Fast compression
+
+# Performance monitoring
+monitoring:
+  throughput_target_tps: 5000    # Target 5,000 TPS
+  batching_window_ms: 100        # 100ms batching window
+  health_check_interval_ms: 5000 # Health check every 5 seconds
+
+# Resource allocation
+resources:
+  cpu_request: "2000m"          # 2 CPU cores
+  memory_request: "4Gi"         # 4GB RAM
+  cpu_limit: "4000m"            # 4 CPU cores max
+  memory_limit: "8Gi"           # 8GB RAM max

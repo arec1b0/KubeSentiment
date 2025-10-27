@@ -3,13 +3,14 @@ Monitoring endpoints.
 """
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from app.api.schemas.responses import (
     ComponentHealth,
     DetailedHealthResponse,
     HealthDetail,
     HealthResponse,
+    KafkaMetricsResponse,
     MetricsResponse,
 )
 from app.core.config import Settings, get_settings
@@ -31,6 +32,7 @@ router = APIRouter()
     description="Get a detailed health status of the service and its dependencies.",
 )
 async def detailed_health_check(
+    request: Request,
     settings: Settings = Depends(get_settings),
     model=Depends(get_model_service),
     secret_manager=Depends(get_secret_manager),
@@ -45,6 +47,10 @@ async def detailed_health_check(
             secret_manager
         ),
     }
+
+    # Add Kafka health check if enabled
+    if settings.kafka_enabled and hasattr(request.app.state, 'kafka_consumer') and request.app.state.kafka_consumer:
+        checks["kafka"] = health_checker.check_kafka_health(request.app.state.kafka_consumer)
 
     overall_status = "healthy"
     dependencies = []
@@ -76,6 +82,7 @@ async def detailed_health_check(
     description="Check the health status of the service and model availability.",
 )
 async def health_check(
+    request: Request,
     model=Depends(get_model_service),
     backend: str = Depends(get_model_backend),
     settings: Settings = Depends(get_settings),
@@ -85,8 +92,16 @@ async def health_check(
     model_status = "available" if model.is_ready() else "unavailable"
     secrets_healthy = secret_manager.is_healthy()
 
+    # Check Kafka health if enabled
+    kafka_status = "disabled"
+    kafka_healthy = True
+    if settings.kafka_enabled and hasattr(request.app.state, 'kafka_consumer') and request.app.state.kafka_consumer:
+        kafka_health = HealthChecker().check_kafka_health(request.app.state.kafka_consumer)
+        kafka_status = kafka_health.get("status", "unknown")
+        kafka_healthy = kafka_status == "healthy"
+
     overall_status = "healthy"
-    if not model.is_ready() or not secrets_healthy:
+    if not model.is_ready() or not secrets_healthy or not kafka_healthy:
         overall_status = "unhealthy"
 
     return HealthResponse(
@@ -95,6 +110,7 @@ async def health_check(
         version=settings.app_version,
         backend=backend,
         timestamp=time.time(),
+        kafka_status=kafka_status if settings.kafka_enabled else None,
     )
 
 
@@ -160,6 +176,31 @@ async def get_metrics_json(
     try:
         metrics = model.get_performance_metrics()
         return MetricsResponse(**metrics)
+
+    except Exception as e:
+        handle_metrics_error(e)
+
+
+@router.get(
+    "/kafka-metrics",
+    response_model=KafkaMetricsResponse,
+    summary="Kafka consumer metrics",
+    description="Get detailed metrics about the Kafka consumer performance and health.",
+)
+async def get_kafka_metrics(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> KafkaMetricsResponse:
+    """Get Kafka consumer metrics if Kafka is enabled."""
+    if not settings.kafka_enabled:
+        raise HTTPException(status_code=404, detail="Kafka consumer is disabled")
+
+    if not hasattr(request.app.state, 'kafka_consumer') or not request.app.state.kafka_consumer:
+        raise HTTPException(status_code=404, detail="Kafka consumer not initialized")
+
+    try:
+        metrics = request.app.state.kafka_consumer.get_metrics()
+        return KafkaMetricsResponse(**metrics)
 
     except Exception as e:
         handle_metrics_error(e)

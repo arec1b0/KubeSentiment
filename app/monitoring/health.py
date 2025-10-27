@@ -116,3 +116,48 @@ class HealthChecker:
                 "status": "unknown",
                 "error": str(e),
             }
+
+    @staticmethod
+    def check_kafka_health(kafka_consumer) -> Dict[str, Any]:
+        """Checks the health of the Kafka consumer.
+
+        Args:
+            kafka_consumer: An instance of HighThroughputKafkaConsumer.
+
+        Returns:
+            A dictionary containing the health status of the Kafka consumer.
+        """
+        try:
+            if not kafka_consumer:
+                return {
+                    "status": "disabled",
+                    "details": {"reason": "Kafka consumer not initialized"},
+                }
+
+            is_running = kafka_consumer.is_running()
+            metrics = kafka_consumer.get_metrics()
+
+            health_info = {
+                "status": "healthy" if is_running else "unhealthy",
+                "is_running": is_running,
+                "details": {
+                    "messages_consumed": metrics.get("messages_consumed", 0),
+                    "messages_processed": metrics.get("messages_processed", 0),
+                    "throughput_tps": metrics.get("throughput_tps", 0.0),
+                    "consumer_threads": metrics.get("consumer_threads", 0),
+                    "running": metrics.get("running", False),
+                },
+            }
+
+            # Mark as degraded if throughput is very low or no recent activity
+            if is_running and metrics.get("throughput_tps", 0) < 1.0:
+                health_info["status"] = "degraded"
+
+            return health_info
+
+        except Exception as e:
+            logger.error("Kafka health check failed", error=str(e), exc_info=True)
+            return {
+                "status": "unhealthy",
+                "error": str(e),
+            }

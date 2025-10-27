@@ -1,0 +1,148 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_METRIC_REPORTERS: io.confluent.metrics.reporter.ConfluentMetricsReporter
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+      KAFKA_CONFLUENT_METRICS_ENABLE: 'true'
+      KAFKA_CONFLUENT_SUPPORT_CUSTOMER_ID: anonymous
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_DELETE_TOPIC_ENABLE: 'true'
+      # Performance optimizations
+      KAFKA_NUM_PARTITIONS: 8
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_MESSAGE_MAX_BYTES: 10485760  # 10MB
+      KAFKA_FETCH_MESSAGE_MAX_BYTES: 10485760  # 10MB
+      KAFKA_MAX_REQUEST_SIZE: 10485760  # 10MB
+      KAFKA_PRODUCER_BATCH_SIZE: 32768  # 32KB
+      KAFKA_PRODUCER_LINGER_MS: 10
+      KAFKA_PRODUCER_COMPRESSION_TYPE: lz4
+
+  # Kafka UI for monitoring
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana-dashboards:/var/lib/grafana/dashboards
+      - ./monitoring/grafana-provisioning:/etc/grafana/provisioning
+
+  # KubeSentiment API with Kafka consumer
+  kubesentiment-kafka:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: kubesentiment-kafka
+    depends_on:
+      - kafka
+      - prometheus
+    ports:
+      - "8001:8000"
+    environment:
+      - ENVIRONMENT=development
+      - KAFKA_ENABLED=true
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_TOPIC=sentiment_requests
+      - KAFKA_CONSUMER_GROUP=kubesentiment_consumer
+      - KAFKA_CONSUMER_THREADS=4
+      - KAFKA_BATCH_SIZE=100
+      - ENABLE_METRICS=true
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./configs/kafka.yaml:/app/configs/kafka.yaml
+      - model_cache:/app/model_cache
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Performance test runner
+  performance-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: kafka-performance-test
+    depends_on:
+      - kafka
+      - kubesentiment-kafka
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - TEST_TOPIC=sentiment_requests
+      - TEST_DURATION=300
+      - TARGET_TPS=5000
+    volumes:
+      - ./benchmarking:/app/benchmarking
+      - ./configs:/app/configs
+    command: >
+      bash -c "sleep 30 &&
+               python benchmarking/kafka_performance_test.py
+               --config configs/kafka.yaml
+               --duration 300
+               --target-tps 5000"
+
+volumes:
+  grafana_data:
+  model_cache:

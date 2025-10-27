@@ -62,6 +62,81 @@ TEXT_LENGTH = Histogram(
     buckets=[10, 50, 100, 200, 500, 1000, 2000],
 )
 
+# Kafka consumer metrics
+KAFKA_MESSAGES_CONSUMED = Counter(
+    "kafka_messages_consumed_total",
+    "Total number of Kafka messages consumed",
+    ["topic", "consumer_group", "partition"],
+)
+
+KAFKA_MESSAGES_PROCESSED = Counter(
+    "kafka_messages_processed_total",
+    "Total number of Kafka messages successfully processed",
+    ["topic", "consumer_group"],
+)
+
+KAFKA_MESSAGES_FAILED = Counter(
+    "kafka_messages_failed_total",
+    "Total number of Kafka messages that failed processing",
+    ["topic", "consumer_group", "error_type"],
+)
+
+KAFKA_MESSAGES_RETRIED = Counter(
+    "kafka_messages_retried_total",
+    "Total number of Kafka messages retried",
+    ["topic", "consumer_group"],
+)
+
+KAFKA_MESSAGES_DLQ = Counter(
+    "kafka_messages_dlq_total",
+    "Total number of Kafka messages sent to dead letter queue",
+    ["topic", "consumer_group", "dlq_topic"],
+)
+
+KAFKA_PROCESSING_DURATION = Histogram(
+    "kafka_message_processing_duration_seconds",
+    "Time taken to process Kafka messages",
+    ["topic", "consumer_group"],
+    buckets=[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0],
+)
+
+KAFKA_THROUGHPUT_TPS = Gauge(
+    "kafka_consumer_throughput_tps",
+    "Kafka consumer throughput in transactions per second",
+    ["topic", "consumer_group"],
+)
+
+KAFKA_BATCH_SIZE = Histogram(
+    "kafka_batch_size",
+    "Distribution of Kafka batch sizes",
+    ["topic", "consumer_group"],
+    buckets=[1, 5, 10, 25, 50, 100, 250, 500, 1000],
+)
+
+KAFKA_CONSUMER_LAG = Gauge(
+    "kafka_consumer_lag",
+    "Kafka consumer lag per partition",
+    ["topic", "consumer_group", "partition"],
+)
+
+KAFKA_CONSUMER_GROUP_LAG = Gauge(
+    "kafka_consumer_group_lag",
+    "Total Kafka consumer group lag",
+    ["consumer_group"],
+)
+
+KAFKA_BATCH_QUEUE_SIZE = Gauge(
+    "kafka_batch_queue_size",
+    "Current size of Kafka batch processing queue",
+    ["topic", "consumer_group"],
+)
+
+KAFKA_ACTIVE_BATCHES = Gauge(
+    "kafka_active_batches",
+    "Number of active message batches being processed",
+    ["topic", "consumer_group"],
+)
+
 
 class PrometheusMetrics:
     """Manages the collection and exposure of Prometheus metrics.
@@ -163,6 +238,62 @@ class PrometheusMetrics:
     def decrement_active_requests(self):
         """Decrements the gauge for the number of active requests."""
         ACTIVE_REQUESTS.dec()
+
+    def record_kafka_message_consumed(self, topic: str, consumer_group: str, partition: int):
+        """Records a consumed Kafka message."""
+        KAFKA_MESSAGES_CONSUMED.labels(
+            topic=topic, consumer_group=consumer_group, partition=str(partition)
+        ).inc()
+
+    def record_kafka_message_processed(self, topic: str, consumer_group: str, count: int = 1):
+        """Records successfully processed Kafka messages."""
+        KAFKA_MESSAGES_PROCESSED.labels(topic=topic, consumer_group=consumer_group).inc(count)
+
+    def record_kafka_message_failed(self, topic: str, consumer_group: str, error_type: str):
+        """Records a failed Kafka message."""
+        KAFKA_MESSAGES_FAILED.labels(
+            topic=topic, consumer_group=consumer_group, error_type=error_type
+        ).inc()
+
+    def record_kafka_message_retried(self, topic: str, consumer_group: str):
+        """Records a retried Kafka message."""
+        KAFKA_MESSAGES_RETRIED.labels(topic=topic, consumer_group=consumer_group).inc()
+
+    def record_kafka_message_dlq(self, topic: str, consumer_group: str, dlq_topic: str):
+        """Records a Kafka message sent to dead letter queue."""
+        KAFKA_MESSAGES_DLQ.labels(
+            topic=topic, consumer_group=consumer_group, dlq_topic=dlq_topic
+        ).inc()
+
+    def record_kafka_processing_duration(self, topic: str, consumer_group: str, duration: float):
+        """Records Kafka message processing duration."""
+        KAFKA_PROCESSING_DURATION.labels(topic=topic, consumer_group=consumer_group).observe(duration)
+
+    def set_kafka_throughput_tps(self, topic: str, consumer_group: str, throughput: float):
+        """Sets the current Kafka consumer throughput in TPS."""
+        KAFKA_THROUGHPUT_TPS.labels(topic=topic, consumer_group=consumer_group).set(throughput)
+
+    def record_kafka_batch_size(self, topic: str, consumer_group: str, batch_size: int):
+        """Records Kafka batch size."""
+        KAFKA_BATCH_SIZE.labels(topic=topic, consumer_group=consumer_group).observe(batch_size)
+
+    def set_kafka_consumer_lag(self, topic: str, consumer_group: str, partition: int, lag: int):
+        """Sets Kafka consumer lag per partition."""
+        KAFKA_CONSUMER_LAG.labels(
+            topic=topic, consumer_group=consumer_group, partition=str(partition)
+        ).set(lag)
+
+    def set_kafka_consumer_group_lag(self, consumer_group: str, lag: int):
+        """Sets total Kafka consumer group lag."""
+        KAFKA_CONSUMER_GROUP_LAG.labels(consumer_group=consumer_group).set(lag)
+
+    def set_kafka_batch_queue_size(self, topic: str, consumer_group: str, queue_size: int):
+        """Sets current Kafka batch queue size."""
+        KAFKA_BATCH_QUEUE_SIZE.labels(topic=topic, consumer_group=consumer_group).set(queue_size)
+
+    def set_kafka_active_batches(self, topic: str, consumer_group: str, active_batches: int):
+        """Sets number of active Kafka batches."""
+        KAFKA_ACTIVE_BATCHES.labels(topic=topic, consumer_group=consumer_group).set(active_batches)
 
     def get_metrics(self) -> str:
         """Generates and returns the metrics in Prometheus text format.
