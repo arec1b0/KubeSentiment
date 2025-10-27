@@ -5,7 +5,7 @@ This service encapsulates the business logic for making predictions,
 separating it from the API and model layers.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from app.core.config import Settings
 from app.core.logging import get_contextual_logger, get_logger
@@ -82,12 +82,10 @@ class PredictionService:
                 "Model not ready for prediction",
                 model_status="unavailable",
             )
+            model_settings = getattr(self.model, "settings", None)
+            model_name = model_settings.model_name if model_settings else "unknown"
             raise ModelNotLoadedError(
-                model_name=(
-                    getattr(self.model, "settings", None).model_name
-                    if hasattr(self.model, "settings")
-                    else "unknown"
-                ),
+                model_name=model_name,
                 context={"service": "prediction"},
             )
 
@@ -107,6 +105,110 @@ class PredictionService:
         except Exception as e:
             prediction_logger.error(
                 "Prediction failed in service layer",
+                error=str(e),
+                error_type=type(e).__name__,
+                exc_info=True,
+            )
+            raise
+
+    def predict_batch(self, texts: List[str]) -> List[Dict[str, Any]]:
+        """Performs sentiment analysis on multiple texts using vectorized operations.
+
+        This method provides significant performance improvements over sequential
+        single predictions by leveraging batch processing and vectorization.
+
+        Args:
+            texts: A list of input texts to be analyzed.
+
+        Returns:
+            A list of dictionaries containing prediction results for each text.
+
+        Raises:
+            ValueError: If the input list is empty or all texts are empty.
+            ModelNotLoadedError: If the model is not loaded or ready for inference.
+        """
+        # Create contextual logger for batch prediction
+        batch_logger = get_contextual_logger(
+            __name__,
+            operation="batch_prediction_service",
+            batch_size=len(texts),
+        )
+
+        batch_logger.debug("Starting batch prediction service", service="prediction")
+
+        # Validate input
+        if not texts or len(texts) == 0:
+            raise ValueError("Batch must contain at least one text")
+
+        # Filter empty and oversized texts
+        validated_texts: List[str] = []
+        errors: List[Dict[str, Any]] = []
+
+        for idx, text in enumerate(texts):
+            try:
+                if not text or not text.strip():
+                    errors.append({"index": idx, "error": "Empty text"})
+                    validated_texts.append("")  # Placeholder
+                elif len(text) > self.settings.max_text_length:
+                    raise TextTooLongError(
+                        text_length=len(text), max_length=self.settings.max_text_length
+                    )
+                else:
+                    validated_texts.append(text.strip())
+            except TextTooLongError:
+                errors.append(
+                    {
+                        "index": idx,
+                        "error": f"Text too long: {len(text)} > {self.settings.max_text_length}",
+                    }
+                )
+                validated_texts.append("")  # Placeholder
+
+        # Check if we have any valid texts
+        valid_count = sum(1 for t in validated_texts if t)
+        if valid_count == 0:
+            raise ValueError("All texts in batch are empty or invalid")
+
+        # Check model readiness
+        if not self.model.is_ready():
+            batch_logger.error(
+                "Model not ready for batch prediction",
+                model_status="unavailable",
+            )
+            model_settings = getattr(self.model, "settings", None)
+            model_name = model_settings.model_name if model_settings else "unknown"
+            raise ModelNotLoadedError(
+                model_name=model_name,
+                context={"service": "batch_prediction"},
+            )
+
+        # Perform batch prediction
+        try:
+            results = self.model.predict_batch(validated_texts)
+
+            # Mark error results
+            for error_info in errors:
+                error_idx = error_info["index"]
+                if isinstance(error_idx, int):
+                    results[error_idx] = {
+                        "label": "ERROR",
+                        "score": 0.0,
+                        "error": error_info["error"],
+                        "inference_time_ms": 0.0,
+                    }
+
+            batch_logger.info(
+                "Batch prediction completed successfully",
+                batch_size=len(texts),
+                valid_predictions=valid_count,
+                errors=len(errors),
+            )
+
+            return results
+
+        except Exception as e:
+            batch_logger.error(
+                "Batch prediction failed in service layer",
                 error=str(e),
                 error_type=type(e).__name__,
                 exc_info=True,
