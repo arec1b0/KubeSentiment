@@ -369,6 +369,98 @@ class Settings(BaseSettings):
         le=10000,
     )
 
+    # Redis cache settings
+    redis_enabled: bool = Field(default=False, description="Enable Redis distributed caching")
+    redis_host: str = Field(
+        default="localhost",
+        description="Redis server host",
+        min_length=1,
+    )
+    redis_port: int = Field(
+        default=6379,
+        description="Redis server port",
+        ge=1,
+        le=65535,
+    )
+    redis_db: int = Field(
+        default=0,
+        description="Redis database number",
+        ge=0,
+        le=15,
+    )
+    redis_password: Optional[str] = Field(
+        default=None,
+        description="Redis password for authentication",
+        exclude=True,  # Don't include in API responses
+    )
+    redis_max_connections: int = Field(
+        default=50,
+        description="Maximum number of Redis connections in pool",
+        ge=10,
+        le=1000,
+    )
+    redis_socket_timeout: int = Field(
+        default=5,
+        description="Redis socket timeout in seconds",
+        ge=1,
+        le=60,
+    )
+    redis_socket_connect_timeout: int = Field(
+        default=5,
+        description="Redis socket connection timeout in seconds",
+        ge=1,
+        le=60,
+    )
+    redis_namespace: str = Field(
+        default="kubesentiment",
+        description="Redis key namespace prefix",
+        min_length=1,
+        max_length=50,
+    )
+    redis_prediction_cache_ttl: int = Field(
+        default=3600,
+        description="TTL for prediction cache entries in seconds",
+        ge=60,
+        le=86400,  # Max 24 hours
+    )
+    redis_feature_cache_ttl: int = Field(
+        default=1800,
+        description="TTL for feature cache entries in seconds",
+        ge=60,
+        le=86400,
+    )
+
+    # Anomaly buffer settings
+    anomaly_buffer_enabled: bool = Field(
+        default=True,
+        description="Enable anomaly detection buffer",
+    )
+    anomaly_buffer_max_size: int = Field(
+        default=10000,
+        description="Maximum number of anomalies to store in buffer",
+        ge=100,
+        le=100000,
+    )
+    anomaly_buffer_default_ttl: int = Field(
+        default=3600,
+        description="Default TTL for anomaly entries in seconds",
+        ge=300,
+        le=86400,
+    )
+    anomaly_buffer_cleanup_interval: int = Field(
+        default=300,
+        description="Interval for cleaning up expired anomalies in seconds",
+        ge=60,
+        le=3600,
+    )
+
+    # Distributed Kafka consumer settings
+    kafka_partition_assignment_strategy: str = Field(
+        default="roundrobin",
+        description="Partition assignment strategy for consumer group",
+        pattern=r"^(range|roundrobin|sticky)$",
+    )
+
     @field_validator("allowed_models")
     @classmethod
     def validate_model_names(cls, v):
