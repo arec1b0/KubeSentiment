@@ -9,10 +9,15 @@ import asyncio
 import time
 from collections import deque
 from dataclasses import dataclass
-from typing import Any, Callable, Coroutine, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import pandas as pd
 
 from app.core.config import get_settings
 from app.core.logging import get_contextual_logger, get_logger
+from app.features.feature_engineering import get_feature_engineer
+from app.features.online_normalization import OnlineStandardScaler
 from app.models.base import ModelStrategy
 
 logger = get_logger(__name__)
@@ -28,6 +33,7 @@ class BatchConfig:
         min_batch_size: Minimum batch size before processing (for efficiency).
         dynamic_batching: Enable dynamic batch size adjustment based on load.
     """
+
     max_batch_size: int = 32
     max_wait_time_ms: float = 50.0  # 50ms max wait
     min_batch_size: int = 1
@@ -44,6 +50,7 @@ class PendingRequest:
         timestamp: Time when request was added to queue.
         request_id: Unique identifier for the request.
     """
+
     text: str
     future: asyncio.Future
     timestamp: float
@@ -63,11 +70,7 @@ class StreamProcessor:
         queue: Queue of pending requests waiting to be processed.
     """
 
-    def __init__(
-        self,
-        model: ModelStrategy,
-        config: Optional[BatchConfig] = None
-    ):
+    def __init__(self, model: ModelStrategy, config: Optional[BatchConfig] = None):
         """Initializes the stream processor.
 
         Args:
@@ -91,6 +94,20 @@ class StreamProcessor:
         settings = get_settings()
         self.logger = get_logger(__name__)
 
+        # Initialize feature engineering and normalization components
+        self.feature_engineer = get_feature_engineer()
+        self.online_scaler = OnlineStandardScaler()
+        # Use data directory relative to project root, or create ./data if not configured
+        data_dir = getattr(settings, "data_dir", "./data")
+        self.scaler_state_path = Path(data_dir) / "scaler_state.json"
+
+        # Load existing scaler state if available
+        try:
+            self.online_scaler.load_state(str(self.scaler_state_path))
+            self.logger.info("Loaded existing scaler state", path=str(self.scaler_state_path))
+        except Exception as e:
+            self.logger.info("No existing scaler state found, starting fresh", error=str(e))
+
     async def predict_async(self, text: str, request_id: Optional[str] = None) -> Dict[str, Any]:
         """Adds a prediction request to the batch queue.
 
@@ -106,6 +123,7 @@ class StreamProcessor:
         """
         if request_id is None:
             import uuid
+
             request_id = str(uuid.uuid4())
 
         # Create a future for this request
@@ -114,10 +132,7 @@ class StreamProcessor:
 
         # Create pending request
         pending_request = PendingRequest(
-            text=text,
-            future=future,
-            timestamp=time.time(),
-            request_id=request_id
+            text=text, future=future, timestamp=time.time(), request_id=request_id
         )
 
         # Add to queue
@@ -189,8 +204,10 @@ class StreamProcessor:
             timeout_trigger = wait_time_ms >= self.config.max_wait_time_ms
             min_size_trigger = batch_size >= self.config.min_batch_size
 
-            should_process = size_trigger or timeout_trigger or (
-                min_size_trigger and wait_time_ms >= self.config.max_wait_time_ms * 0.5
+            should_process = (
+                size_trigger
+                or timeout_trigger
+                or (min_size_trigger and wait_time_ms >= self.config.max_wait_time_ms * 0.5)
             )
 
             if should_process:
@@ -228,38 +245,14 @@ class StreamProcessor:
                 queue_size=len(self.queue),
             )
 
+            # Feature engineering and online normalization
+            self._process_features(texts, batch_logger)
+
             # Perform vectorized batch prediction
             results = self.model.predict_batch(texts)
 
-            processing_time = (time.time() - start_time) * 1000
-
-            # Update statistics
-            self._stats["total_batches"] += 1
-            self._stats["total_processing_time_ms"] += processing_time
-
-            # Calculate rolling average batch size
-            alpha = 0.1  # Smoothing factor for exponential moving average
-            self._stats["avg_batch_size"] = (
-                alpha * len(batch) + (1 - alpha) * self._stats["avg_batch_size"]
-            )
-
-            # Count cache hits
-            cache_hits = sum(1 for r in results if r.get("cached", False))
-            self._stats["cache_hits"] += cache_hits
-
-            # Resolve all futures with their results
-            for req, result in zip(batch, results):
-                if not req.future.done():
-                    req.future.set_result(result)
-
-            batch_logger.info(
-                "Batch processed successfully",
-                batch_size=len(batch),
-                processing_time_ms=round(processing_time, 2),
-                throughput_requests_per_sec=round(len(batch) / (processing_time / 1000), 2),
-                cache_hits=cache_hits,
-                cache_hit_rate=round(cache_hits / len(batch), 2),
-            )
+            # Update and log batch statistics
+            self._finalize_batch_processing(batch, results, start_time, batch_logger)
 
         except Exception as e:
             batch_logger.error(
@@ -274,6 +267,139 @@ class StreamProcessor:
             for req in batch:
                 if not req.future.done():
                     req.future.set_exception(e)
+
+    def _process_features(self, texts: List[str], batch_logger) -> None:
+        """Process features for a batch of texts."""
+        try:
+            # Extract numerical features from texts
+            feature_dicts = [self.feature_engineer.extract_features(text) for text in texts]
+
+            # Convert to DataFrame and handle missing values
+            feature_df = pd.DataFrame(feature_dicts).fillna(0)
+
+            # Define numerical feature columns for normalization
+            numerical_features = [
+                "char_count",
+                "word_count",
+                "sentence_count",
+                "avg_word_length",
+                "avg_sentence_length",
+                "unique_word_count",
+                "lexical_richness",
+                "stopwords_count",
+                "stopwords_ratio",
+                "vader_sentiment_compound",
+                "vader_sentiment_pos",
+                "vader_sentiment_neg",
+                "vader_sentiment_neu",
+                "flesch_reading_ease",
+                "flesch_kincaid_grade",
+                "smog_index",
+                "coleman_liau_index",
+                "automated_readability_index",
+                "dale_chall_readability_score",
+                "gunning_fog",
+                "noun_count",
+                "verb_count",
+                "adjective_count",
+                "adverb_count",
+                "pronoun_count",
+                "noun_ratio",
+                "verb_ratio",
+                "adjective_ratio",
+                "punctuation_count",
+                "punctuation_ratio",
+                "uppercase_word_count",
+                "uppercase_word_ratio",
+                "exclamation_mark_count",
+                "question_mark_count",
+                "numeric_count",
+                "all_caps_word_count",
+                "all_caps_word_ratio",
+            ]
+
+            # Filter to available numerical features
+            available_features = [col for col in numerical_features if col in feature_df.columns]
+            feature_array = feature_df[available_features].values
+
+            if feature_array.shape[0] > 0:
+                # Update scaler with new batch and normalize features
+                self.online_scaler.partial_fit(feature_array)
+
+                # Normalize features
+                normalized_features = self.online_scaler.transform(feature_array)
+
+                # Save updated scaler state
+                self.online_scaler.save_state(str(self.scaler_state_path))
+
+                batch_logger.info(
+                    "Normalized features generated",
+                    shape=normalized_features.shape,
+                    n_features=len(available_features),
+                    scaler_samples_seen=self.online_scaler.n_samples_seen_,
+                )
+
+                # Log sample normalized features for debugging (first sample only)
+                if len(normalized_features) > 0:
+                    sample_features = {
+                        available_features[i]: float(normalized_features[0, i])
+                        for i in range(min(5, len(available_features)))  # First 5 features
+                    }
+                    batch_logger.debug(
+                        "Sample normalized features",
+                        sample_features=sample_features,
+                        text_preview=texts[0][:50] if texts else "",
+                    )
+
+            else:
+                batch_logger.warning("No numerical features available for normalization")
+
+        except Exception as fe_e:
+            batch_logger.error(
+                "Feature engineering/normalization failed",
+                error=str(fe_e),
+                error_type=type(fe_e).__name__,
+                exc_info=True,
+            )
+            # Continue with prediction even if feature engineering fails
+
+    def _finalize_batch_processing(
+        self,
+        batch: List[PendingRequest],
+        results: List[Dict[str, Any]],
+        start_time: float,
+        batch_logger,
+    ) -> None:
+        """Finalize batch processing and update statistics."""
+        processing_time = (time.time() - start_time) * 1000
+
+        # Update statistics
+        self._stats["total_batches"] += 1
+        self._stats["total_processing_time_ms"] += processing_time
+
+        # Calculate rolling average batch size
+        alpha = 0.1  # Smoothing factor for exponential moving average
+        self._stats["avg_batch_size"] = (
+            alpha * len(batch) + (1 - alpha) * self._stats["avg_batch_size"]
+        )
+
+        # Count cache hits
+        cache_hits = sum(1 for r in results if r.get("cached", False))
+        self._stats["cache_hits"] += cache_hits
+
+        # Resolve all futures with their results
+        for req, result in zip(batch, results):
+            if not req.future.done():
+                req.future.set_result(result)
+
+        batch_logger.info(
+            "Batch processed successfully",
+            batch_size=len(batch),
+            processing_time_ms=round(processing_time, 2),
+            throughput_requests_per_sec=round(len(batch) / (processing_time / 1000), 2),
+            cache_hits=cache_hits,
+            cache_hit_rate=round(cache_hits / len(batch), 2),
+        )
 
     def get_stats(self) -> Dict[str, Any]:
         """Retrieves processing statistics.
@@ -296,9 +422,12 @@ class StreamProcessor:
             "is_processing": self._processing,
             "cache_hits": self._stats["cache_hits"],
             "cache_hit_rate": round(
-                self._stats["cache_hits"] / self._stats["total_requests"]
-                if self._stats["total_requests"] > 0 else 0.0,
-                2
+                (
+                    self._stats["cache_hits"] / self._stats["total_requests"]
+                    if self._stats["total_requests"] > 0
+                    else 0.0
+                ),
+                2,
             ),
         }
 
@@ -386,16 +515,17 @@ class StreamProcessor:
             # Return error results for all texts
             error_results = []
             for text in texts:
-                error_results.append({
-                    "label": "ERROR",
-                    "score": 0.0,
-                    "error": str(e),
-                    "inference_time_ms": 0.0,
-                    "model_name": "stream_processor",
-                    "text_length": len(text),
-                    "backend": "async_batch",
-                    "cached": False,
-                })
+                error_results.append(
+                    {
+                        "label": "ERROR",
+                        "score": 0.0,
+                        "error": str(e),
+                        "inference_time_ms": 0.0,
+                        "model_name": "stream_processor",
+                        "text_length": len(text),
+                        "backend": "async_batch",
+                        "cached": False,
+                    }
+                )
 
             return error_results
-
