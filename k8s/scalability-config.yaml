@@ -181,11 +181,11 @@ spec:
     - Egress
 
   ingress:
-    # Allow traffic from load balancer
+    # Allow traffic from ingress controller namespace
     - from:
-        - podSelector:
+        - namespaceSelector:
             matchLabels:
-              app: kubesentiment-lb
+              kubernetes.io/metadata.name: ingress-nginx
       ports:
         - protocol: TCP
           port: 8000
