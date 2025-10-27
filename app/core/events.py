@@ -86,6 +86,33 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Store consumer in app state for access by other components
     app.state.kafka_consumer = kafka_consumer
 
+    # Initialize async batch service
+    async_batch_service = None
+    try:
+        from app.services.stream_processor import StreamProcessor
+        from app.services.async_batch_service import AsyncBatchService
+
+        # Create prediction service with the loaded model
+        from app.services.prediction import PredictionService
+        prediction_svc = PredictionService(model, settings)
+
+        # Create stream processor
+        stream_processor = StreamProcessor(model)
+
+        # Create async batch service
+        async_batch_service = AsyncBatchService(prediction_svc, stream_processor)
+
+        # Start the service
+        await async_batch_service.start()
+
+        logger.info("Async batch service started successfully")
+
+    except Exception as e:
+        logger.error("Async batch service initialization failed", error=str(e), exc_info=True)
+
+    # Store async batch service in app state
+    app.state.async_batch_service = async_batch_service
+
     # Application is ready
     logger.info("Application startup complete", host=settings.host, port=settings.port)
 
@@ -101,6 +128,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.info("Kafka consumer stopped successfully")
         except Exception as e:
             logger.error("Error stopping Kafka consumer", error=str(e), exc_info=True)
+
+    # Shutdown async batch service
+    if hasattr(app.state, 'async_batch_service') and app.state.async_batch_service:
+        try:
+            await app.state.async_batch_service.stop()
+            logger.info("Async batch service stopped successfully")
+        except Exception as e:
+            logger.error("Error stopping async batch service", error=str(e), exc_info=True)
 
     # Add any other cleanup logic here if needed
     logger.info("Application shutdown complete")

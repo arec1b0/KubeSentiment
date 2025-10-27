@@ -2,6 +2,8 @@
 Response schemas for API endpoints.
 """
 
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -51,6 +53,7 @@ class HealthResponse(BaseModel):
     backend: str = Field(..., description="Model backend in use")
     timestamp: float = Field(..., description="Health check timestamp")
     kafka_status: Optional[str] = Field(None, description="Kafka consumer status (if enabled)")
+    async_batch_status: Optional[str] = Field(None, description="Async batch service status (if enabled)")
 
 
 class KafkaMetricsResponse(BaseModel):
@@ -88,6 +91,125 @@ class KafkaMetricsResponse(BaseModel):
     consumer_threads: int = Field(..., description="Number of consumer threads")
     pending_batches: int = Field(..., description="Number of pending message batches")
     batch_queue_size: int = Field(..., description="Current batch queue size")
+
+
+class BatchJobResponse(BaseModel):
+    """Response for batch job creation.
+
+    Attributes:
+        job_id: Unique identifier for the batch job.
+        status: Current status of the job.
+        total_texts: Number of texts in the batch.
+        estimated_completion_seconds: Estimated time for completion.
+        created_at: Timestamp when job was created.
+        priority: Processing priority.
+    """
+
+    job_id: str = Field(..., description="Unique batch job identifier")
+    status: str = Field(..., description="Current job status")
+    total_texts: int = Field(..., description="Number of texts in batch")
+    estimated_completion_seconds: int = Field(..., description="Estimated completion time")
+    created_at: float = Field(..., description="Job creation timestamp")
+    priority: str = Field(..., description="Processing priority")
+    progress_percentage: float = Field(default=0.0, description="Processing progress (0-100%)")
+
+
+class BatchJobStatus(BaseModel):
+    """Detailed status of a batch job.
+
+    Attributes:
+        job_id: Unique identifier for the batch job.
+        status: Current status (pending, processing, completed, failed).
+        total_texts: Total number of texts in the batch.
+        processed_texts: Number of texts processed so far.
+        failed_texts: Number of texts that failed processing.
+        progress_percentage: Processing progress (0-100%).
+        created_at: Timestamp when job was created.
+        started_at: Timestamp when processing started.
+        completed_at: Timestamp when processing completed.
+        estimated_completion_seconds: Estimated time for completion.
+        priority: Processing priority.
+        error: Error message if job failed.
+    """
+
+    job_id: str = Field(..., description="Unique batch job identifier")
+    status: str = Field(..., description="Current job status")
+    total_texts: int = Field(..., description="Total texts in batch")
+    processed_texts: int = Field(default=0, description="Texts processed so far")
+    failed_texts: int = Field(default=0, description="Texts that failed processing")
+    progress_percentage: float = Field(default=0.0, description="Processing progress")
+    created_at: float = Field(..., description="Job creation timestamp")
+    started_at: Optional[float] = Field(None, description="Processing start timestamp")
+    completed_at: Optional[float] = Field(None, description="Processing completion timestamp")
+    estimated_completion_seconds: int = Field(..., description="Estimated completion time")
+    priority: str = Field(..., description="Processing priority")
+    error: Optional[str] = Field(None, description="Error message if failed")
+
+
+class BatchPredictionResponse(BaseModel):
+    """Response for batch prediction results.
+
+    Attributes:
+        job_id: Unique identifier for the batch job.
+        results: List of prediction results for each text.
+        summary: Summary statistics for the batch.
+        processing_time_seconds: Total processing time.
+        average_inference_time_ms: Average inference time per text.
+    """
+
+    job_id: str = Field(..., description="Batch job identifier")
+    results: List[PredictionResponse] = Field(..., description="Individual prediction results")
+    summary: Dict[str, Any] = Field(..., description="Batch processing summary")
+    processing_time_seconds: float = Field(..., description="Total processing time")
+    average_inference_time_ms: float = Field(..., description="Average inference time per text")
+
+
+class BatchPredictionResults(BaseModel):
+    """Paginated results for large batch jobs.
+
+    Attributes:
+        job_id: Unique identifier for the batch job.
+        results: List of prediction results (paginated).
+        total_results: Total number of results available.
+        page: Current page number.
+        page_size: Number of results per page.
+        has_more: Whether there are more results available.
+        summary: Summary statistics for the batch.
+    """
+
+    job_id: str = Field(..., description="Batch job identifier")
+    results: List[PredictionResponse] = Field(..., description="Prediction results for this page")
+    total_results: int = Field(..., description="Total number of results")
+    page: int = Field(..., description="Current page number", ge=1)
+    page_size: int = Field(..., description="Results per page", ge=1, le=1000)
+    has_more: bool = Field(..., description="Whether more results are available")
+    summary: Dict[str, Any] = Field(..., description="Batch processing summary")
+
+
+class AsyncBatchMetricsResponse(BaseModel):
+    """Metrics for async batch processing.
+
+    Attributes:
+        total_jobs: Total number of batch jobs created.
+        active_jobs: Number of currently active jobs.
+        completed_jobs: Number of completed jobs.
+        failed_jobs: Number of failed jobs.
+        average_processing_time_seconds: Average processing time per job.
+        average_throughput_tps: Average throughput in texts per second.
+        queue_size: Current size of the batch processing queue.
+        average_batch_size: Average size of processed batches.
+        processing_efficiency: Processing efficiency percentage.
+    """
+
+    total_jobs: int = Field(..., description="Total batch jobs created")
+    active_jobs: int = Field(..., description="Currently active jobs")
+    completed_jobs: int = Field(..., description="Successfully completed jobs")
+    failed_jobs: int = Field(..., description="Failed jobs")
+    average_processing_time_seconds: float = Field(..., description="Average processing time")
+    average_throughput_tps: float = Field(..., description="Average throughput (TPS)")
+    queue_size: int = Field(..., description="Current batch queue size")
+    average_batch_size: float = Field(..., description="Average batch size")
+    processing_efficiency: float = Field(..., description="Processing efficiency %")
 
 
 class MetricsResponse(BaseModel):

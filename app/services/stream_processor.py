@@ -344,3 +344,58 @@ class StreamProcessor:
 
         logger.info("Stream processor shutdown complete")
 
+    async def predict_async_batch(self, texts: List[str], batch_id: str) -> List[Dict[str, Any]]:
+        """Process a batch of texts asynchronously.
+
+        This method provides async batch processing optimized for high throughput.
+
+        Args:
+            texts: List of texts to process.
+            batch_id: Identifier for the batch.
+
+        Returns:
+            List of prediction results.
+        """
+        batch_logger = get_contextual_logger(
+            __name__,
+            operation="async_batch_processing",
+            batch_id=batch_id,
+            batch_size=len(texts),
+        )
+
+        try:
+            # Use the existing batch prediction logic but in async context
+            results = self.model.predict_batch(texts)
+
+            batch_logger.info(
+                "Async batch processed successfully",
+                batch_size=len(texts),
+                batch_id=batch_id,
+            )
+
+            return results
+
+        except Exception as e:
+            batch_logger.error(
+                "Async batch processing failed",
+                batch_id=batch_id,
+                error=str(e),
+                exc_info=True,
+            )
+
+            # Return error results for all texts
+            error_results = []
+            for text in texts:
+                error_results.append({
+                    "label": "ERROR",
+                    "score": 0.0,
+                    "error": str(e),
+                    "inference_time_ms": 0.0,
+                    "model_name": "stream_processor",
+                    "text_length": len(text),
+                    "backend": "async_batch",
+                    "cached": False,
+                })
+
+            return error_results
+

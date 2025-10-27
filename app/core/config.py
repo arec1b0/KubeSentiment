@@ -307,6 +307,63 @@ class Settings(BaseSettings):
         pattern=r"^(none|gzip|snappy|lz4|zstd)$",
     )
 
+    # Async batch processing settings
+    async_batch_enabled: bool = Field(default=True, description="Enable async batch processing")
+    async_batch_max_jobs: int = Field(
+        default=1000,
+        description="Maximum number of concurrent batch jobs",
+        ge=10,
+        le=10000,
+    )
+    async_batch_max_batch_size: int = Field(
+        default=1000,
+        description="Maximum batch size for async processing",
+        ge=10,
+        le=10000,
+    )
+    async_batch_default_timeout_seconds: int = Field(
+        default=300,
+        description="Default timeout for batch jobs in seconds",
+        ge=30,
+        le=3600,
+    )
+    async_batch_priority_high_limit: int = Field(
+        default=100,
+        description="Maximum high priority jobs in queue",
+        ge=10,
+        le=1000,
+    )
+    async_batch_priority_medium_limit: int = Field(
+        default=500,
+        description="Maximum medium priority jobs in queue",
+        ge=100,
+        le=5000,
+    )
+    async_batch_priority_low_limit: int = Field(
+        default=1000,
+        description="Maximum low priority jobs in queue",
+        ge=200,
+        le=10000,
+    )
+    async_batch_cleanup_interval_seconds: int = Field(
+        default=60,
+        description="Interval for cleaning up expired jobs",
+        ge=10,
+        le=3600,
+    )
+    async_batch_cache_ttl_seconds: int = Field(
+        default=3600,
+        description="Time-to-live for cached batch results",
+        ge=300,
+        le=86400,  # Max 24 hours
+    )
+    async_batch_result_cache_max_size: int = Field(
+        default=1000,
+        description="Maximum number of cached batch results",
+        ge=100,
+        le=10000,
+    )
+
     @field_validator("allowed_models")
     @classmethod
     def validate_model_names(cls, v):

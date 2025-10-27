@@ -6,6 +6,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from app.api.schemas.responses import (
+    AsyncBatchMetricsResponse,
     ComponentHealth,
     DetailedHealthResponse,
     HealthDetail,
@@ -15,14 +16,41 @@ from app.api.schemas.responses import (
 )
 from app.core.config import Settings, get_settings
 from app.core.dependencies import get_model_backend, get_model_service
+from app.core.logging import get_logger
 from app.core.secrets import get_secret_manager
 from app.monitoring.health import HealthChecker
+from app.services.async_batch_service import AsyncBatchService
 from app.utils.error_handlers import (
-    handle_metrics_error,
     handle_prometheus_metrics_error,
 )
 
 router = APIRouter()
+logger = get_logger(__name__)
+
+
+async def get_async_batch_service_dependency(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> AsyncBatchService:
+    """Get the async batch service instance for monitoring endpoints.
+
+    Args:
+        request: The FastAPI request object.
+        settings: Application settings.
+
+    Returns:
+        The async batch service instance.
+
+    Raises:
+        HTTPException: If the service is not available.
+    """
+    if not settings.async_batch_enabled:
+        raise HTTPException(status_code=404, detail="Async batch processing is disabled")
+
+    if not hasattr(request.app.state, 'async_batch_service') or not request.app.state.async_batch_service:
+        raise HTTPException(status_code=404, detail="Async batch service not initialized")
+
+    return request.app.state.async_batch_service  # type: ignore
 
 
 @router.get(
@@ -51,6 +79,10 @@ async def detailed_health_check(
     # Add Kafka health check if enabled
     if settings.kafka_enabled and hasattr(request.app.state, 'kafka_consumer') and request.app.state.kafka_consumer:
         checks["kafka"] = health_checker.check_kafka_health(request.app.state.kafka_consumer)
+
+    # Add async batch health check if enabled
+    if settings.async_batch_enabled and hasattr(request.app.state, 'async_batch_service') and request.app.state.async_batch_service:
+        checks["async_batch"] = health_checker.check_async_batch_health(request.app.state.async_batch_service)
 
     overall_status = "healthy"
     dependencies = []
@@ -100,8 +132,16 @@ async def health_check(
         kafka_status = kafka_health.get("status", "unknown")
         kafka_healthy = kafka_status == "healthy"
 
+    # Check async batch health if enabled
+    async_batch_status = "disabled"
+    async_batch_healthy = True
+    if settings.async_batch_enabled and hasattr(request.app.state, 'async_batch_service') and request.app.state.async_batch_service:
+        async_batch_health = HealthChecker().check_async_batch_health(request.app.state.async_batch_service)
+        async_batch_status = async_batch_health.get("status", "unknown")
+        async_batch_healthy = async_batch_status == "healthy"
+
     overall_status = "healthy"
-    if not model.is_ready() or not secrets_healthy or not kafka_healthy:
+    if not model.is_ready() or not secrets_healthy or not kafka_healthy or not async_batch_healthy:
         overall_status = "unhealthy"
 
     return HealthResponse(
@@ -111,6 +151,7 @@ async def health_check(
         backend=backend,
         timestamp=time.time(),
         kafka_status=kafka_status if settings.kafka_enabled else None,
+        async_batch_status=async_batch_status if settings.async_batch_enabled else None,
     )
 
 
@@ -178,7 +219,8 @@ async def get_metrics_json(
         return MetricsResponse(**metrics)
 
     except Exception as e:
-        handle_metrics_error(e)
+        logger.error(f"Error retrieving metrics: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve metrics")
 
 
 @router.get(
@@ -203,4 +245,34 @@ async def get_kafka_metrics(
         return KafkaMetricsResponse(**metrics)
 
     except Exception as e:
-        handle_metrics_error(e)
+        logger.error(f"Error retrieving metrics: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve metrics")
+
+
+@router.get(
+    "/async-batch-metrics",
+    response_model=AsyncBatchMetricsResponse,
+    summary="Async batch processing metrics",
+    description="Get comprehensive metrics for async batch processing performance.",
+)
+async def get_async_batch_metrics(
+    async_batch_service: AsyncBatchService = Depends(get_async_batch_service_dependency),
+) -> AsyncBatchMetricsResponse:
+    """Get async batch processing metrics.
+
+    Args:
+        async_batch_service: The async batch service dependency.
+
+    Returns:
+        AsyncBatchMetricsResponse with comprehensive metrics.
+
+    Raises:
+        HTTPException: If async batch processing is not enabled or available.
+    """
+    try:
+        metrics = await async_batch_service.get_batch_metrics()
+        return metrics  # type: ignore
+
+    except Exception as e:
+        logger.error(f"Error retrieving metrics: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve metrics")

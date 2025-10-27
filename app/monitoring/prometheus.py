@@ -9,7 +9,14 @@ import time
 from typing import Optional
 
 import torch
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, Info, generate_latest
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    Counter,
+    Gauge,
+    Histogram,
+    Info,
+    generate_latest,
+)
 
 from app.core.config import get_settings
 
@@ -135,6 +142,73 @@ KAFKA_ACTIVE_BATCHES = Gauge(
     "kafka_active_batches",
     "Number of active message batches being processed",
     ["topic", "consumer_group"],
+)
+
+# Async batch processing metrics
+ASYNC_BATCH_JOBS_TOTAL = Counter(
+    "async_batch_jobs_total",
+    "Total number of async batch jobs created",
+    ["priority"],
+)
+
+ASYNC_BATCH_JOBS_ACTIVE = Gauge(
+    "async_batch_jobs_active",
+    "Number of currently active async batch jobs",
+)
+
+ASYNC_BATCH_JOBS_COMPLETED_GAUGE = Gauge(
+    "async_batch_jobs_completed_gauge",
+    "Total number of completed async batch jobs",
+)
+
+ASYNC_BATCH_JOBS_FAILED_GAUGE = Gauge(
+    "async_batch_jobs_failed_gauge",
+    "Total number of failed async batch jobs",
+)
+
+ASYNC_BATCH_JOBS_COMPLETED = Counter(
+    "async_batch_jobs_completed_total",
+    "Total number of completed async batch jobs",
+    ["priority", "status"],
+)
+
+ASYNC_BATCH_JOBS_FAILED = Counter(
+    "async_batch_jobs_failed_total",
+    "Total number of failed async batch jobs",
+    ["priority"],
+)
+
+ASYNC_BATCH_PROCESSING_TIME = Histogram(
+    "async_batch_processing_time_seconds",
+    "Time taken to process async batch jobs",
+    ["priority"],
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 300.0],
+)
+
+ASYNC_BATCH_THROUGHPUT_TPS = Gauge(
+    "async_batch_throughput_tps",
+    "Async batch processing throughput in texts per second",
+)
+
+ASYNC_BATCH_QUEUE_SIZE = Gauge(
+    "async_batch_queue_size",
+    "Current size of async batch processing queue",
+)
+
+ASYNC_BATCH_SIZE = Histogram(
+    "async_batch_size",
+    "Distribution of async batch sizes",
+    buckets=[1, 5, 10, 25, 50, 100, 250, 500, 1000],
+)
+
+ASYNC_BATCH_CACHE_HITS = Counter(
+    "async_batch_cache_hits_total",
+    "Total number of async batch cache hits",
+)
+
+ASYNC_BATCH_CACHE_MISSES = Counter(
+    "async_batch_cache_misses_total",
+    "Total number of async batch cache misses",
 )
 
 
@@ -267,7 +341,9 @@ class PrometheusMetrics:
 
     def record_kafka_processing_duration(self, topic: str, consumer_group: str, duration: float):
         """Records Kafka message processing duration."""
-        KAFKA_PROCESSING_DURATION.labels(topic=topic, consumer_group=consumer_group).observe(duration)
+        KAFKA_PROCESSING_DURATION.labels(topic=topic, consumer_group=consumer_group).observe(
+            duration
+        )
 
     def set_kafka_throughput_tps(self, topic: str, consumer_group: str, throughput: float):
         """Sets the current Kafka consumer throughput in TPS."""
@@ -294,6 +370,52 @@ class PrometheusMetrics:
     def set_kafka_active_batches(self, topic: str, consumer_group: str, active_batches: int):
         """Sets number of active Kafka batches."""
         KAFKA_ACTIVE_BATCHES.labels(topic=topic, consumer_group=consumer_group).set(active_batches)
+
+    def record_batch_job_submitted(self, priority: str, batch_size: int):
+        """Records a batch job submission."""
+        ASYNC_BATCH_JOBS_TOTAL.labels(priority=priority).inc()
+        ASYNC_BATCH_SIZE.observe(batch_size)
+
+    def set_async_batch_jobs_total(self, total_jobs: int):
+        """Sets total number of async batch jobs."""
+        # Note: This is a gauge, not a counter, so we don't use inc()
+
+    def set_async_batch_jobs_active(self, active_jobs: int):
+        """Sets number of active async batch jobs."""
+        ASYNC_BATCH_JOBS_ACTIVE.set(active_jobs)
+
+    def set_async_batch_jobs_completed(self, completed_jobs: int):
+        """Sets total number of completed async batch jobs."""
+        ASYNC_BATCH_JOBS_COMPLETED_GAUGE.set(completed_jobs)
+
+    def set_async_batch_jobs_failed(self, failed_jobs: int):
+        """Sets total number of failed async batch jobs."""
+        ASYNC_BATCH_JOBS_FAILED_GAUGE.set(failed_jobs)
+
+    def record_batch_job_completed(self, priority: str, batch_size: int, processing_time: float):
+        """Records a completed batch job."""
+        ASYNC_BATCH_JOBS_COMPLETED.labels(priority=priority, status="success").inc()
+        ASYNC_BATCH_PROCESSING_TIME.labels(priority=priority).observe(processing_time)
+
+    def record_batch_job_failed(self, priority: str, batch_size: int):
+        """Records a failed batch job."""
+        ASYNC_BATCH_JOBS_FAILED.labels(priority=priority).inc()
+
+    def set_async_batch_throughput_tps(self, throughput: float):
+        """Sets async batch processing throughput."""
+        ASYNC_BATCH_THROUGHPUT_TPS.set(throughput)
+
+    def set_async_batch_queue_size(self, queue_size: int):
+        """Sets async batch queue size."""
+        ASYNC_BATCH_QUEUE_SIZE.set(queue_size)
+
+    def record_async_batch_cache_hit(self):
+        """Records an async batch cache hit."""
+        ASYNC_BATCH_CACHE_HITS.inc()
+
+    def record_async_batch_cache_miss(self):
+        """Records an async batch cache miss."""
+        ASYNC_BATCH_CACHE_MISSES.inc()
 
     def get_metrics(self) -> str:
         """Generates and returns the metrics in Prometheus text format.

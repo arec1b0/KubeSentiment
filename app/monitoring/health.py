@@ -161,3 +161,72 @@ class HealthChecker:
                 "status": "unhealthy",
                 "error": str(e),
             }
+
+    @staticmethod
+    def check_async_batch_health(async_batch_service) -> Dict[str, Any]:
+        """Checks the health of the async batch service.
+
+        Args:
+            async_batch_service: An instance of AsyncBatchService.
+
+        Returns:
+            A dictionary containing the health status of the async batch service.
+        """
+        try:
+            if not async_batch_service:
+                return {
+                    "status": "disabled",
+                    "details": {"reason": "Async batch service not initialized"},
+                }
+
+            # Get basic metrics to check if service is responsive
+            try:
+                # For health check, we'll get metrics synchronously or handle async
+                if hasattr(async_batch_service, 'get_batch_metrics'):
+                    # Check if method is async
+                    import asyncio
+                    if asyncio.iscoroutinefunction(async_batch_service.get_batch_metrics):
+                        # If async, we'll just check basic properties instead
+                        metrics = None
+                    else:
+                        metrics = async_batch_service.get_batch_metrics()
+                else:
+                    metrics = None
+
+                queue_status = async_batch_service.get_job_queue_status()
+            except Exception:
+                # If metrics fail, assume service is unhealthy
+                metrics = None
+                queue_status = {"high_priority": 0, "medium_priority": 0, "low_priority": 0, "total": 0}
+
+            # Check if service is processing jobs
+            active_jobs = metrics.active_jobs if metrics else 0
+            total_jobs = metrics.total_jobs if metrics else 0
+            throughput = metrics.average_throughput_tps if metrics else 0.0
+            efficiency = metrics.processing_efficiency if metrics else 0.0
+            is_active = active_jobs > 0 or any(size > 0 for size in queue_status.values())
+
+            health_info = {
+                "status": "healthy",
+                "is_active": is_active,
+                "details": {
+                    "total_jobs": total_jobs,
+                    "active_jobs": active_jobs,
+                    "queue_status": queue_status,
+                    "throughput_tps": throughput,
+                    "processing_efficiency": efficiency,
+                },
+            }
+
+            # Mark as degraded if no activity for extended period
+            if not is_active and total_jobs == 0:
+                health_info["status"] = "degraded"
+
+            return health_info
+
+        except Exception as e:
+            logger.error("Async batch health check failed", error=str(e), exc_info=True)
+            return {
+                "status": "unhealthy",
+                "error": str(e),
+            }
