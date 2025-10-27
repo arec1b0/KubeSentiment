@@ -100,7 +100,7 @@ data:
           },
           "targets": [
             {
-              "expr": "rate(http_requests_total{job=\"mlops-sentiment\"}[5m])",
+              "expr": "rate(sentiment_requests_total{job=\"mlops-sentiment\"}[5m])",
               "interval": "",
               "legendFormat": "{{method}} {{status}}",
               "refId": "A"
@@ -161,7 +161,7 @@ data:
           "pluginVersion": "8.0.0",
           "targets": [
             {
-              "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"mlops-sentiment\"}[5m])) * 1000",
+              "expr": "histogram_quantile(0.95, rate(sentiment_request_duration_seconds_bucket{job=\"mlops-sentiment\"}[5m])) * 1000",
               "interval": "",
               "legendFormat": "95th percentile",
               "refId": "A"
@@ -242,7 +242,7 @@ data:
           },
           "targets": [
             {
-              "expr": "rate(mlops_inference_duration_seconds_sum{job=\"mlops-sentiment\"}[5m]) / rate(mlops_inference_duration_seconds_count{job=\"mlops-sentiment\"}[5m]) * 1000",
+              "expr": "rate(sentiment_inference_duration_seconds_sum{job=\"mlops-sentiment\"}[5m]) / rate(sentiment_inference_duration_seconds_count{job=\"mlops-sentiment\"}[5m]) * 1000",
               "interval": "",
               "legendFormat": "Average Inference Time",
               "refId": "A"
