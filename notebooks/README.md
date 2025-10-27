@@ -4,15 +4,32 @@ Interactive Jupyter notebooks that provide comprehensive exploration, analysis, 
 
 ## 🎯 Notebook Overview
 
+### Tutorials
+
 | Notebook | Description | Key Topics | Difficulty |
 |----------|-------------|------------|------------|
-| **[01_getting_started.ipynb](01_getting_started.ipynb)** | Introduction and basic usage | API basics, sentiment analysis, health checks | 🟢 Beginner |
-| **[02_model_exploration.ipynb](02_model_exploration.ipynb)** | Model analysis and understanding | DistilBERT, tokenization, performance analysis | 🟡 Intermediate |
-| **[03_api_testing.ipynb](03_api_testing.ipynb)** | API endpoints testing and integration | Functional testing, load testing, error handling | 🟡 Intermediate |
-| **[04_benchmarking_analysis.ipynb](04_benchmarking_analysis.ipynb)** | Performance benchmarking and cost analysis | Scaling analysis, cost optimization, infrastructure comparison | 🟠 Advanced |
-| **[05_monitoring_metrics.ipynb](05_monitoring_metrics.ipynb)** | Monitoring and metrics analysis | Observability, alerting, data drift detection | 🟠 Advanced |
-| **[06_development_workflow.ipynb](06_development_workflow.ipynb)** | Development and testing workflows | CI/CD, code quality, debugging, best practices | 🟠 Advanced |
-| **[07_deployment_guide.ipynb](07_deployment_guide.ipynb)** | Deployment and infrastructure guide | Kubernetes, Helm, scaling, production readiness | 🔴 Expert |
+| **[tutorials/01_getting_started.ipynb](tutorials/01_getting_started.ipynb)** | Introduction and basic usage | API basics, sentiment analysis, health checks | 🟢 Beginner |
+| **[tutorials/06_development_workflow.ipynb](tutorials/06_development_workflow.ipynb)** | Development and testing workflows | CI/CD, code quality, debugging, best practices | 🟠 Advanced |
+
+### Experiments
+
+| Notebook | Description | Key Topics | Difficulty |
+|----------|-------------|------------|------------|
+| **[experiments/02_model_exploration.ipynb](experiments/02_model_exploration.ipynb)** | Model analysis and understanding | DistilBERT, tokenization, performance analysis | 🟡 Intermediate |
+| **[experiments/experiment_tracking.ipynb](experiments/experiment_tracking.ipynb)** | Integrate with MLflow or Weights & Biases for hyperparameter tuning. | MLflow, Weights & Biases, hyperparameter tuning | 🟠 Advanced |
+
+### Production
+
+| Notebook | Description | Key Topics | Difficulty |
+|----------|-------------|------------|------------|
+| **[production/03_api_testing.ipynb](production/03_api_testing.ipynb)** | API endpoints testing and integration | Functional testing, load testing, error handling | 🟡 Intermediate |
+| **[production/04_benchmarking_analysis.ipynb](production/04_benchmarking_analysis.ipynb)** | Performance benchmarking and cost analysis | Scaling analysis, cost optimization, infrastructure comparison | 🟠 Advanced |
+| **[production/05_monitoring_metrics.ipynb](production/05_monitoring_metrics.ipynb)** | Monitoring and metrics analysis | Observability, alerting, data drift detection | 🟠 Advanced |
+| **[production/07_deployment_guide.ipynb](production/07_deployment_guide.ipynb)** | Deployment and infrastructure guide | Kubernetes, Helm, scaling, production readiness | 🔴 Expert |
+| **[production/mlops_pipeline_overview.ipynb](production/mlops_pipeline_overview.ipynb)** | End-to-end pipeline demo with Kubernetes deployment stubs. | MLOps, Kubernetes, CI/CD | 🔴 Expert |
+| **[production/model_retraining_automation.ipynb](production/model_retraining_automation.ipynb)** | Script for monitoring model drift and triggering retrains via GitHub Actions. | MLOps, GitHub Actions, model drift | 🔴 Expert |
+| **[production/onnx_optimization_benchmark.ipynb](production/onnx_optimization_benchmark.ipynb)** | Compare ONNX runtime performance across hardware (e.g., CPU vs. GPU in Colab). | ONNX, performance, benchmarking | 🔴 Expert |
+| **[production/data_engineering_flow.ipynb](production/data_engineering_flow.ipynb)** | ETL processes for distributed systems, including error recovery and observability. | ETL, data engineering, observability | 🔴 Expert |
 
 ## 🚀 Quick Start
 
@@ -44,22 +61,22 @@ jupyter notebook notebooks/
 
 ### 🟢 Beginner Path
 
-1. **[01_getting_started.ipynb](01_getting_started.ipynb)** - Learn the basics
-2. **[02_model_exploration.ipynb](02_model_exploration.ipynb)** - Understand the model
+1. **[tutorials/01_getting_started.ipynb](tutorials/01_getting_started.ipynb)** - Learn the basics
+2. **[experiments/02_model_exploration.ipynb](experiments/02_model_exploration.ipynb)** - Understand the model
 
 ### 🟡 Intermediate Path
 
-3. **[03_api_testing.ipynb](03_api_testing.ipynb)** - Test the API
-4. **[06_development_workflow.ipynb](06_development_workflow.ipynb)** - Development practices
+3. **[production/03_api_testing.ipynb](production/03_api_testing.ipynb)** - Test the API
+4. **[tutorials/06_development_workflow.ipynb](tutorials/06_development_workflow.ipynb)** - Development practices
 
 ### 🟠 Advanced Path
 
-5. **[04_benchmarking_analysis.ipynb](04_benchmarking_analysis.ipynb)** - Performance analysis
-6. **[05_monitoring_metrics.ipynb](05_monitoring_metrics.ipynb)** - Monitoring & alerting
+5. **[production/04_benchmarking_analysis.ipynb](production/04_benchmarking_analysis.ipynb)** - Performance analysis
+6. **[production/05_monitoring_metrics.ipynb](production/05_monitoring_metrics.ipynb)** - Monitoring & alerting
 
 ### 🔴 Expert Path
 
-7. **[07_deployment_guide.ipynb](07_deployment_guide.ipynb)** - Production deployment
+7. **[production/07_deployment_guide.ipynb](production/07_deployment_guide.ipynb)** - Production deployment
 
 ## 🎯 Use Cases
 
@@ -289,6 +306,6 @@ matplotlib.use('Agg')
 
 ---
 
-**🎯 Ready to explore KubeSentiment? Start with [01_getting_started.ipynb](01_getting_started.ipynb)!**
+**🎯 Ready to explore KubeSentiment? Start with [tutorials/01_getting_started.ipynb](tutorials/01_getting_started.ipynb)!**
 
 *Built with ❤️ for the MLOps community*
