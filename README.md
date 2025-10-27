@@ -99,13 +99,18 @@ This is the quickest way to get the service running on your local machine.
     cd mlops-sentiment
     ```
 
-2.  **Start the service:**
+2.  **Install dependencies:**
+    ```bash
+    make install-dev
+    ```
+
+3.  **Start the service:**
     ```bash
     docker-compose up --build
     ```
     This will build the Docker image and start the FastAPI service.
 
-3.  **Test the service:**
+4.  **Test the service:**
     Open a new terminal and send a prediction request:
     ```bash
     curl -X POST "http://localhost:8000/predict" \
@@ -145,10 +150,13 @@ The service exposes several key endpoints:
 
 | Method | Endpoint              | Description                                      |
 |--------|-----------------------|--------------------------------------------------|
-| `POST` | `/predict`            | Analyzes the sentiment of the input text.        |
-| `GET`  | `/health`             | Health check endpoint for readiness/liveness.    |
-| `GET`  | `/metrics`            | Exposes Prometheus metrics.                      |
-| `GET`  | `/api/v1/info/model`  | Returns metadata about the loaded ML model.      |
+| `POST` | `/api/v1/predict`            | Analyzes the sentiment of the input text.        |
+| `POST`   | `/api/v1/batch/predict`      | Submits a batch of texts for asynchronous prediction. |
+| `GET`    | `/api/v1/batch/status/{job_id}` | Checks the status of a batch prediction job.      |
+| `GET`    | `/api/v1/batch/results/{job_id}`| Retrieves the results of a completed batch job. |
+| `GET`  | `/api/v1/health`             | Health check endpoint for readiness/liveness.    |
+| `GET`  | `/api/v1/metrics`            | Exposes Prometheus metrics.                      |
+| `GET`  | `/api/v1/model-info`  | Returns metadata about the loaded ML model.      |
 
 ### Configuration
 

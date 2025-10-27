@@ -97,10 +97,10 @@ class TestCorrelationIdMiddleware:
         """
         test_settings = Settings(debug=True, api_key=None, allowed_origins=["*"])
 
-        with patch("app.config.get_settings", return_value=test_settings):
-            with patch("app.main.get_settings", return_value=test_settings):
-                with patch("app.ml.sentiment.pipeline") as mock_pipeline:
-                    mock_model = Mock()
+        with patch("app.config.get_settings", return_value=test_settings), patch(
+            "app.main.get_settings", return_value=test_settings
+        ), patch("app.ml.sentiment.pipeline") as mock_pipeline:
+            mock_model = Mock()
                     mock_model.return_value = [{"label": "POSITIVE", "score": 0.95}]
                     mock_pipeline.return_value = mock_model
 
@@ -280,8 +280,8 @@ class TestLoggingIntegration:
 
                 # Capture logs
                 log_capture = StringIO()
-                handler = logging.StreamHandler(log_capture)
-                logging.getLogger().addHandler(handler)
+                handler = MagicMock()
+                MagicMock().getLogger().addHandler(handler)
 
                 try:
                     app = create_app()

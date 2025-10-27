@@ -10,13 +10,12 @@ without service interruption.
 import argparse
 import logging
 import os
-import random
 import secrets
 import string
 import sys
 import time
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Optional
 
 try:
     import hvac
@@ -137,13 +136,12 @@ class SecretRotator:
 
             # Get current secret for backup
             try:
-                current_response = self.client.secrets.kv.v2.read_secret_version(
+                self.client.secrets.kv.v2.read_secret_version(
                     path=secret_path, mount_point=self.mount_point
                 )
                 logger.info(f"Backing up current version of {secret_key}")
             except Exception:
                 logger.warning(f"No existing secret found for {secret_key}")
-                current_response = None
 
             # Generate new value if not provided
             if new_value is None:

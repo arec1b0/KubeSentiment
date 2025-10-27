@@ -1,13 +1,14 @@
 """
 Configuration management for the MLOps sentiment analysis service.
 
-This module handles all configuration settings, environment variables,
-and application parameters in a centralized manner with comprehensive validation.
+This module centralizes all configuration settings for the application, using
+pydantic-settings to load and validate parameters from environment variables
+and .env files. It provides a single, reliable source of truth for all
+configurable aspects of the service.
 """
 
 import os
 import re
-from functools import cached_property
 from typing import List, Optional
 
 from pydantic import Field, field_validator, model_validator
@@ -15,12 +16,13 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Manages application settings, environment variables, and secrets.
+    """Manages application-wide settings, loaded from environment variables.
 
-    This class centralizes all configuration parameters for the application.
-    Settings are loaded from environment variables with the prefix 'MLOPS_'.
-    It supports HashiCorp Vault for secure secret management, falling back to
-    environment variables if Vault is not enabled.
+    This class uses pydantic-settings to define, validate, and manage all
+    configuration parameters for the application. Settings are loaded from
+    environment variables, which can be prefixed (e.g., `MLOPS_DEBUG=true`).
+    It includes settings for the server, model, security, and integrations
+    like HashiCorp Vault and Kafka.
 
     Attributes:
         app_name: The name of the application.
@@ -463,8 +465,13 @@ class Settings(BaseSettings):
 
     @field_validator("allowed_models")
     @classmethod
-    def validate_model_names(cls, v):
+    def validate_model_names(cls, v: List[str]) -> List[str]:
         """Validates the format of each model name in the allowed list.
+
+        This validator ensures that the model names conform to the expected
+        format for Hugging Face model identifiers, which typically consist of
+        alphanumeric characters, hyphens, and underscores, and may include a
+        namespace separated by a forward slash.
 
         Args:
             v: The list of allowed model names.
@@ -476,7 +483,6 @@ class Settings(BaseSettings):
             ValueError: If a model name has an invalid format or is too long.
         """
         for model_name in v:
-            # Basic validation for Hugging Face model names
             if not re.match(r"^[a-zA-Z0-9/_-]+$", model_name):
                 raise ValueError(f"Invalid model name format: {model_name}")
             if len(model_name) > 200:
@@ -485,8 +491,11 @@ class Settings(BaseSettings):
 
     @field_validator("model_cache_dir")
     @classmethod
-    def validate_cache_dir(cls, v):
+    def validate_cache_dir(cls, v: Optional[str]) -> Optional[str]:
         """Validates that the cache directory is an absolute path and its parent exists.
+
+        This ensures that the application does not attempt to write to a
+        non-existent or invalid directory, which could lead to runtime errors.
 
         Args:
             v: The path to the model cache directory.
@@ -495,13 +504,12 @@ class Settings(BaseSettings):
             The validated cache directory path.
 
         Raises:
-            ValueError: If the path is not absolute or the parent directory does not exist.
+            ValueError: If the path is not absolute or the parent directory
+                does not exist.
         """
         if v is not None:
-            # Check if path is absolute and valid
             if not os.path.isabs(v):
                 raise ValueError("Cache directory must be an absolute path")
-            # Check if parent directory exists (don't create automatically)
             parent_dir = os.path.dirname(v)
             if not os.path.exists(parent_dir):
                 raise ValueError(f"Parent directory does not exist: {parent_dir}")
@@ -511,6 +519,9 @@ class Settings(BaseSettings):
     def cors_origins(self) -> List[str]:
         """Provides the list of CORS origins for middleware configuration.
 
+        This property is used to configure the `CORSMiddleware` in the main
+        application factory, allowing for a clean separation of concerns.
+
         Returns:
             A list of strings representing the allowed origins for CORS.
         """
@@ -518,8 +529,12 @@ class Settings(BaseSettings):
 
     @field_validator("allowed_origins")
     @classmethod
-    def validate_cors_origins(cls, v):
+    def validate_cors_origins(cls, v: List[str]) -> List[str]:
         """Validates the format of CORS origin URLs and disallows wildcards.
+
+        To enhance security, this validator enforces that all CORS origins are
+        explicitly defined and disallows the use of the wildcard ('*'), which
+        can be a security risk.
 
         Args:
             v: The list of CORS origins.
@@ -531,14 +546,11 @@ class Settings(BaseSettings):
             ValueError: If a wildcard origin is used or a URL is invalid.
         """
         for origin in v:
-            # Wildcard CORS is a security risk - require explicit origins
             if origin == "*":
                 raise ValueError(
                     "Wildcard CORS origin '*' is not allowed. "
                     "Specify explicit origins for security."
                 )
-
-            # Validate URL format
             url_pattern = re.compile(r"^https?://[a-zA-Z0-9.-]+(?:\:[0-9]+)?(?:/.*)?$")
             if not url_pattern.match(origin):
                 raise ValueError(f"Invalid CORS origin URL: {origin}")
@@ -546,10 +558,12 @@ class Settings(BaseSettings):
 
     @field_validator("api_key")
     @classmethod
-    def validate_api_key(cls, v):
+    def validate_api_key(cls, v: Optional[str]) -> Optional[str]:
         """Validates the strength of the API key.
 
-        The key must be at least 8 characters long and contain both letters and numbers.
+        This validator enforces a basic level of complexity for the API key,
+        requiring a minimum length and a mix of letters and numbers. This helps
+        to prevent the use of weak, easily guessable keys.
 
         Args:
             v: The API key.
@@ -563,13 +577,15 @@ class Settings(BaseSettings):
         if v is not None:
             if len(v) < 8:
                 raise ValueError("API key must be at least 8 characters")
-            # Check for basic complexity
             if not re.search(r"[A-Za-z]", v) or not re.search(r"[0-9]", v):
                 raise ValueError("API key must contain both letters and numbers")
         return v
 
     def _validate_model_in_allowed_list(self) -> None:
-        """Ensures the selected model_name is in the allowed_models list.
+        """Ensures the selected `model_name` is in the `allowed_models` list.
+
+        This is a security measure to prevent the loading of arbitrary models,
+        which could be a vector for an attack.
 
         Raises:
             ValueError: If `model_name` is not in `allowed_models`.
@@ -582,6 +598,9 @@ class Settings(BaseSettings):
     def _validate_worker_count_consistency(self) -> None:
         """Validates that multiple workers are not used in debug mode.
 
+        Running multiple workers with hot reloading can lead to unexpected
+        behavior and race conditions, so this is disallowed.
+
         Raises:
             ValueError: If `debug` is True and `workers` is greater than 1.
         """
@@ -591,10 +610,13 @@ class Settings(BaseSettings):
     def _validate_cache_memory_usage(self) -> None:
         """Estimates cache memory usage to prevent excessive allocation.
 
+        This provides a basic sanity check to prevent the application from
+        being configured in a way that would consume an unreasonable amount of
+        memory for its prediction cache.
+
         Raises:
             ValueError: If the estimated memory usage exceeds a predefined limit.
         """
-        # Rough estimate: each cache entry might be ~1KB per 100 chars
         estimated_memory_mb = (self.prediction_cache_max_size * self.max_text_length) / 100000
         if estimated_memory_mb > 1000:  # 1GB limit
             raise ValueError(
@@ -606,11 +628,13 @@ class Settings(BaseSettings):
     def validate_configuration_consistency(self):
         """Performs cross-field validation to ensure configuration consistency.
 
-        This validator runs after individual field validators and checks relationships
-        between different configuration settings.
+        This validator runs after all individual field validators and checks
+        for logical inconsistencies between different settings, such as ensuring
+        the selected model is in the allowed list and that debug mode is not
+        used with multiple workers.
 
         Returns:
-            The validated Settings instance.
+            The validated `Settings` instance.
         """
         self._validate_model_in_allowed_list()
         self._validate_worker_count_consistency()
@@ -621,12 +645,13 @@ class Settings(BaseSettings):
     def secret_manager(self):
         """Initializes and retrieves the appropriate secret manager.
 
-        This property lazily initializes the secret manager based on whether Vault
-        is enabled. It returns either a `VaultSecretManager` or an
-        `EnvironmentSecretManager` instance.
+        This property lazily initializes the secret manager, choosing between
+        HashiCorp Vault and environment variables based on the configuration.
+        This allows the application to adapt to different deployment
+        environments without code changes.
 
         Returns:
-            An instance of a secret manager.
+            An instance of a `SecretManager` implementation.
         """
         from app.core.secrets import get_secret_manager
 
@@ -643,9 +668,9 @@ class Settings(BaseSettings):
     def get_secret(self, key: str, default: Optional[str] = None) -> Optional[str]:
         """Retrieves a secret from the configured secret manager.
 
-        This method abstracts the secret retrieval process, allowing other parts
-        of the application to fetch secrets without needing to know the
-        underlying secret management system.
+        This method provides a convenient, high-level interface for accessing
+        secrets, abstracting away the details of the underlying secret
+        management system.
 
         Args:
             key: The key of the secret to retrieve.
@@ -677,10 +702,12 @@ settings = Settings()
 
 
 def get_settings() -> Settings:
-    """Dependency function to get the application settings instance.
+    """Provides a dependency-injected instance of the application settings.
 
-    This function is used by FastAPI's dependency injection system to provide
-    the global `Settings` object to route handlers and other dependencies.
+    This function is used by FastAPI's dependency injection system to make the
+    global `Settings` object available to route handlers and other dependencies.
+    This ensures that all parts of the application have access to a consistent
+    set of configuration parameters.
 
     Returns:
         The singleton instance of the application settings.

@@ -1,10 +1,13 @@
 """
-Dependency injection for the application.
+Dependency injection for the MLOps sentiment analysis service.
 
-This module provides centralized dependency injection functions for FastAPI.
+This module provides centralized dependency injection functions for FastAPI,
+following the dependency inversion principle. It allows for a clean separation
+of concerns and makes the application more modular, testable, and maintainable
+by decoupling the API layer from the concrete implementations of services and
+models.
 """
 
-from functools import lru_cache
 from typing import Optional
 
 from fastapi import Depends, Query
@@ -19,13 +22,15 @@ def get_model_backend(
     """Determines the model backend based on query parameters and settings.
 
     This dependency function inspects the 'backend' query parameter. If it's
-    provided, it will be used. Otherwise, it checks if an ONNX model path is
-    configured in the settings. If so, 'onnx' is returned; otherwise, it
-    defaults to 'pytorch'.
+    provided and valid, it will be used. Otherwise, it falls back to the
+    default backend, which is 'onnx' if an ONNX model path is configured, and
+    'pytorch' otherwise. This allows for dynamic selection of the inference
+    backend at request time.
 
     Args:
-        backend: The model backend specified in the query parameter.
-        settings: The application's configuration settings.
+        backend: The model backend specified in the query parameter (optional).
+        settings: The application's configuration settings, injected as a
+            dependency.
 
     Returns:
         The name of the model backend to use, either 'onnx' or 'pytorch'.
@@ -45,15 +50,19 @@ def get_model_service(
 
     This function acts as a factory for the model service. It uses the
     `get_model_backend` dependency to determine which backend to use and then
-    creates the appropriate model service instance.
+    creates and returns the appropriate model service instance (e.g., a
+    PyTorch model or an ONNX model). This abstracts the model instantiation
+    process from the API layer.
 
     Args:
-        backend: The selected model backend, provided by `get_model_backend`.
+        backend: The selected model backend, provided by the
+            `get_model_backend` dependency.
 
     Returns:
-        An instance of the model service corresponding to the backend.
+        An instance of a class that implements the `ModelStrategy` protocol,
+        corresponding to the selected backend.
     """
-    # Import here to avoid circular imports
+    # Import here to avoid circular imports at startup
     from app.models.factory import ModelFactory
 
     return ModelFactory.create_model(backend)
@@ -66,14 +75,17 @@ def get_prediction_service(
 ):
     """Provides an instance of the prediction service.
 
-    This dependency injects the appropriate model service and the application
-    settings into the `PredictionService`, making it available to the API
-    endpoints.
+    This dependency injects the appropriate model service, the application
+    settings, and the feature engineering service into the `PredictionService`.
+    This makes the fully configured service available to the API endpoints,
+    encapsulating the business logic for making predictions.
 
     Args:
-        model: The model service instance from `get_model_service`.
-        settings: The application's configuration settings.
-        feature_engineer: The feature engineering service instance.
+        model: The model service instance, provided by `get_model_service`.
+        settings: The application's configuration settings, provided by
+            `get_settings`.
+        feature_engineer: The feature engineering service instance, provided by
+            `get_feature_engineer`.
 
     Returns:
         An instance of the `PredictionService`.
@@ -84,7 +96,15 @@ def get_prediction_service(
 
 
 def get_feature_engineer():
-    """Provides a singleton instance of the feature engineering service."""
+    """Provides a singleton instance of the feature engineering service.
+
+    This dependency ensures that the `FeatureEngineer` class, which may have a
+    costly initialization process (e.g., downloading NLTK data), is created
+    only once and reused across the application.
+
+    Returns:
+        The singleton instance of the `FeatureEngineer`.
+    """
     from app.features.feature_engineering import get_feature_engineer as get_fe
 
     return get_fe()

@@ -1,5 +1,9 @@
 """
 Prediction endpoints.
+
+This module provides the primary endpoints for making sentiment analysis
+predictions. It includes synchronous and asynchronous endpoints for
+single predictions and batch processing.
 """
 
 from fastapi import APIRouter, Depends, Response
@@ -30,24 +34,31 @@ async def predict_sentiment(
 ) -> PredictionResponse:
     """Analyzes the sentiment of a given text.
 
-    This is the primary endpoint for sentiment analysis. It accepts a text
-    input and returns a prediction of its sentiment, including a label (e.g.,
-    'POSITIVE', 'NEGATIVE') and a confidence score. The endpoint also provides
-    metadata in its response headers, such as the inference time.
+    This is the primary endpoint for real-time sentiment analysis. It accepts a
+    JSON payload with a single text input and returns a prediction of its
+    sentiment, including a label (e.g., 'POSITIVE', 'NEGATIVE') and a
+    confidence score. The endpoint also provides performance metadata in its
+    response headers, such as the inference time and the model backend used.
 
     Args:
-        payload: The request body containing the text to be analyzed.
-        response: The FastAPI `Response` object, used to set custom headers.
-        prediction_service: The prediction service, injected as a dependency.
-        backend: The name of the model backend in use.
-        settings: The application's configuration settings.
+        payload: The request body, which should be a `TextInput` object
+            containing the text to be analyzed.
+        response: The FastAPI `Response` object, used to set custom headers
+            with metadata about the prediction.
+        prediction_service: The prediction service, injected as a dependency,
+            which encapsulates the business logic for making predictions.
+        backend: The name of the model backend in use (e.g., 'pytorch', 'onnx'),
+            injected as a dependency.
+        settings: The application's configuration settings, injected as a
+            dependency.
 
     Returns:
-        A `PredictionResponse` object with the sentiment analysis results.
+        A `PredictionResponse` object with the sentiment analysis results,
+        including the predicted label and confidence score.
 
     Raises:
-        HTTPException: If the model is not loaded or if an error occurs
-            during the prediction process.
+        HTTPException: If the input text is invalid, the model is not loaded,
+            or if an unexpected error occurs during the prediction process.
     """
     # Create contextual logger for this request
     logger = get_contextual_logger(

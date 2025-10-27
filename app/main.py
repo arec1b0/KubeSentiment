@@ -2,7 +2,10 @@
 Application entrypoint for the MLOps sentiment analysis service.
 
 This module serves as the main application factory and lifecycle manager,
-handling FastAPI app creation, middleware setup, and graceful shutdown.
+handling FastAPI app creation, middleware setup, and graceful shutdown. It
+initializes the FastAPI application, configures middleware for logging,
+CORS, authentication, and metrics, sets up a global exception handler,
+and includes the API routers.
 """
 
 import time
@@ -18,10 +21,10 @@ from app.api.middleware import (
     MetricsMiddleware,
     RequestLoggingMiddleware,
 )
-from app.monitoring.routes import router as monitoring_router
 from app.core.config import get_settings
 from app.core.events import lifespan
 from app.core.logging import get_logger, setup_structured_logging
+from app.monitoring.routes import router as monitoring_router
 from app.utils.exceptions import ServiceError
 
 # Setup structured logging
@@ -34,7 +37,9 @@ def create_app() -> FastAPI:
 
     This factory function initializes the FastAPI application, sets up middleware,
     registers routers, and defines event handlers. It centralizes the
-    application's construction, making it easier to manage and test.
+    application's construction, making it easier to manage and test. The
+    middleware is configured in a specific order to ensure that correlation IDs
+    and logging are available for all requests.
 
     Returns:
         The configured FastAPI application instance.
@@ -58,7 +63,7 @@ def create_app() -> FastAPI:
     # Add request logging middleware
     app.add_middleware(RequestLoggingMiddleware)
 
-    # Add CORS middleware
+    # Add CORS middleware to allow cross-origin requests
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
@@ -67,10 +72,10 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Add API key auth middleware
+    # Add API key auth middleware for securing endpoints
     app.add_middleware(APIKeyAuthMiddleware)
 
-    # Add metrics middleware
+    # Add metrics middleware for Prometheus monitoring
     try:
         app.add_middleware(MetricsMiddleware)
         logger.info("Prometheus metrics middleware enabled")
@@ -84,7 +89,9 @@ def create_app() -> FastAPI:
 
         This global handler catches any unhandled exceptions, logs them, and
         returns a standardized JSON error response. It distinguishes between
-        custom `ServiceError` exceptions and other unexpected errors.
+        custom `ServiceError` exceptions, which have a defined status code and
+        error code, and other unexpected errors, which are treated as 500
+        Internal Server Errors.
 
         Args:
             request: The incoming request that caused the exception.
@@ -128,7 +135,8 @@ def create_app() -> FastAPI:
         """Provides basic service information at the root endpoint.
 
         This endpoint serves as a simple health check and provides metadata
-        about the service, such as its name and version.
+        about the service, such as its name, version, and links to the
+        documentation and health check endpoints.
 
         Returns:
             A dictionary containing service information.
@@ -152,8 +160,9 @@ if __name__ == "__main__":
     """
     Development server entry point.
 
-    This should only be used for local development.
-    For production, use a proper ASGI server like uvicorn or gunicorn.
+    This script is intended for local development only and should not be used
+    to run the application in a production environment. For production, use a
+    proper ASGI server like Gunicorn or Uvicorn with multiple worker processes.
     """
     import uvicorn
 

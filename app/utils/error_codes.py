@@ -1,8 +1,10 @@
 """
 Standardized error codes for the MLOps sentiment analysis service.
 
-This module defines error codes, messages, and response structures
-for consistent error handling across the API.
+This module establishes a centralized and consistent error handling framework
+for the API. It defines a set of standardized error codes, human-readable
+messages, and utility functions for creating and raising structured error
+responses, ensuring that API clients receive clear and predictable error information.
 """
 
 from enum import Enum
@@ -14,9 +16,10 @@ from fastapi import HTTPException
 class ErrorCode(str, Enum):
     """Defines standardized error codes for the application.
 
-    This enumeration centralizes all error codes, making them easy to manage
-    and reference. The codes are categorized by their nature (e.g., input
-    validation, model errors).
+    This enumeration centralizes all possible error codes, making them easy to
+    manage, reference, and maintain. The codes are categorized by their nature,
+    such as input validation, model-related issues, security, and general
+    system errors, which helps in diagnosing problems more efficiently.
     """
 
     # Input validation errors (1000-1099)
@@ -41,39 +44,42 @@ class ErrorCode(str, Enum):
 
 
 class ErrorMessages:
-    """Provides human-readable messages for each error code.
+    """Provides human-readable messages for each defined error code.
 
-    This class maps each `ErrorCode` to a descriptive message, which can be
-    used in API error responses.
+    This class maps each `ErrorCode` to a descriptive, user-friendly message.
+    This separation of codes and messages facilitates easier management and
+    potential internationalization of error responses in the future.
     """
 
     MESSAGES = {
-        ErrorCode.INVALID_INPUT_TEXT: "Invalid input text provided",
-        ErrorCode.TEXT_TOO_LONG: "Input text exceeds maximum length limit",
-        ErrorCode.TEXT_EMPTY: "Input text cannot be empty or whitespace only",
-        ErrorCode.TEXT_INVALID_CHARACTERS: "Input text contains invalid characters",
-        ErrorCode.MODEL_NOT_LOADED: "Sentiment analysis model is not loaded",
-        ErrorCode.MODEL_INFERENCE_FAILED: "Model inference failed",
-        ErrorCode.MODEL_TIMEOUT: "Model inference timed out",
-        ErrorCode.INVALID_MODEL_NAME: "Requested model name is not allowed",
-        ErrorCode.UNAUTHORIZED_ACCESS: "Unauthorized access to API endpoint",
-        ErrorCode.INTERNAL_SERVER_ERROR: "Internal server error occurred",
-        ErrorCode.SERVICE_UNAVAILABLE: "Service is temporarily unavailable",
-        ErrorCode.RATE_LIMIT_EXCEEDED: "API rate limit exceeded",
+        ErrorCode.INVALID_INPUT_TEXT: "Invalid input text provided. The text may be malformed or of an unsupported type.",
+        ErrorCode.TEXT_TOO_LONG: "The provided input text exceeds the maximum allowed length limit.",
+        ErrorCode.TEXT_EMPTY: "Input text cannot be empty or consist only of whitespace.",
+        ErrorCode.TEXT_INVALID_CHARACTERS: "The input text contains invalid or unsupported characters.",
+        ErrorCode.MODEL_NOT_LOADED: "The sentiment analysis model is currently not loaded or unavailable.",
+        ErrorCode.MODEL_INFERENCE_FAILED: "An unexpected error occurred during the model inference process.",
+        ErrorCode.MODEL_TIMEOUT: "The model inference process timed out before a result could be returned.",
+        ErrorCode.INVALID_MODEL_NAME: "The requested model name is invalid, not found, or not permitted.",
+        ErrorCode.UNAUTHORIZED_ACCESS: "Unauthorized access. A valid authentication token is required.",
+        ErrorCode.INTERNAL_SERVER_ERROR: "An unexpected internal server error occurred.",
+        ErrorCode.SERVICE_UNAVAILABLE: "The service is temporarily unavailable. Please try again later.",
+        ErrorCode.RATE_LIMIT_EXCEEDED: "You have exceeded the API rate limit. Please wait before making new requests.",
     }
 
     @classmethod
     def get_message(cls, error_code: ErrorCode) -> str:
         """Retrieves the message for a given error code.
 
+        If the error code is not found in the map, a default message is returned
+        to ensure that a response can always be generated.
+
         Args:
-            error_code: The `ErrorCode` for which to get the message.
+            error_code: The `ErrorCode` for which to retrieve the message.
 
         Returns:
-            The corresponding error message, or a default message if the
-            code is not found.
+            The corresponding error message as a string.
         """
-        return cls.MESSAGES.get(error_code, "Unknown error occurred")
+        return cls.MESSAGES.get(error_code, "An unknown error occurred.")
 
 
 def create_error_response(
@@ -82,33 +88,34 @@ def create_error_response(
     status_code: int = 400,
     **additional_context,
 ) -> Dict[str, Any]:
-    """Constructs a standardized error response dictionary.
+    """Constructs a standardized dictionary for an error response.
 
     This function creates a consistent structure for all API error responses,
-    including the error code, a message, and any additional context.
+    including the error code, a standard message, a detailed message, and any
+    additional context that might be useful for debugging.
 
     Args:
-        error_code: The `ErrorCode` for this error.
-        detail: A more specific, human-readable message about the error.
+        error_code: The `ErrorCode` enum member for this error.
+        detail: An optional, more specific, human-readable message about the
+                error. If not provided, the default message is used.
         status_code: The HTTP status code for the response.
-        **additional_context: Any extra information to include in the
-            'context' field of the response.
+        **additional_context: Any extra key-value pairs to include in the
+                               'context' field of the response.
 
     Returns:
-        A dictionary representing the standardized error response.
+        A dictionary representing the standardized error response, suitable for
+        JSON serialization.
     """
+    error_message = ErrorMessages.get_message(error_code)
     response = {
         "error_code": error_code.value,
-        "error_message": ErrorMessages.get_message(error_code),
+        "error_message": error_message,
         "status_code": status_code,
     }
-
     if detail:
         response["detail"] = detail
-
     if additional_context:
         response["context"] = additional_context
-
     return response
 
 
@@ -120,19 +127,22 @@ def raise_validation_error(
 ) -> None:
     """Creates a standardized error response and raises it as an `HTTPException`.
 
-    This utility function is a convenient way to raise exceptions that will be
-    automatically handled by FastAPI and converted into a JSON error response.
+    This utility function is a convenient wrapper that simplifies raising
+    exceptions that FastAPI can automatically handle and convert into a
+    JSON error response. It is the preferred way to generate errors from
+    within the application's business logic.
 
     Args:
-        error_code: The `ErrorCode` for this error.
-        detail: A more specific, human-readable message about the error.
-        status_code: The HTTP status code for the exception.
-        **additional_context: Any extra information to include in the
-            error response.
+        error_code: The `ErrorCode` enum member for this error.
+        detail: An optional, more specific, human-readable message about the
+                error.
+        status_code: The HTTP status code to be used for the exception.
+        **additional_context: Any extra information to include in the error
+                               response.
 
     Raises:
-        HTTPException: An exception that FastAPI will convert into a
-            standardized JSON error response.
+        HTTPException: An exception that FastAPI will catch and convert into a
+                       standardized JSON error response.
     """
     error_response = create_error_response(error_code, detail, status_code, **additional_context)
     raise HTTPException(status_code=status_code, detail=error_response)

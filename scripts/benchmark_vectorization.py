@@ -13,14 +13,13 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from app.core.config import get_settings
 from app.models.factory import ModelFactory
 from app.services.stream_processor import BatchConfig
 from app.utils.benchmark import PerformanceBenchmark
 
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Sample texts for benchmarking
 SAMPLE_TEXTS = [
@@ -73,10 +72,7 @@ async def main():
     print_header("Benchmark 1: Sequential Single Predictions (Baseline)")
     print("Processing texts one at a time (traditional approach)...\n")
 
-    baseline_result = benchmark.benchmark_single_predictions(
-        texts=SAMPLE_TEXTS,
-        warmup_runs=5
-    )
+    baseline_result = benchmark.benchmark_single_predictions(texts=SAMPLE_TEXTS, warmup_runs=5)
     benchmark.print_results(baseline_result)
 
     # Benchmark 2: Vectorized Batch Predictions
@@ -84,9 +80,7 @@ async def main():
     print("Processing texts in batches with vectorization...\n")
 
     batch_result = benchmark.benchmark_batch_predictions(
-        texts=SAMPLE_TEXTS,
-        batch_size=32,
-        warmup_runs=1
+        texts=SAMPLE_TEXTS, batch_size=32, warmup_runs=1
     )
     benchmark.print_results(batch_result)
 
@@ -103,13 +97,11 @@ async def main():
         max_batch_size=32,
         max_wait_time_ms=50.0,  # 50ms max wait
         min_batch_size=1,
-        dynamic_batching=True
+        dynamic_batching=True,
     )
 
     stream_result = await benchmark.benchmark_stream_processing(
-        texts=SAMPLE_TEXTS,
-        batch_config=stream_config,
-        concurrency=10
+        texts=SAMPLE_TEXTS, batch_config=stream_config, concurrency=10
     )
     benchmark.print_results(stream_result)
 
@@ -123,21 +115,37 @@ async def main():
     print("┌────────────────────────────────────────────────────────────────────┐")
     print("│                     LATENCY COMPARISON                             │")
     print("├────────────────────────────────────────────────────────────────────┤")
-    print(f"│ Baseline (Single):     {baseline_result.avg_latency_ms:>8.2f} ms                           │")
-    print(f"│ Batch Vectorized:      {batch_result.avg_latency_ms:>8.2f} ms  ({comparison_batch.latency_reduction_pct:>5.1f}% reduction)  │")
-    print(f"│ Stream Processing:     {stream_result.avg_latency_ms:>8.2f} ms  ({comparison_stream.latency_reduction_pct:>5.1f}% reduction)  │")
+    print(
+        f"│ Baseline (Single):     {baseline_result.avg_latency_ms:>8.2f} ms │"
+    )
+    print(
+        f"│ Batch Vectorized:      {batch_result.avg_latency_ms:>8.2f} ms  ({comparison_batch.latency_reduction_pct:>5.1f}% reduction) │"
+    )
+    print(
+        f"│ Stream Processing:     {stream_result.avg_latency_ms:>8.2f} ms  ({comparison_stream.latency_reduction_pct:>5.1f}% reduction)  │"
+    )
     print("├────────────────────────────────────────────────────────────────────┤")
     print("│                    THROUGHPUT COMPARISON                           │")
     print("├────────────────────────────────────────────────────────────────────┤")
-    print(f"│ Baseline (Single):     {baseline_result.throughput_rps:>8.2f} req/s                        │")
-    print(f"│ Batch Vectorized:      {batch_result.throughput_rps:>8.2f} req/s ({comparison_batch.throughput_improvement_pct:>5.1f}% gain)    │")
-    print(f"│ Stream Processing:     {stream_result.throughput_rps:>8.2f} req/s ({comparison_stream.throughput_improvement_pct:>5.1f}% gain)    │")
+    print(
+        f"│ Baseline (Single):     {baseline_result.throughput_rps:>8.2f} req/s                        │"
+    )
+    print(
+        f"│ Batch Vectorized:      {batch_result.throughput_rps:>8.2f} req/s ({comparison_batch.throughput_improvement_pct:>5.1f}% gain)    │"
+    )
+    print(
+        f"│ Stream Processing:     {stream_result.throughput_rps:>8.2f} req/s ({comparison_stream.throughput_improvement_pct:>5.1f}% gain)    │"
+    )
     print("└────────────────────────────────────────────────────────────────────┘")
 
     # Key Insights
     print("\n📊 Key Insights:")
-    print(f"   • Vectorization achieves {comparison_batch.latency_reduction_pct:.1f}% latency reduction")
-    print(f"   • Stream processing achieves {comparison_stream.latency_reduction_pct:.1f}% latency reduction")
+    print(
+        f"   • Vectorization achieves {comparison_batch.latency_reduction_pct:.1f}% latency reduction"
+    )
+    print(
+        f"   • Stream processing achieves {comparison_stream.latency_reduction_pct:.1f}% latency reduction"
+    )
     print(f"   • Overall speedup: {comparison_stream.speedup_factor:.2f}x faster")
     print(f"   • Throughput improvement: {comparison_stream.throughput_improvement_pct:.1f}%")
 
@@ -160,9 +168,8 @@ async def main():
         print(f"   (Target: {target_reduction}% reduction)")
         print(f"   Note: Results may vary based on hardware and model size")
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-

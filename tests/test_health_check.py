@@ -91,9 +91,7 @@ def test_detailed_health_check_unhealthy_model(
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "unhealthy"
-    model_health = next(
-        (d for d in data["dependencies"] if d["component_name"] == "model"), None
-    )
+    model_health = next((d for d in data["dependencies"] if d["component_name"] == "model"), None)
     assert model_health is not None
     assert model_health["details"]["status"] == "degraded"
     assert model_health["details"]["error"] == "Model not loaded"
@@ -138,11 +136,7 @@ def test_detailed_health_check_unhealthy_secrets_backend(
     data = response.json()
     assert data["status"] == "unhealthy"
     secrets_health = next(
-        (
-            d
-            for d in data["dependencies"]
-            if d["component_name"] == "secrets_backend"
-        ),
+        (d for d in data["dependencies"] if d["component_name"] == "secrets_backend"),
         None,
     )
     assert secrets_health is not None

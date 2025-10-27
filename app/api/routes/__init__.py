@@ -15,4 +15,3 @@ router.include_router(async_batch.router, tags=["Async Batch"])
 router.include_router(model_info.router, tags=["Model Info"])
 
 __all__ = ["router"]
-

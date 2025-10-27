@@ -16,11 +16,10 @@ import re
 import sys
 import time
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 try:
     import hvac
-    import yaml
 except ImportError:
     print("ERROR: Required libraries not found. Install with: pip install hvac pyYAML")
     sys.exit(1)
@@ -204,9 +203,6 @@ class ProgressTracker:
         """
         self.current += 1
         percentage = (self.current / self.total) * 100
-
-        elapsed = time.time() - self.start_time
-        rate = self.current / elapsed if elapsed > 0 else 0
 
         if item_name:
             logger.info(
@@ -415,37 +411,8 @@ class SecretMigrator:
             return False
 
 
-def get_secret_interactive(secret_name: str) -> Optional[str]:
-    """Prompts the user to enter a secret value interactively.
-
-    This function uses `getpass` to hide the user's input, which is a secure
-    way to handle secrets entered on the command line.
-
-    Args:
-        secret_name: The name of the secret to be entered.
-
-    Returns:
-        The secret value entered by the user, or `None` if no value is
-        provided.
-    """
-    try:
-        value = getpass.getpass(f"Enter value for {secret_name} (hidden): ")
-        if not value:
-            logger.warning(f"No value provided for {secret_name}")
-            return None
-        return value
-    except KeyboardInterrupt:
-        logger.info("\nCancelled by user")
-        return None
-
-
-def main():
-    """The main entry point for the secret migration script.
-
-    This function handles command-line argument parsing, sets up the
-    `SecretMigrator`, and orchestrates the migration process, including
-    backups, validation, and verification.
-    """
+def parse_args():
+    """Parses command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Migrate secrets from GitHub Actions to HashiCorp Vault"
     )
@@ -467,8 +434,17 @@ def main():
         action="store_true",
         help="Show what would be migrated without actually migrating",
     )
+    return parser.parse_args()
 
-    args = parser.parse_args()
+
+def main():
+    """The main entry point for the secret migration script.
+
+    This function handles command-line argument parsing, sets up the
+    `SecretMigrator`, and orchestrates the migration process, including
+    backups, validation, and verification.
+    """
+    args = parse_args()
 
     # Get Vault token
     vault_token = args.vault_token or os.getenv("VAULT_TOKEN")
