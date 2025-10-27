@@ -80,7 +80,7 @@ spec:
     - type: Pods
       pods:
         metric:
-          name: active_requests
+          name: sentiment_active_requests
         target:
           type: AverageValue
           averageValue: "50"
