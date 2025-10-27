@@ -96,3 +96,28 @@ class ModelInfoResponse(BaseModel):
     is_ready: bool = Field(..., description="Whether model is ready for inference")
     cache_size: int = Field(..., description="Current prediction cache size")
     cache_max_size: int = Field(..., description="Maximum cache size")
+
+
+class HealthDetail(BaseModel):
+    """Represents the detailed health status of a component."""
+
+    status: str = Field(..., description="Health status of the component")
+    error: str | None = Field(None, description="Error message if component is unhealthy")
+
+
+class ComponentHealth(BaseModel):
+    """Represents the health of a single dependency or component."""
+
+    component_name: str = Field(..., description="Name of the component")
+    details: HealthDetail = Field(..., description="Detailed health status")
+
+
+class DetailedHealthResponse(BaseModel):
+    """Defines the schema for a detailed health check response."""
+
+    status: str = Field(..., description="Overall service status")
+    version: str = Field(..., description="Application version")
+    timestamp: float = Field(..., description="Health check timestamp")
+    dependencies: list[ComponentHealth] = Field(
+        ..., description="Health status of individual dependencies"
+    )

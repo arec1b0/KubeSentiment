@@ -52,6 +52,32 @@ class HealthChecker:
             }
 
     @staticmethod
+    @staticmethod
+    def check_secrets_backend_health(secret_manager) -> Dict[str, Any]:
+        """Checks the health of the secrets management backend.
+
+        Args:
+            secret_manager: An instance of a `SecretManager`.
+
+        Returns:
+            A dictionary containing the health status of the secrets backend.
+        """
+        try:
+            is_healthy = secret_manager.is_healthy()
+            health_info = secret_manager.get_health_info()
+
+            return {
+                "status": "healthy" if is_healthy else "unhealthy",
+                "details": health_info,
+            }
+        except Exception as e:
+            logger.error("Secrets backend health check failed", error=str(e), exc_info=True)
+            return {
+                "status": "unhealthy",
+                "error": str(e),
+            }
+
+    @staticmethod
     def check_system_health() -> Dict[str, Any]:
         """Checks the overall health of the system.
 
