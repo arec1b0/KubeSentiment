@@ -54,7 +54,6 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 
 # Copy application code
 COPY app/ ./app/
-COPY .env .env* ./
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/logs /app/tmp && \
