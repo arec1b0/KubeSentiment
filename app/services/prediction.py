@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 
 from app.core.config import Settings
 from app.core.logging import get_contextual_logger, get_logger
+from app.features.feature_engineering import FeatureEngineer
 from app.models.base import ModelStrategy
 from app.utils.exceptions import ModelNotLoadedError, TextEmptyError, TextTooLongError
 
@@ -29,17 +30,26 @@ class PredictionService:
             protocol.
         settings: The application's configuration settings.
         logger: A configured logger instance.
+        feature_engineer: An instance of the `FeatureEngineer` for extracting
+            advanced text features.
     """
 
-    def __init__(self, model: ModelStrategy, settings: Settings):
+    def __init__(
+        self,
+        model: ModelStrategy,
+        settings: Settings,
+        feature_engineer: FeatureEngineer,
+    ):
         """Initializes the prediction service.
 
         Args:
             model: An instance of a model strategy (e.g., PyTorch or ONNX).
             settings: The application's configuration settings.
+            feature_engineer: An instance of the feature engineering service.
         """
         self.model = model
         self.settings = settings
+        self.feature_engineer = feature_engineer
         self.logger = get_logger(__name__)
 
     def predict(self, text: str) -> Dict[str, Any]:
@@ -92,6 +102,12 @@ class PredictionService:
         # Perform prediction
         try:
             result = self.model.predict(text.strip())
+
+            # Conditionally extract and merge advanced features
+            if self.settings.enable_feature_engineering:
+                features = self.feature_engineer.extract_features(text.strip())
+                result["features"] = features
+                prediction_logger.info("Advanced feature extraction enabled and completed")
 
             prediction_logger.info(
                 "Prediction completed successfully",

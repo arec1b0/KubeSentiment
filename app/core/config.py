@@ -110,6 +110,11 @@ class Settings(BaseSettings):
         default=512, description="Maximum input text length", ge=1, le=10000
     )
 
+    # Feature Engineering settings
+    enable_feature_engineering: bool = Field(
+        default=False, description="Enable advanced feature engineering"
+    )
+
     # Cache settings
     prediction_cache_max_size: int = Field(
         default=1000,

@@ -62,6 +62,7 @@ def get_model_service(
 def get_prediction_service(
     model=Depends(get_model_service),
     settings: Settings = Depends(get_settings),
+    feature_engineer=Depends(get_feature_engineer),
 ):
     """Provides an instance of the prediction service.
 
@@ -72,10 +73,18 @@ def get_prediction_service(
     Args:
         model: The model service instance from `get_model_service`.
         settings: The application's configuration settings.
+        feature_engineer: The feature engineering service instance.
 
     Returns:
         An instance of the `PredictionService`.
     """
     from app.services.prediction import PredictionService
 
-    return PredictionService(model=model, settings=settings)
+    return PredictionService(model=model, settings=settings, feature_engineer=feature_engineer)
+
+
+def get_feature_engineer():
+    """Provides a singleton instance of the feature engineering service."""
+    from app.features.feature_engineering import get_feature_engineer as get_fe
+
+    return get_fe()

@@ -31,6 +31,7 @@ class PredictionResponse(BaseModel):
     text_length: int = Field(..., description="Length of processed text")
     backend: str = Field(..., description="Model backend used (pytorch/onnx)")
     cached: bool = Field(default=False, description="Whether result was cached")
+    features: Optional[Dict[str, Any]] = Field(None, description="Advanced text features")
 
 
 class HealthResponse(BaseModel):
@@ -53,7 +54,9 @@ class HealthResponse(BaseModel):
     backend: str = Field(..., description="Model backend in use")
     timestamp: float = Field(..., description="Health check timestamp")
     kafka_status: Optional[str] = Field(None, description="Kafka consumer status (if enabled)")
-    async_batch_status: Optional[str] = Field(None, description="Async batch service status (if enabled)")
+    async_batch_status: Optional[str] = Field(
+        None, description="Async batch service status (if enabled)"
+    )
 
 
 class KafkaMetricsResponse(BaseModel):
@@ -84,7 +87,9 @@ class KafkaMetricsResponse(BaseModel):
     messages_retried: int = Field(..., description="Total messages retried")
     messages_sent_to_dlq: int = Field(..., description="Total messages sent to DLQ")
     total_processing_time_ms: float = Field(..., description="Total processing time (ms)")
-    avg_processing_time_ms: float = Field(..., description="Average processing time per message (ms)")
+    avg_processing_time_ms: float = Field(
+        ..., description="Average processing time per message (ms)"
+    )
     throughput_tps: float = Field(..., description="Current throughput (TPS)")
     consumer_group_lag: int = Field(..., description="Current consumer group lag")
     running: bool = Field(..., description="Whether consumer is running")
