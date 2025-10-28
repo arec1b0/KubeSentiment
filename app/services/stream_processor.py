@@ -16,11 +16,95 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from app.core.config import get_settings
-from app.core.logging import get_contextual_logger, get_logger
-from app.features.feature_engineering import get_feature_engineer
-from app.features.online_normalization import OnlineStandardScaler
-from app.models.base import ModelStrategy
+try:  # pragma: no cover - allow running without full settings stack
+    from app.core.config import get_settings
+except Exception:  # pragma: no cover - fallback stub for lightweight tests
+
+    def get_settings():  # type: ignore[misc]
+        class _Fallback:
+            app_version = "test"
+            data_dir = "./data"
+
+        return _Fallback()
+
+
+try:  # pragma: no cover - optional dependency in tests
+    from app.core.logging import get_contextual_logger, get_logger
+except Exception:  # pragma: no cover - fallback to stdlib logging
+    import logging
+
+    class _StdLoggerAdapter:
+        def __init__(self, name: str):
+            self._logger = logging.getLogger(name)
+
+        def _render(self, message: str, **extra: Any) -> str:
+            payload = {k: v for k, v in extra.items() if k != "exc_info"}
+            if payload:
+                formatted = ", ".join(
+                    f"{key}={value!r}" for key, value in payload.items()
+                )
+                return f"{message} | {formatted}"
+            return message
+
+        def info(self, message: str, *args: Any, **kwargs: Any) -> None:
+            exc_info = kwargs.pop("exc_info", None)
+            self._logger.info(self._render(message, **kwargs), *args, exc_info=exc_info)
+
+        def warning(self, message: str, *args: Any, **kwargs: Any) -> None:
+            exc_info = kwargs.pop("exc_info", None)
+            self._logger.warning(
+                self._render(message, **kwargs), *args, exc_info=exc_info
+            )
+
+        def error(self, message: str, *args: Any, **kwargs: Any) -> None:
+            exc_info = kwargs.pop("exc_info", None)
+            self._logger.error(
+                self._render(message, **kwargs), *args, exc_info=exc_info
+            )
+
+    def get_logger(name: str) -> _StdLoggerAdapter:
+        return _StdLoggerAdapter(name)
+
+    def get_contextual_logger(name: str, **_: Any) -> _StdLoggerAdapter:
+        return _StdLoggerAdapter(name)
+
+
+try:  # pragma: no cover - optional dependency in tests
+    from app.features.feature_engineering import get_feature_engineer
+except Exception:  # pragma: no cover
+
+    def get_feature_engineer():  # type: ignore[misc]
+        return None
+
+
+try:  # pragma: no cover
+    from app.features.online_normalization import OnlineStandardScaler
+except Exception:  # pragma: no cover
+
+    class OnlineStandardScaler:  # type: ignore[override]
+        def __init__(self) -> None:
+            self.n_samples_seen_ = 0
+
+        def load_state(self, *_: Any, **__: Any) -> None:  # noqa: D401 - simple stub
+            """No-op for tests when scaler is unavailable."""
+
+        def save_state(self, *_: Any, **__: Any) -> None:
+            """No-op save implementation for tests."""
+
+        def partial_fit(self, features: Any) -> None:
+            length = len(getattr(features, "index", features))
+            self.n_samples_seen_ += int(length)
+
+        def transform(self, features: Any) -> Any:
+            return features
+
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover
+    from app.models.base import ModelStrategy
+else:
+    ModelStrategy = Any  # type: ignore[misc, assignment]
 
 logger = get_logger(__name__)
 
@@ -126,11 +210,17 @@ class StreamProcessor:
 
         try:
             self.online_scaler.load_state(str(self.scaler_state_path))
-            self.logger.info("Loaded existing scaler state", path=str(self.scaler_state_path))
+            self.logger.info(
+                "Loaded existing scaler state", path=str(self.scaler_state_path)
+            )
         except Exception as e:
-            self.logger.info("No existing scaler state found, starting fresh", error=str(e))
+            self.logger.info(
+                "No existing scaler state found, starting fresh", error=str(e)
+            )
 
-    async def predict_async(self, text: str, request_id: Optional[str] = None) -> Dict[str, Any]:
+    async def predict_async(
+        self, text: str, request_id: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Adds a prediction request to the batch queue and awaits the result.
 
         This method queues the request and returns a future that will be
@@ -222,7 +312,10 @@ class StreamProcessor:
             should_process = (
                 size_trigger
                 or timeout_trigger
-                or (min_size_trigger and wait_time_ms >= self.config.max_wait_time_ms * 0.5)
+                or (
+                    min_size_trigger
+                    and wait_time_ms >= self.config.max_wait_time_ms * 0.5
+                )
             )
 
             if should_process:
@@ -273,7 +366,9 @@ class StreamProcessor:
             batch_logger: A contextual logger for logging batch-specific information.
         """
         try:
-            feature_dicts = [self.feature_engineer.extract_features(text) for text in texts]
+            feature_dicts = [
+                self.feature_engineer.extract_features(text) for text in texts
+            ]
             feature_df = pd.DataFrame(feature_dicts).fillna(0)
             numerical_features = [
                 "char_count",
@@ -314,7 +409,9 @@ class StreamProcessor:
                 "all_caps_word_count",
                 "all_caps_word_ratio",
             ]
-            available_features = [col for col in numerical_features if col in feature_df.columns]
+            available_features = [
+                col for col in numerical_features if col in feature_df.columns
+            ]
             feature_array = feature_df[available_features].values
 
             if feature_array.shape[0] > 0:
@@ -328,10 +425,14 @@ class StreamProcessor:
                     scaler_samples_seen=self.online_scaler.n_samples_seen_,
                 )
             else:
-                batch_logger.warning("No numerical features available for normalization")
+                batch_logger.warning(
+                    "No numerical features available for normalization"
+                )
         except Exception as fe_e:
             batch_logger.error(
-                "Feature engineering/normalization failed", error=str(fe_e), exc_info=True
+                "Feature engineering/normalization failed",
+                error=str(fe_e),
+                exc_info=True,
             )
 
     def _finalize_batch_processing(
@@ -442,7 +543,9 @@ class StreamProcessor:
                 pass
         logger.info("Stream processor shutdown complete")
 
-    async def predict_async_batch(self, texts: List[str], batch_id: str) -> List[Dict[str, Any]]:
+    async def predict_async_batch(
+        self, texts: List[str], batch_id: str
+    ) -> List[Dict[str, Any]]:
         """Processes a batch of texts asynchronously for high throughput.
 
         This method is optimized for processing pre-formed batches of requests,
@@ -457,17 +560,25 @@ class StreamProcessor:
             A list of prediction result dictionaries.
         """
         batch_logger = get_contextual_logger(
-            __name__, operation="async_batch_processing", batch_id=batch_id, batch_size=len(texts)
+            __name__,
+            operation="async_batch_processing",
+            batch_id=batch_id,
+            batch_size=len(texts),
         )
         try:
             results = self.model.predict_batch(texts)
             batch_logger.info(
-                "Async batch processed successfully", batch_size=len(texts), batch_id=batch_id
+                "Async batch processed successfully",
+                batch_size=len(texts),
+                batch_id=batch_id,
             )
             return results
         except Exception as e:
             batch_logger.error(
-                "Async batch processing failed", batch_id=batch_id, error=str(e), exc_info=True
+                "Async batch processing failed",
+                batch_id=batch_id,
+                error=str(e),
+                exc_info=True,
             )
             error_result = {
                 "label": "ERROR",

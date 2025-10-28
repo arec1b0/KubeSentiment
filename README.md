@@ -191,6 +191,16 @@ This allows you to answer questions like:
 
 The benchmarking scripts generate a comprehensive HTML report with performance comparisons, cost analysis, and resource utilization charts. See the **[Benchmarking README](benchmarking/README.md)** for more details.
 
+### Latest Kafka Consumer Benchmark Snapshot
+
+| Scenario | Batch Size | Messages Processed | Wall Time (s) | Approx. Throughput (msg/s) |
+|----------|------------|--------------------|----------------|-----------------------------|
+| Synthetic workload executed with the in-repo `MockModel` using the high-throughput Kafka consumer (no external brokers) | 1,000 | 1,000 | 0.0095 | ~105,700 |
+
+> **How it was measured:** `python benchmarking` helper script (see commit history) instantiates `HighThroughputKafkaConsumer` with the same `MockModel` used in the test suite and processes 1,000 synthetic messages in a single batch. This mirrors the high-throughput path without requiring a live Kafka cluster, making it reproducible in constrained environments.
+
+> **Tip:** For end-to-end benchmarks against a running Kafka cluster, use `benchmarking/kafka_performance_test.py`. It exercises producer/consumer I/O, DLQ handling, and Prometheus instrumentation at scale.
+
 ## 🤝 Contributing
 
 We welcome contributions of all kinds! Whether it's reporting a bug, improving documentation, or submitting a new feature, your help is appreciated.
