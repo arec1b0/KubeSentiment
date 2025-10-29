@@ -8,9 +8,9 @@ data:
   redis.conf: |
     # Redis configuration for distributed caching
 
-    # Network
-    bind 0.0.0.0
-    protected-mode no
+    # Network - Security hardened
+    bind 127.0.0.1
+    protected-mode yes
     port 6379
     tcp-backlog 511
     timeout 0
@@ -41,8 +41,9 @@ data:
     repl-disable-tcp-nodelay no
     replica-priority 100
 
-    # Security
-    # requirepass your_redis_password_here
+    # Security - Authentication enabled
+    # Password will be injected via environment variable
+    requirepass REDIS_PASSWORD_PLACEHOLDER
 
     # Memory Management
     maxmemory 2gb
@@ -123,6 +124,14 @@ spec:
         prometheus.io/port: "9121"
         prometheus.io/path: "/metrics"
     spec:
+      # Pod-level security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999  # Redis user
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+
       containers:
         - name: redis
           image: redis:7.2-alpine
@@ -131,14 +140,40 @@ spec:
             - containerPort: 6379
               name: redis
               protocol: TCP
+
+          # Container-level security context
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 999
+            capabilities:
+              drop:
+                - ALL
+
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: password
+
           command:
-            - redis-server
-            - /usr/local/etc/redis/redis.conf
+            - sh
+            - -c
+            - |
+              # Replace password placeholder with actual password
+              sed "s/REDIS_PASSWORD_PLACEHOLDER/$REDIS_PASSWORD/g" /usr/local/etc/redis/redis.conf > /tmp/redis.conf
+              redis-server /tmp/redis.conf
+
           volumeMounts:
             - name: redis-config
               mountPath: /usr/local/etc/redis
+              readOnly: true
             - name: redis-data
               mountPath: /data
+            - name: redis-tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 100m
@@ -157,8 +192,9 @@ spec:
           readinessProbe:
             exec:
               command:
-                - redis-cli
-                - ping
+                - sh
+                - -c
+                - redis-cli -a "$REDIS_PASSWORD" ping
             initialDelaySeconds: 5
             periodSeconds: 5
             timeoutSeconds: 3
@@ -173,15 +209,30 @@ spec:
             - containerPort: 9121
               name: metrics
               protocol: TCP
+
+          # Container-level security context
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 999
+            capabilities:
+              drop:
+                - ALL
+
           env:
             - name: REDIS_ADDR
               value: "localhost:6379"
-            # Uncomment if using password
-            # - name: REDIS_PASSWORD
-            #   valueFrom:
-            #     secretKeyRef:
-            #       name: redis-secret
-            #       key: password
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: password
+
+          volumeMounts:
+            - name: exporter-tmp
+              mountPath: /tmp
+
           resources:
             requests:
               cpu: 50m
@@ -197,6 +248,10 @@ spec:
         - name: redis-data
           persistentVolumeClaim:
             claimName: redis-pvc
+        - name: redis-tmp
+          emptyDir: {}
+        - name: exporter-tmp
+          emptyDir: {}
 
       # Anti-affinity to avoid multiple Redis instances on same node
       affinity:
@@ -230,16 +285,22 @@ spec:
   storageClassName: standard  # Change based on your cluster's storage class
 
 ---
-# Optional: Redis Secret for password
-# Uncomment and configure if using authentication
-# apiVersion: v1
-# kind: Secret
-# metadata:
-#   name: redis-secret
-#   namespace: default
-# type: Opaque
-# stringData:
-#   password: "your_secure_redis_password_here"
+# Redis Secret for authentication
+# IMPORTANT: In production, use external secret management (HashiCorp Vault, Sealed Secrets, etc.)
+# or inject this secret through your CI/CD pipeline
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-secret
+  namespace: default
+  labels:
+    app: redis
+    component: cache
+type: Opaque
+stringData:
+  # Generate a strong password using: openssl rand -base64 32
+  # This is a placeholder - replace with actual secure password
+  password: "CHANGE_ME_IN_PRODUCTION"
 
 ---
 # ServiceMonitor for Prometheus Operator

@@ -7,6 +7,12 @@ global:
   imagePullSecrets: []
   storageClass: ""
 
+# Namespace settings
+namespace:
+  create: true
+  name: "mlops"
+  annotations: {}
+
 # Application settings
 app:
   name: mlops-sentiment
