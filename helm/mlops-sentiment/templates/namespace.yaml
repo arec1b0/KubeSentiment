@@ -1,0 +1,25 @@
+{{- if .Values.namespace.create -}}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace.name | default "mlops" }}
+  labels:
+    {{- include "mlops-sentiment.labels" . | nindent 4 }}
+    # Pod Security Admission labels (Kubernetes 1.23+)
+    # Enforce restricted security standards for all pods in this namespace
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    # Audit mode logs violations without blocking
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    # Warn mode shows warnings to users on violations
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+  annotations:
+    # Document the security requirements
+    description: "MLOps Sentiment Analysis namespace with restricted pod security standards"
+    security-policy: "CIS Kubernetes Benchmark 5.2.x compliant"
+    {{- with .Values.namespace.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

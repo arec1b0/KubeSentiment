@@ -30,20 +30,22 @@ stringData:
     templates:
       - '/etc/alertmanager/templates/*.tmpl'
 
-    # Routing configuration
+    # Routing configuration with improved alert grouping
     route:
-      group_by: ['alertname', 'cluster', 'service']
+      # Group alerts by alertname, cluster, namespace, and service for better correlation
+      group_by: ['alertname', 'cluster', 'namespace', 'service']
       group_wait: 30s
       group_interval: 5m
-      repeat_interval: 12h
+      repeat_interval: 4h  # Reduced from 12h for faster re-notification
       receiver: 'default'
-      
+
       routes:
-        # Critical alerts - immediate notification
+        # Critical alerts - immediate notification with faster grouping
         - match:
             severity: critical
           receiver: 'critical-alerts'
           group_wait: 10s
+          group_interval: 2m  # Faster grouping for critical alerts
           repeat_interval: 1h
           routes:
             # ML model specific critical alerts
@@ -51,6 +53,7 @@ stringData:
                 component: ml-model
               receiver: 'ml-critical'
               group_wait: 5s
+              group_interval: 1m  # Very fast grouping for ML critical issues
               repeat_interval: 30m
         
         # Warning alerts - less frequent
@@ -88,6 +91,15 @@ stringData:
             environment: staging
           receiver: 'staging-alerts'
           repeat_interval: 6h
+
+        # Watchdog - Dead Man's Switch
+        # Routes watchdog alerts to dedicated receiver to verify alerting pipeline
+        - match:
+            alertname: Watchdog
+          receiver: 'watchdog'
+          group_wait: 0s
+          group_interval: 1m
+          repeat_interval: 5m  # Send every 5 minutes to confirm health
 
     # Inhibition rules - suppress alerts
     inhibit_rules:
@@ -289,3 +301,13 @@ stringData:
               **Description:** {{ .Annotations.description }}
               {{ end }}
             send_resolved: true
+
+      # Watchdog - Dead Man's Switch
+      # This receiver is intentionally minimal to reduce noise
+      # It's used to verify that Alertmanager is functioning
+      - name: 'watchdog'
+        slack_configs:
+          - channel: '#monitoring-health'
+            title: '👁️ Alertmanager Watchdog'
+            text: 'Alertmanager is healthy and processing alerts'
+            send_resolved: false  # Don't send resolved notifications

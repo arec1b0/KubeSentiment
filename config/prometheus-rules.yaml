@@ -382,3 +382,115 @@ spec:
         summary: "High cache miss rate"
         description: "Cache miss rate is {{ $value | percent }}, consider adjusting cache TTL"
         runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-cache"
+
+  # Alertmanager health monitoring
+  - name: alertmanager.health.rules
+    interval: 30s
+    rules:
+    # Dead Man's Switch - ensures alerting pipeline is functional
+    # This alert should ALWAYS be firing
+    - alert: Watchdog
+      expr: vector(1)
+      labels:
+        severity: none
+        service: alertmanager
+        component: health
+      annotations:
+        summary: "Alertmanager health check"
+        description: "This is a Watchdog alert that should always be firing. If you stop receiving this alert, it means the alerting pipeline is broken."
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#watchdog"
+
+    # Alert if Alertmanager is down
+    - alert: AlertmanagerDown
+      expr: up{job="alertmanager"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        service: alertmanager
+        component: availability
+      annotations:
+        summary: "Alertmanager is down"
+        description: "Alertmanager has been down for more than 5 minutes. No alerts will be delivered."
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#alertmanager-down"
+
+    # Alert if too many notifications are failing
+    - alert: AlertmanagerNotificationsFailing
+      expr: rate(alertmanager_notifications_failed_total[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        service: alertmanager
+        component: notifications
+      annotations:
+        summary: "High rate of failed alert notifications"
+        description: "{{ $value | humanize }} notifications per second are failing for {{ $labels.integration }}"
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#alertmanager-notifications"
+
+  # Redis security and health monitoring
+  - name: redis.security.rules
+    interval: 30s
+    rules:
+    # Redis authentication failures
+    - alert: RedisAuthFailures
+      expr: rate(redis_rejected_connections_total[5m]) > 5
+      for: 2m
+      labels:
+        severity: security
+        service: redis
+        component: security
+      annotations:
+        summary: "Redis authentication failures detected"
+        description: "{{ $value | humanize }} authentication failures per second on Redis instance {{ $labels.instance }}. Potential unauthorized access attempt."
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#redis-auth-failures"
+
+    # Redis down
+    - alert: RedisDown
+      expr: up{job="redis"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: redis
+        component: availability
+      annotations:
+        summary: "Redis instance is down"
+        description: "Redis instance {{ $labels.instance }} has been down for more than 1 minute"
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#redis-down"
+
+    # Redis high memory usage
+    - alert: RedisHighMemoryUsage
+      expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        service: redis
+        component: resources
+      annotations:
+        summary: "Redis memory usage is high"
+        description: "Redis instance {{ $labels.instance }} is using {{ $value | humanizePercentage }} of available memory"
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#redis-memory"
+
+    # Redis eviction rate high
+    - alert: RedisHighEvictionRate
+      expr: rate(redis_evicted_keys_total[5m]) > 10
+      for: 5m
+      labels:
+        severity: warning
+        service: redis
+        component: performance
+      annotations:
+        summary: "High Redis key eviction rate"
+        description: "Redis is evicting {{ $value | humanize }} keys per second on {{ $labels.instance }}. Consider increasing maxmemory."
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#redis-eviction"
+
+    # Redis connection exhaustion
+    - alert: RedisConnectionsNearLimit
+      expr: redis_connected_clients / redis_config_maxclients > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        service: redis
+        component: connections
+      annotations:
+        summary: "Redis connections near limit"
+        description: "Redis instance {{ $labels.instance }} is using {{ $value | humanizePercentage }} of max connections"
+        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#redis-connections"
