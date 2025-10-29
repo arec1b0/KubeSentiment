@@ -201,6 +201,60 @@ The benchmarking scripts generate a comprehensive HTML report with performance c
 
 > **Tip:** For end-to-end benchmarks against a running Kafka cluster, use `benchmarking/kafka_performance_test.py`. It exercises producer/consumer I/O, DLQ handling, and Prometheus instrumentation at scale.
 
+## 🔒 Testing & Security
+
+KubeSentiment includes comprehensive testing and security measures to ensure production readiness.
+
+### Testing Strategy
+
+Our testing approach follows the testing pyramid with multiple layers:
+
+- **Unit Tests**: Fast, isolated tests for individual components (85% coverage minimum)
+- **Integration Tests**: Validate component interactions and API endpoints
+- **Load Tests**: Performance testing with realistic traffic patterns (constant, ramp, spike, wave)
+- **Chaos Engineering**: Resilience testing with pod failures and network disruptions
+
+```bash
+# Run unit and integration tests
+make test
+
+# Run load tests
+python benchmarking/load_test.py --url http://localhost:8000 --rps 100 --duration 60
+
+# Run chaos engineering tests
+python tests/chaos/chaos_engineering_tests.py --namespace default
+```
+
+See **[Testing Guide](docs/TESTING_GUIDE.md)** for comprehensive testing documentation.
+
+### Security
+
+A comprehensive security audit has been performed covering:
+
+- **Container Security**: Non-root user, read-only filesystem, dropped capabilities
+- **Kubernetes RBAC**: Least-privilege service accounts and roles
+- **Network Policies**: Strict ingress/egress controls
+- **Secrets Management**: HashiCorp Vault integration
+- **Vulnerability Scanning**: Automated Trivy scans in CI/CD
+
+Key security features:
+- ✅ Multi-stage Docker builds with minimal attack surface
+- ✅ Pod Security Standards enforcement
+- ✅ TLS/SSL encryption for all traffic
+- ✅ Automated security scanning on every build
+- ✅ Secret rotation with 7-day warning threshold
+
+See **[Security Audit Report](docs/SECURITY_AUDIT_REPORT.md)** for detailed findings and recommendations.
+
+### CI/CD Pipeline
+
+Automated testing and security in GitHub Actions:
+
+1. **Code Quality**: Black, isort, ruff, flake8, mypy
+2. **Testing**: Unit tests (85% coverage), integration tests
+3. **Security Scanning**: Trivy vulnerability scanning (CRITICAL/HIGH)
+4. **Build & Deploy**: Multi-stage Docker build with security best practices
+
 ## 🤝 Contributing
 
 We welcome contributions of all kinds! Whether it's reporting a bug, improving documentation, or submitting a new feature, your help is appreciated.

@@ -210,6 +210,10 @@ pdb:
   enabled: true
   minAvailable: 1
 
+# RBAC Configuration
+rbac:
+  create: true
+
 # ServiceAccount
 serviceAccount:
   create: true

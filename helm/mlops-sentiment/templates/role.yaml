@@ -1,0 +1,33 @@
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "mlops-sentiment.fullname" . }}
+  labels:
+    {{- include "mlops-sentiment.labels" . | nindent 4 }}
+rules:
+  # Allow reading ConfigMaps for application configuration
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow reading pods for health checks and self-discovery
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+
+  # Allow reading services for service discovery
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list"]
+
+  {{- if not .Values.vault.enabled }}
+  # Only allow secret access if Vault is not enabled
+  # When Vault is enabled, secrets are injected via Vault agent
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - {{ include "mlops-sentiment.fullname" . }}-secret
+    verbs: ["get"]
+  {{- end }}
+{{- end }}
