@@ -124,19 +124,28 @@ services:
 
 ### Manual Deployment
 
-1. Create the namespace:
-   ```bash
-   kubectl create namespace mlops
-   ```
+**Note:** This project uses Helm for deployment. Individual Kubernetes manifest files are generated from the Helm chart templates. For raw manifest deployment, use one of these approaches:
 
-2. Deploy the application:
-   ```bash
-   kubectl apply -f k8s/configmap.yaml
-   kubectl apply -f k8s/deployment.yaml
-   kubectl apply -f k8s/service.yaml
-   kubectl apply -f k8s/ingress.yaml
-   kubectl apply -f k8s/hpa.yaml
-   ```
+#### Option 1: Generate Manifests from Helm (Recommended)
+```bash
+# Generate all Kubernetes manifests
+helm template mlops-sentiment ./helm/mlops-sentiment \
+  --namespace mlops-sentiment \
+  --values helm/mlops-sentiment/values-dev.yaml \
+  > generated-manifests.yaml
+
+# Apply generated manifests
+kubectl create namespace mlops-sentiment
+kubectl apply -f generated-manifests.yaml
+```
+
+#### Option 2: Use Scalability Configuration
+```bash
+# For scalability features (Redis, HPA, etc.)
+kubectl create namespace mlops-sentiment
+kubectl apply -f k8s/redis-deployment.yaml
+kubectl apply -f k8s/scalability-config.yaml
+```
 
 ## Configuration
 

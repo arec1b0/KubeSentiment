@@ -112,6 +112,9 @@ This is the quickest way to get the service running on your local machine.
 
 4.  **Test the service:**
     Open a new terminal and send a prediction request:
+
+    > **Note on Ports:** The application runs on port 8000 inside the container. When using Docker Compose, this is mapped to `localhost:8000`. In Kubernetes, you can use `kubectl port-forward` to map to any local port (e.g., `8080:80` or `8000:8000`).
+
     ```bash
     curl -X POST "http://localhost:8000/predict" \
          -H "Content-Type: application/json" \
