@@ -26,7 +26,7 @@ You can contribute in several ways:
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-org/KubeSentiment.git
+    git clone https://github.com/arec1b0/KubeSentiment.git
     cd KubeSentiment
     ```
 

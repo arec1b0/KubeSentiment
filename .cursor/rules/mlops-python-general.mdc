@@ -22,7 +22,7 @@ alwaysApply: true
 ## Code Quality and Structure
 
 ### Python Best Practices
-- Use **Python 3.9+** with type hints throughout the codebase
+- Use **Python 3.11+** with type hints throughout the codebase
 - Follow **PEP 8** style guidelines with **black** formatter
 - Use **ruff** for fast Python linting and code analysis
 - Implement **pre-commit** hooks for automated code quality checks

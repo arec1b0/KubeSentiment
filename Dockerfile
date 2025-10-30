@@ -12,7 +12,7 @@ LABEL org.opencontainers.image.version="${VERSION}"
 LABEL org.opencontainers.image.revision="${REVISION}"
 LABEL org.opencontainers.image.title="MLOps Sentiment Analysis Service"
 LABEL org.opencontainers.image.description="Production-ready FastAPI microservice for sentiment analysis"
-LABEL org.opencontainers.image.source="https://github.com/your-org/mlops-sentiment"
+LABEL org.opencontainers.image.source="https://github.com/arec1b0/KubeSentiment"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # Set environment variables for Python

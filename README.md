@@ -1,7 +1,7 @@
 # KubeSentiment: Production-Ready MLOps Sentiment Analysis Microservice
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/arec1b0/mlops-sentiment/actions)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/arec1b0/mlops-sentiment/releases)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/arec1b0/KubeSentiment/actions)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/arec1b0/KubeSentiment/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)](https://example.com/coverage)
 [![Code Quality](https://img.shields.io/badge/quality-A-brightgreen.svg)](https://example.com/quality)
@@ -95,8 +95,8 @@ This is the quickest way to get the service running on your local machine.
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/arec1b0/mlops-sentiment.git
-    cd mlops-sentiment
+    git clone https://github.com/arec1b0/KubeSentiment.git
+    cd KubeSentiment
     ```
 
 2.  **Install dependencies:**
@@ -112,6 +112,9 @@ This is the quickest way to get the service running on your local machine.
 
 4.  **Test the service:**
     Open a new terminal and send a prediction request:
+
+    > **Note on Ports:** The application runs on port 8000 inside the container. When using Docker Compose, this is mapped to `localhost:8000`. In Kubernetes, you can use `kubectl port-forward` to map to any local port (e.g., `8080:80` or `8000:8000`).
+
     ```bash
     curl -X POST "http://localhost:8000/predict" \
          -H "Content-Type: application/json" \
@@ -121,11 +124,13 @@ This is the quickest way to get the service running on your local machine.
     You should receive a response like:
     ```json
     {
-      "text": "This is an amazing project and the setup was so easy!",
-      "sentiment": {
-        "label": "POSITIVE",
-        "score": 0.9998
-      }
+      "label": "POSITIVE",
+      "score": 0.9998,
+      "inference_time_ms": 45.2,
+      "model_name": "distilbert-base-uncased-finetuned-sst-2-english",
+      "text_length": 54,
+      "backend": "pytorch",
+      "cached": false
     }
     ```
 
@@ -157,6 +162,8 @@ The service exposes several key endpoints:
 | `GET`  | `/api/v1/health`             | Health check endpoint for readiness/liveness.    |
 | `GET`  | `/api/v1/metrics`            | Exposes Prometheus metrics.                      |
 | `GET`  | `/api/v1/model-info`  | Returns metadata about the loaded ML model.      |
+
+> **Note on API Versioning:** All endpoints use the `/api/v1` prefix in production mode. When running in debug mode (`MLOPS_DEBUG=true`), the `/api/v1` prefix is omitted for easier local development (e.g., `/predict` instead of `/api/v1/predict`).
 
 ### Configuration
 

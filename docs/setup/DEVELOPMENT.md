@@ -5,9 +5,17 @@
 ### 1. **Environment Setup**
 
 ```bash
-# The virtual environment is already created at: F:\Projects\MLOps\venv\
-# Python version: 3.13.5
-# All dependencies are installed
+# Create and activate virtual environment
+python -m venv venv
+
+# Activate (Linux/macOS)
+source venv/bin/activate
+
+# Activate (Windows)
+# venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
 ### 2. **Start Development Server**
@@ -22,6 +30,8 @@ python run.py
 - **Alternative Docs**: <http://localhost:8000/redoc>
 - **Health Check**: <http://localhost:8000/health>
 - **Metrics**: <http://localhost:8000/metrics>
+
+> **Development Mode:** When running locally with `MLOPS_DEBUG=true`, API endpoints are available at the root level without the `/api/v1` prefix for easier testing. Production deployments use the `/api/v1` prefix for all endpoints.
 
 ## 🧪 Testing
 
@@ -51,7 +61,7 @@ curl -X POST "http://localhost:8000/predict" \
 ## 📁 Project Structure
 
 ```
-f:\Projects\MLOps\
+KubeSentiment/
 ├── .env                    # Environment variables
 ├── app/                    # Main application
 │   ├── __init__.py         # Package init
@@ -59,7 +69,7 @@ f:\Projects\MLOps\
 │   ├── config.py          # Configuration management
 │   ├── api.py             # API endpoints
 │   └── ml/                # ML modules
-│       ├── __init__.py    
+│       ├── __init__.py
 │       └── sentiment.py   # Sentiment analysis logic
 ├── k8s/                   # Kubernetes manifests
 │   ├── namespace.yaml     # Namespace and resource quotas
@@ -130,7 +140,7 @@ MLOPS_MODEL_NAME=distilbert-base-uncased-finetuned-sst-2-english
 
 ```bash
 # Reinstall dependencies
-F:\Projects\MLOps\venv\Scripts\python.exe -m pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
 **Model Loading Issues**

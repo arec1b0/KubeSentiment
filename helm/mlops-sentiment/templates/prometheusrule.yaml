@@ -22,7 +22,7 @@ spec:
       annotations:
         summary: "MLOps Sentiment service is down"
         description: "MLOps Sentiment service has been down for more than 1 minute. Instance: {{ $labels.instance }}"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#service-down"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#service-down"
 
     - alert: MLOpsHighErrorRate
       expr: rate(http_requests_total{job="mlops-sentiment",status=~"5.."}[5m]) / rate(http_requests_total{job="mlops-sentiment"}[5m]) > 0.05
@@ -33,7 +33,7 @@ spec:
       annotations:
         summary: "High error rate detected"
         description: "Error rate is {{ $value | humanizePercentage }} for more than 5 minutes"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#high-error-rate"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#high-error-rate"
 
     - alert: MLOpsHighLatency
       expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="mlops-sentiment"}[5m])) > 0.5
@@ -44,7 +44,7 @@ spec:
       annotations:
         summary: "High latency detected"
         description: "95th percentile latency is {{ $value }}s for more than 10 minutes"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#high-latency"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#high-latency"
 
     # ML Model Specific Alerts
     - alert: MLModelInferenceSlowdown
@@ -57,7 +57,7 @@ spec:
       annotations:
         summary: "ML model inference is slow"
         description: "Average inference time is {{ $value }}s, which is above the 200ms threshold"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#slow-inference"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#slow-inference"
 
     - alert: MLModelNotLoaded
       expr: mlops_model_loaded{job="mlops-sentiment"} == 0
@@ -69,7 +69,7 @@ spec:
       annotations:
         summary: "ML model is not loaded"
         description: "ML model failed to load or became unavailable on instance {{ $labels.instance }}"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#model-not-loaded"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#model-not-loaded"
 
     # Resource Usage Alerts
     - alert: MLOpsHighCPUUsage
@@ -82,7 +82,7 @@ spec:
       annotations:
         summary: "High CPU usage detected"
         description: "CPU usage is {{ $value }}% on pod {{ $labels.pod }}"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#high-cpu"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#high-cpu"
 
     - alert: MLOpsHighMemoryUsage
       expr: container_memory_usage_bytes{pod=~"mlops-sentiment-.*"} / container_spec_memory_limit_bytes{pod=~"mlops-sentiment-.*"} * 100 > 85
@@ -94,7 +94,7 @@ spec:
       annotations:
         summary: "High memory usage detected"
         description: "Memory usage is {{ $value }}% on pod {{ $labels.pod }}"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#high-memory"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#high-memory"
 
     - alert: MLOpsPodCrashLooping
       expr: rate(kube_pod_container_status_restarts_total{pod=~"mlops-sentiment-.*"}[15m]) > 0
@@ -106,7 +106,7 @@ spec:
       annotations:
         summary: "Pod is crash looping"
         description: "Pod {{ $labels.pod }} is restarting frequently"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#crash-loop"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#crash-loop"
 
     # Business Logic Alerts
     - alert: MLOpsLowPredictionConfidence
@@ -119,7 +119,7 @@ spec:
       annotations:
         summary: "Low prediction confidence detected"
         description: "Average prediction confidence is {{ $value }}, which is below the 0.7 threshold"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#low-confidence"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#low-confidence"
 
     - alert: MLOpsNoTrafficReceived
       expr: rate(http_requests_total{job="mlops-sentiment"}[10m]) == 0
@@ -131,7 +131,7 @@ spec:
       annotations:
         summary: "No traffic received"
         description: "No HTTP requests received for more than 15 minutes"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#no-traffic"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#no-traffic"
 
     # Security Alerts
     - alert: MLOpsUnauthorizedAccess
@@ -144,7 +144,7 @@ spec:
       annotations:
         summary: "Unauthorized access attempts detected"
         description: "{{ $value }} unauthorized requests per second detected"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#unauthorized-access"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#unauthorized-access"
 
     - alert: MLOpsSuspiciousTrafficPattern
       expr: rate(http_requests_total{job="mlops-sentiment"}[1m]) > 100
@@ -156,5 +156,5 @@ spec:
       annotations:
         summary: "Suspicious traffic pattern detected"
         description: "Very high request rate: {{ $value }} requests per second"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#suspicious-traffic"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#suspicious-traffic"
 {{- end }}

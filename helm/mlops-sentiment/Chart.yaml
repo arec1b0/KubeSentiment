@@ -10,9 +10,9 @@ keywords:
   - machine-learning
   - monitoring
   - fastapi
-home: https://github.com/arec1b0/mlops-sentiment
+home: https://github.com/arec1b0/KubeSentiment
 sources:
-  - https://github.com/arec1b0/mlops-sentiment
+  - https://github.com/arec1b0/KubeSentiment
 maintainers:
   - name: Daniil Krizhanovskyi
     email: daniil@example.com

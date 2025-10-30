@@ -71,7 +71,7 @@ spec:
       annotations:
         summary: "SLO breach: Availability below 99.9%"
         description: "Service availability is {{ $value }}%, which is below the 99.9% SLO target"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#slo-availability"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#slo-availability"
 
     # Latency SLI (95% of requests < 200ms)
     - alert: MLOpsSLOLatencyBreach
@@ -84,7 +84,7 @@ spec:
       annotations:
         summary: "SLO breach: 95th percentile latency above 200ms"
         description: "95th percentile latency is {{ $value }}s, which exceeds the 200ms SLO target"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#slo-latency"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#slo-latency"
 
     # ML Quality SLI (average confidence > 80%)
     - alert: MLOpsSLOQualityBreach
@@ -98,7 +98,7 @@ spec:
       annotations:
         summary: "SLO breach: ML prediction confidence below 80%"
         description: "Average prediction confidence is {{ $value }}, which is below the 80% SLO target"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#slo-quality"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#slo-quality"
 
   # Business logic alerting rules
   - name: mlops.business.rules
@@ -115,7 +115,7 @@ spec:
       annotations:
         summary: "Unusual traffic spike detected"
         description: "Current request rate ({{ $value }}) is 5x higher than the hourly average"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#traffic-spike"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#traffic-spike"
 
     - alert: MLOpsTrafficDrop
       expr: mlops:http_requests:rate5m < 0.2 * mlops:http_requests:rate1h and mlops:http_requests:rate1h > 0.1
@@ -127,7 +127,7 @@ spec:
       annotations:
         summary: "Significant traffic drop detected"
         description: "Current request rate ({{ $value }}) is 80% lower than the hourly average"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#traffic-drop"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#traffic-drop"
 
     # ML model drift detection
     - alert: MLOpsPredictionPatternChange
@@ -144,7 +144,7 @@ spec:
       annotations:
         summary: "ML prediction pattern change detected"
         description: "Average prediction confidence has changed by {{ $value }} compared to 24h ago"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#model-drift"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#model-drift"
 
     # Resource efficiency alerts
     - alert: MLOpsResourceInefficiency
@@ -157,7 +157,7 @@ spec:
       annotations:
         summary: "Low resource utilization detected"
         description: "CPU usage is {{ $value }}% with {{ query "kube_deployment_status_replicas{deployment=\"mlops-sentiment\"}" }} replicas"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#resource-efficiency"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#resource-efficiency"
 
   # Infrastructure alerting rules
   - name: mlops.infrastructure.rules
@@ -174,7 +174,7 @@ spec:
       annotations:
         summary: "Kubernetes node not ready"
         description: "Node {{ $labels.node }} has been not ready for more than 5 minutes"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#node-not-ready"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#node-not-ready"
 
     # Persistent Volume issues
     - alert: MLOpsPVCPendingOrLost
@@ -187,7 +187,7 @@ spec:
       annotations:
         summary: "PVC in problematic state"
         description: "PVC {{ $labels.persistentvolumeclaim }} in namespace {{ $labels.namespace }} is in {{ $labels.phase }} state"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#pvc-issues"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#pvc-issues"
 
     # Network policy violations (if monitoring is available)
     - alert: MLOpsNetworkPolicyViolation
@@ -200,7 +200,7 @@ spec:
       annotations:
         summary: "Network policy violations detected"
         description: "{{ $value }} network policy violations detected for MLOps pods in the last 5 minutes"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#network-policy"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#network-policy"
 
   # Predictive alerting rules
   - name: mlops.predictive.rules
@@ -221,7 +221,7 @@ spec:
       annotations:
         summary: "Disk space exhaustion predicted"
         description: "Disk {{ $labels.device }} on {{ $labels.instance }} is predicted to run out of space in 4 hours"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#disk-space"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#disk-space"
 
     # Predict memory exhaustion
     - alert: MLOpsMemoryExhaustionPredicted
@@ -238,7 +238,7 @@ spec:
       annotations:
         summary: "Memory exhaustion predicted"
         description: "Pod {{ $labels.pod }} is predicted to exceed memory limit in 2 hours"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#memory-prediction"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#memory-prediction"
 
   # Vault secrets management alerting rules
   - name: vault.secrets.rules
@@ -255,7 +255,7 @@ spec:
       annotations:
         summary: "Vault server is down"
         description: "Vault server {{ $labels.instance }} has been down for more than 2 minutes"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-down"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#vault-down"
 
     - alert: VaultSealed
       expr: vault_core_unsealed == 0
@@ -267,7 +267,7 @@ spec:
       annotations:
         summary: "Vault is sealed"
         description: "Vault server {{ $labels.instance }} is sealed and cannot serve requests"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-sealed"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#vault-sealed"
 
     # Authentication and authorization
     - alert: VaultAuthenticationFailures
@@ -280,7 +280,7 @@ spec:
       annotations:
         summary: "High number of Vault authentication failures"
         description: "{{ $value }} authentication failures detected in the last 5 minutes"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-auth-failures"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#vault-auth-failures"
 
     - alert: VaultPolicyViolations
       expr: increase(vault_policy_violations_total[5m]) > 0
@@ -292,7 +292,7 @@ spec:
       annotations:
         summary: "Vault policy violations detected"
         description: "Policy violations detected for policy {{ $labels.policy_name }}"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-policy-violations"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#vault-policy-violations"
 
     # Secret access patterns
     - alert: VaultUnusualSecretAccess
@@ -305,7 +305,7 @@ spec:
       annotations:
         summary: "Unusual spike in secret access"
         description: "{{ $value }} secret accesses detected in the last hour for {{ $labels.secret_key }}"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-secret-access"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#vault-secret-access"
 
     - alert: VaultSecretAccessErrors
       expr: increase(vault_secret_access_total{status="failure"}[5m]) > 10
@@ -317,7 +317,7 @@ spec:
       annotations:
         summary: "High number of secret access errors"
         description: "{{ $value }} secret access errors detected in the last 5 minutes"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-secret-errors"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#vault-secret-errors"
 
     # Token management
     - alert: VaultTokenRenewalFailures
@@ -330,7 +330,7 @@ spec:
       annotations:
         summary: "Vault token renewal issues"
         description: "Multiple token renewal failures detected"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-token-renewal"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#vault-token-renewal"
 
     # Secret rotation monitoring
     - alert: VaultSecretsExpiringSoon
@@ -343,7 +343,7 @@ spec:
       annotations:
         summary: "Secrets expiring within 7 days"
         description: "Secret {{ $labels.secret_key }} expires in {{ $value | humanizeDuration }}"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-secret-expiry"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#vault-secret-expiry"
 
     - alert: VaultSecretRotationWarnings
       expr: increase(vault_secret_rotation_warnings_total[1h]) > 0
@@ -355,7 +355,7 @@ spec:
       annotations:
         summary: "Secret rotation warnings generated"
         description: "Secret rotation warnings detected for secrets approaching expiry"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-rotation-warnings"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#vault-rotation-warnings"
 
     # Performance monitoring
     - alert: VaultHighLatency
@@ -368,7 +368,7 @@ spec:
       annotations:
         summary: "Vault experiencing high latency"
         description: "95th percentile secret access latency is {{ $value }}s"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-latency"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#vault-latency"
 
     # Cache performance
     - alert: VaultCacheInefficiency
@@ -381,7 +381,7 @@ spec:
       annotations:
         summary: "High cache miss rate"
         description: "Cache miss rate is {{ $value | percent }}, consider adjusting cache TTL"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#vault-cache"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#vault-cache"
 
   # Alertmanager health monitoring
   - name: alertmanager.health.rules
@@ -398,7 +398,7 @@ spec:
       annotations:
         summary: "Alertmanager health check"
         description: "This is a Watchdog alert that should always be firing. If you stop receiving this alert, it means the alerting pipeline is broken."
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#watchdog"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#watchdog"
 
     # Alert if Alertmanager is down
     - alert: AlertmanagerDown
@@ -411,7 +411,7 @@ spec:
       annotations:
         summary: "Alertmanager is down"
         description: "Alertmanager has been down for more than 5 minutes. No alerts will be delivered."
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#alertmanager-down"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#alertmanager-down"
 
     # Alert if too many notifications are failing
     - alert: AlertmanagerNotificationsFailing
@@ -424,7 +424,7 @@ spec:
       annotations:
         summary: "High rate of failed alert notifications"
         description: "{{ $value | humanize }} notifications per second are failing for {{ $labels.integration }}"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#alertmanager-notifications"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#alertmanager-notifications"
 
   # Redis security and health monitoring
   - name: redis.security.rules
@@ -441,7 +441,7 @@ spec:
       annotations:
         summary: "Redis authentication failures detected"
         description: "{{ $value | humanize }} authentication failures per second on Redis instance {{ $labels.instance }}. Potential unauthorized access attempt."
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#redis-auth-failures"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#redis-auth-failures"
 
     # Redis down
     - alert: RedisDown
@@ -454,7 +454,7 @@ spec:
       annotations:
         summary: "Redis instance is down"
         description: "Redis instance {{ $labels.instance }} has been down for more than 1 minute"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#redis-down"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#redis-down"
 
     # Redis high memory usage
     - alert: RedisHighMemoryUsage
@@ -467,7 +467,7 @@ spec:
       annotations:
         summary: "Redis memory usage is high"
         description: "Redis instance {{ $labels.instance }} is using {{ $value | humanizePercentage }} of available memory"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#redis-memory"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#redis-memory"
 
     # Redis eviction rate high
     - alert: RedisHighEvictionRate
@@ -480,7 +480,7 @@ spec:
       annotations:
         summary: "High Redis key eviction rate"
         description: "Redis is evicting {{ $value | humanize }} keys per second on {{ $labels.instance }}. Consider increasing maxmemory."
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#redis-eviction"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#redis-eviction"
 
     # Redis connection exhaustion
     - alert: RedisConnectionsNearLimit
@@ -493,4 +493,4 @@ spec:
       annotations:
         summary: "Redis connections near limit"
         description: "Redis instance {{ $labels.instance }} is using {{ $value | humanizePercentage }} of max connections"
-        runbook_url: "https://github.com/arec1b0/mlops-sentiment/wiki/runbooks#redis-connections"
+        runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#redis-connections"
