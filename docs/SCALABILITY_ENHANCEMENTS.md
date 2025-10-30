@@ -394,7 +394,7 @@ Includes:
 
 ```bash
 # Create namespace (if needed)
-kubectl create namespace default
+kubectl create namespace mlops-sentiment
 
 # Deploy Redis
 kubectl apply -f k8s/redis-deployment.yaml

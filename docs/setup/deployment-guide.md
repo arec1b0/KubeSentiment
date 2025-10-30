@@ -17,7 +17,7 @@ This guide provides comprehensive instructions for deploying the Sentiment Analy
 - Docker 20.10+ and Docker Compose 1.29+
 - Kubernetes 1.21+ (for Kubernetes deployment)
 - Helm 3.7+ (for Helm chart deployment)
-- Python 3.9+ (for local development)
+- Python 3.11+ (for local development)
 - 4GB RAM (minimum), 8GB+ recommended
 - 2 CPU cores (minimum), 4+ recommended
 
@@ -187,7 +187,7 @@ Metrics are exposed at `/metrics` in Prometheus format.
 View logs using:
 ```bash
 # For Kubernetes
-kubectl logs -l app=sentiment-service -n mlops --tail=100
+kubectl logs -l app=sentiment-service -n mlops-sentiment --tail=100
 
 # For Docker
 kubectl logs -f sentiment-service

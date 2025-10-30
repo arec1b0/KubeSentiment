@@ -46,7 +46,7 @@ This guide provides solutions to common issues you might encounter while deployi
 **Troubleshooting Steps**:
 1. Check container logs:
    ```bash
-   kubectl logs -l app=sentiment-service -n mlops --tail=100
+   kubectl logs -l app=sentiment-service -n mlops-sentiment --tail=100
    ```
 
 2. Check health endpoint manually:
@@ -145,7 +145,7 @@ The API returns standardized error codes for easier troubleshooting:
 
 2. Check events:
    ```bash
-   kubectl get events -n mlops --sort-by='.metadata.creationTimestamp'
+   kubectl get events -n mlops-sentiment --sort-by='.metadata.creationTimestamp'
    ```
 
 3. Common issues:
@@ -217,7 +217,7 @@ If you encounter an issue not covered in this guide:
 
 1. **Check Logs**:
    ```bash
-   kubectl logs -l app=sentiment-service -n mlops --tail=100
+   kubectl logs -l app=sentiment-service -n mlops-sentiment --tail=100
    ```
 
 2. **Enable Debug Logging**:

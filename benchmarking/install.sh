@@ -94,8 +94,8 @@ install_python_deps() {
     python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
     log_info "Версия Python: $python_version"
     
-    if [[ $(echo "$python_version >= 3.8" | bc -l) -eq 0 ]]; then
-        log_error "Требуется Python 3.8 или выше. Текущая версия: $python_version"
+    if [[ $(echo "$python_version >= 3.11" | bc -l) -eq 0 ]]; then
+        log_error "Требуется Python 3.11 или выше. Текущая версия: $python_version"
         exit 1
     fi
     

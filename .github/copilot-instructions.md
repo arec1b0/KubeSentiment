@@ -203,7 +203,7 @@ def test_prediction_format(sentiment_model):
 
 ### Standards
 
-- Use **Python 3.9+** with type hints
+- Use **Python 3.11+** with type hints
 - Follow **PEP 8** style guidelines
 - Use **black** for formatting (line length: 100)
 - Use **ruff** for linting

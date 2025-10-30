@@ -60,13 +60,13 @@ helm install mlops-sentiment ./helm/mlops-sentiment \
 
 ```bash
 # Delete pod to trigger cold-start
-kubectl delete pod -l app=mlops-sentiment -n mlops
+kubectl delete pod -l app=mlops-sentiment -n mlops-sentiment
 
 # Watch new pod startup
-kubectl get pods -n mlops -w
+kubectl get pods -n mlops-sentiment -w
 
 # Check logs for load time
-kubectl logs -l app=mlops-sentiment -n mlops | grep "Model loaded"
+kubectl logs -l app=mlops-sentiment -n mlops-sentiment | grep "Model loaded"
 # Expected: "Model loaded successfully, duration_ms=45"
 ```
 
@@ -74,7 +74,7 @@ kubectl logs -l app=mlops-sentiment -n mlops | grep "Model loaded"
 
 ```bash
 # Get service URL
-export SERVICE_URL=$(kubectl get svc mlops-sentiment -n mlops -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+export SERVICE_URL=$(kubectl get svc mlops-sentiment -n mlops-sentiment -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 
 # Test prediction (with timing)
 time curl -X POST "http://${SERVICE_URL}/predict" \
@@ -147,7 +147,7 @@ helm install mlops-sentiment ./helm/mlops-sentiment \
 
 ```bash
 # Exec into pod
-kubectl exec -it deployment/mlops-sentiment -n mlops -- bash
+kubectl exec -it deployment/mlops-sentiment -n mlops-sentiment -- bash
 
 # List cached models
 ls -lh /models/models/
@@ -160,7 +160,7 @@ cat /models/metadata/*.json
 
 ```bash
 # Port-forward Prometheus metrics
-kubectl port-forward svc/mlops-sentiment -n mlops 8000:80
+kubectl port-forward svc/mlops-sentiment -n mlops-sentiment 8000:80
 
 # Check cold-start metric
 curl http://localhost:8000/metrics | grep mlops_model_load_duration
@@ -211,7 +211,7 @@ EOF
 
 **Solution:** Check if model is already cached
 ```bash
-kubectl logs <pod-name> -c model-preloader -n mlops
+kubectl logs <pod-name> -c model-preloader -n mlops-sentiment
 # If you see "Model already cached" but it's slow, check PV access
 ```
 
@@ -220,14 +220,14 @@ kubectl logs <pod-name> -c model-preloader -n mlops
 **Solution:** Verify storage class
 ```bash
 kubectl get storageclass
-kubectl describe pvc mlops-sentiment-model-cache -n mlops
+kubectl describe pvc mlops-sentiment-model-cache -n mlops-sentiment
 ```
 
 ### Issue: Cold-start still >100ms
 
 **Solution:** Verify ONNX optimization is enabled
 ```bash
-kubectl get configmap mlops-sentiment-model-init-script -n mlops -o yaml | grep ENABLE_ONNX
+kubectl get configmap mlops-sentiment-model-init-script -n mlops-sentiment -o yaml | grep ENABLE_ONNX
 # Should show: ENABLE_ONNX_OPTIMIZATION: "true"
 ```
 
