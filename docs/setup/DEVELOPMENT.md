@@ -23,6 +23,8 @@ python run.py
 - **Health Check**: <http://localhost:8000/health>
 - **Metrics**: <http://localhost:8000/metrics>
 
+> **Development Mode:** When running locally with `MLOPS_DEBUG=true`, API endpoints are available at the root level without the `/api/v1` prefix for easier testing. Production deployments use the `/api/v1` prefix for all endpoints.
+
 ## 🧪 Testing
 
 ### Quick Test

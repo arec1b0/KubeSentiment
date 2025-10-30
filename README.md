@@ -1,7 +1,7 @@
 # KubeSentiment: Production-Ready MLOps Sentiment Analysis Microservice
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/arec1b0/mlops-sentiment/actions)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/arec1b0/mlops-sentiment/releases)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/arec1b0/KubeSentiment/actions)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/arec1b0/KubeSentiment/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)](https://example.com/coverage)
 [![Code Quality](https://img.shields.io/badge/quality-A-brightgreen.svg)](https://example.com/quality)
@@ -95,8 +95,8 @@ This is the quickest way to get the service running on your local machine.
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/arec1b0/mlops-sentiment.git
-    cd mlops-sentiment
+    git clone https://github.com/arec1b0/KubeSentiment.git
+    cd KubeSentiment
     ```
 
 2.  **Install dependencies:**
@@ -157,6 +157,8 @@ The service exposes several key endpoints:
 | `GET`  | `/api/v1/health`             | Health check endpoint for readiness/liveness.    |
 | `GET`  | `/api/v1/metrics`            | Exposes Prometheus metrics.                      |
 | `GET`  | `/api/v1/model-info`  | Returns metadata about the loaded ML model.      |
+
+> **Note on API Versioning:** All endpoints use the `/api/v1` prefix in production mode. When running in debug mode (`MLOPS_DEBUG=true`), the `/api/v1` prefix is omitted for easier local development (e.g., `/predict` instead of `/api/v1/predict`).
 
 ### Configuration
 

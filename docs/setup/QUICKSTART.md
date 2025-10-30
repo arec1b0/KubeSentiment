@@ -13,8 +13,8 @@ helm version              # Helm package manager
 ### 2️⃣ Clone Repository
 
 ```bash
-git clone https://github.com/arec1b0/mlops-sentiment.git
-cd mlops-sentiment
+git clone https://github.com/arec1b0/KubeSentiment.git
+cd KubeSentiment
 ```
 
 ### 3️⃣ Launch Full Monitoring System
@@ -115,16 +115,18 @@ More details: [Benchmarking Guide](BENCHMARKING.md)
 
 ## 🧪 Testing
 
+> **Note:** The examples below use root-level endpoints (e.g., `/health`, `/predict`). In production deployments, all API endpoints are prefixed with `/api/v1` (e.g., `/api/v1/health`, `/api/v1/predict`). The debug mode (used in local development) omits this prefix for convenience.
+
 ```bash
-# Check service health
+# Check service health (production: /api/v1/health)
 curl http://localhost:8080/health
 
-# Test prediction API
+# Test prediction API (production: /api/v1/predict)
 curl -X POST http://localhost:8080/predict \
   -H "Content-Type: application/json" \
   -d '{"text": "I love this monitoring system!"}'
 
-# View metrics
+# View metrics (production: /api/v1/metrics)
 curl http://localhost:8080/metrics
 
 # Check logs
