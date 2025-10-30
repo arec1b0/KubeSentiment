@@ -124,11 +124,13 @@ This is the quickest way to get the service running on your local machine.
     You should receive a response like:
     ```json
     {
-      "text": "This is an amazing project and the setup was so easy!",
-      "sentiment": {
-        "label": "POSITIVE",
-        "score": 0.9998
-      }
+      "label": "POSITIVE",
+      "score": 0.9998,
+      "inference_time_ms": 45.2,
+      "model_name": "distilbert-base-uncased-finetuned-sst-2-english",
+      "text_length": 54,
+      "backend": "pytorch",
+      "cached": false
     }
     ```
 
