@@ -24,12 +24,16 @@ from app.api.middleware import (
 from app.core.config import get_settings
 from app.core.events import lifespan
 from app.core.logging import get_logger, setup_structured_logging
+from app.core.tracing import setup_tracing, instrument_fastapi_app
 from app.monitoring.routes import router as monitoring_router
 from app.utils.exceptions import ServiceError
 
 # Setup structured logging
 setup_structured_logging()
 logger = get_logger(__name__)
+
+# Setup distributed tracing
+setup_tracing()
 
 
 def create_app() -> FastAPI:
@@ -81,6 +85,13 @@ def create_app() -> FastAPI:
         logger.info("Prometheus metrics middleware enabled")
     except Exception as e:
         logger.warning(f"Prometheus metrics not available: {e}")
+
+    # Instrument FastAPI for distributed tracing
+    try:
+        instrument_fastapi_app(app)
+        logger.info("Distributed tracing instrumentation enabled")
+    except Exception as e:
+        logger.warning(f"Distributed tracing not available: {e}")
 
     # Global exception handler for unhandled errors
     @app.exception_handler(Exception)

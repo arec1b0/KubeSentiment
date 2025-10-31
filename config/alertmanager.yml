@@ -1,0 +1,129 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'mlops-alerts@company.com'
+  smtp_auth_username: 'mlops-alerts@company.com'
+  smtp_auth_password: 'your-app-password'
+  smtp_require_tls: true
+  slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+route:
+  group_by: ['alertname', 'cluster', 'namespace', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default'
+
+  routes:
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      group_interval: 2m
+      repeat_interval: 1h
+      routes:
+        - match:
+            component: ml-model
+          receiver: 'ml-critical'
+          group_wait: 5s
+          group_interval: 1m
+          repeat_interval: 30m
+
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      repeat_interval: 6h
+
+    - match:
+        severity: info
+      receiver: 'info-alerts'
+      repeat_interval: 24h
+
+    - match:
+        alertname: Watchdog
+      receiver: 'watchdog'
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 5m
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'cluster', 'service']
+
+receivers:
+  - name: 'default'
+    slack_configs:
+      - channel: '#alerts'
+        title: '🔔 MLOps Alert'
+        text: |
+          {{ range .Alerts }}
+          **Alert:** {{ .Annotations.summary }}
+          **Description:** {{ .Annotations.description }}
+          **Severity:** {{ .Labels.severity }}
+          **Service:** {{ .Labels.service }}
+          {{ end }}
+        send_resolved: true
+
+  - name: 'critical-alerts'
+    slack_configs:
+      - channel: '#critical-alerts'
+        title: '🚨 CRITICAL MLOps Alert'
+        text: |
+          <!channel>
+          {{ range .Alerts }}
+          **🚨 CRITICAL ALERT 🚨**
+          **Alert:** {{ .Annotations.summary }}
+          **Description:** {{ .Annotations.description }}
+          **Service:** {{ .Labels.service }}
+          **Environment:** {{ .Labels.environment | default "unknown" }}
+          {{ end }}
+        send_resolved: true
+
+  - name: 'ml-critical'
+    slack_configs:
+      - channel: '#ml-alerts'
+        title: '🤖 CRITICAL ML Model Alert'
+        text: |
+          <!channel>
+          **🤖 ML MODEL CRITICAL ISSUE 🤖**
+          {{ range .Alerts }}
+          **Alert:** {{ .Annotations.summary }}
+          **Description:** {{ .Annotations.description }}
+          **Model:** {{ .Labels.model_name | default "unknown" }}
+          {{ end }}
+        send_resolved: true
+
+  - name: 'warning-alerts'
+    slack_configs:
+      - channel: '#alerts'
+        title: '⚠️ MLOps Warning'
+        text: |
+          {{ range .Alerts }}
+          **⚠️ Warning:** {{ .Annotations.summary }}
+          **Description:** {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+
+  - name: 'info-alerts'
+    slack_configs:
+      - channel: '#info'
+        title: 'ℹ️ MLOps Info'
+        text: |
+          {{ range .Alerts }}
+          **ℹ️ Info:** {{ .Annotations.summary }}
+          {{ end }}
+        send_resolved: true
+
+  - name: 'watchdog'
+    slack_configs:
+      - channel: '#monitoring-health'
+        title: '👁️ Alertmanager Watchdog'
+        text: 'Alertmanager is healthy and processing alerts'
+        send_resolved: false
+

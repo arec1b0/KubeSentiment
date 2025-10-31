@@ -50,3 +50,15 @@ black==23.11.0
 ruff==0.1.6
 isort==5.12.0
 pre-commit==3.5.0
+
+# OpenTelemetry for distributed tracing
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+opentelemetry-instrumentation-fastapi==0.42b0
+opentelemetry-instrumentation-httpx==0.42b0
+opentelemetry-instrumentation-requests==0.42b0
+opentelemetry-instrumentation-redis==0.42b0
+opentelemetry-instrumentation-logging==0.42b0
+opentelemetry-exporter-jaeger==1.21.0
+opentelemetry-exporter-zipkin==1.21.0
+opentelemetry-exporter-otlp==1.21.0

@@ -463,6 +463,40 @@ class Settings(BaseSettings):
         pattern=r"^(range|roundrobin|sticky)$",
     )
 
+    # Distributed tracing settings
+    enable_tracing: bool = Field(default=True, description="Enable distributed tracing")
+    tracing_backend: str = Field(
+        default="jaeger",
+        description="Tracing backend: jaeger, zipkin, otlp, or console",
+    )
+    service_name: str = Field(
+        default="sentiment-analysis-api",
+        description="Service name for distributed tracing",
+    )
+    environment: str = Field(
+        default="production", description="Deployment environment (dev/staging/prod)"
+    )
+
+    # Jaeger settings
+    jaeger_agent_host: str = Field(default="jaeger", description="Jaeger agent hostname")
+    jaeger_agent_port: int = Field(default=6831, description="Jaeger agent port", ge=1024, le=65535)
+
+    # Zipkin settings
+    zipkin_endpoint: str = Field(
+        default="http://zipkin:9411", description="Zipkin collector endpoint"
+    )
+
+    # OTLP settings
+    otlp_endpoint: str = Field(
+        default="jaeger:4317", description="OTLP gRPC endpoint"
+    )
+
+    # Tracing exclusions
+    tracing_excluded_urls: str = Field(
+        default="/health,/metrics,/docs,/redoc,/openapi.json",
+        description="Comma-separated list of URLs to exclude from tracing",
+    )
+
     @field_validator("allowed_models")
     @classmethod
     def validate_model_names(cls, v: List[str]) -> List[str]:
