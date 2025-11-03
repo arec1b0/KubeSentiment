@@ -1,0 +1,139 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: sentiment-litmus-workflow
+  namespace: default
+spec:
+  entrypoint: chaos-pipeline
+  serviceAccountName: argo-chaos
+  templates:
+    - name: chaos-pipeline
+      steps:
+        - - name: install-experiments
+            template: install-chaos-experiments
+
+        - - name: pod-delete-test
+            template: run-chaos
+            arguments:
+              parameters:
+                - name: chaosEngine
+                  value: 'sentiment-pod-delete'
+
+        - - name: wait-after-pod-delete
+            template: wait-for-recovery
+            arguments:
+              parameters:
+                - name: duration
+                  value: '60s'
+
+        - - name: network-latency-test
+            template: run-chaos
+            arguments:
+              parameters:
+                - name: chaosEngine
+                  value: 'sentiment-network-latency'
+
+        - - name: wait-after-network
+            template: wait-for-recovery
+            arguments:
+              parameters:
+                - name: duration
+                  value: '60s'
+
+        - - name: cpu-stress-test
+            template: run-chaos
+            arguments:
+              parameters:
+                - name: chaosEngine
+                  value: 'sentiment-cpu-hog'
+
+        - - name: cleanup
+            template: cleanup-experiments
+
+    - name: install-chaos-experiments
+      script:
+        image: litmuschaos/k8s:latest
+        command: [sh]
+        source: |
+          kubectl apply -f https://hub.litmuschaos.io/api/chaos/master?file=charts/generic/pod-delete/experiment.yaml
+          kubectl apply -f https://hub.litmuschaos.io/api/chaos/master?file=charts/generic/container-kill/experiment.yaml
+          kubectl apply -f https://hub.litmuschaos.io/api/chaos/master?file=charts/generic/pod-network-latency/experiment.yaml
+          kubectl apply -f https://hub.litmuschaos.io/api/chaos/master?file=charts/generic/pod-cpu-hog/experiment.yaml
+
+    - name: run-chaos
+      inputs:
+        parameters:
+          - name: chaosEngine
+      script:
+        image: litmuschaos/k8s:latest
+        command: [sh]
+        source: |
+          kubectl apply -f chaos/litmus/{{inputs.parameters.chaosEngine}}.yaml
+          # Wait for chaos to complete
+          kubectl wait --for=condition=ChaosEngineCompleted \
+            chaosengine/{{inputs.parameters.chaosEngine}} \
+            --timeout=600s
+
+    - name: wait-for-recovery
+      inputs:
+        parameters:
+          - name: duration
+      suspend:
+        duration: '{{inputs.parameters.duration}}'
+
+    - name: cleanup-experiments
+      script:
+        image: litmuschaos/k8s:latest
+        command: [sh]
+        source: |
+          kubectl delete chaosengine --all -n default
+          kubectl delete chaosexperiment --all -n default
+---
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: sentiment-scheduled-chaos
+  namespace: default
+spec:
+  schedule: '0 */6 * * *'  # Every 6 hours
+  timezone: 'UTC'
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  workflowSpec:
+    entrypoint: scheduled-chaos
+    serviceAccountName: argo-chaos
+    templates:
+      - name: scheduled-chaos
+        steps:
+          - - name: random-chaos-type
+              template: select-random-chaos
+
+          - - name: execute-chaos
+              template: run-selected-chaos
+              arguments:
+                parameters:
+                  - name: chaosType
+                    value: '{{steps.random-chaos-type.outputs.result}}'
+
+      - name: select-random-chaos
+        script:
+          image: bash:latest
+          command: [bash]
+          source: |
+            CHAOS_TYPES=("sentiment-pod-delete" "sentiment-network-latency" "sentiment-cpu-hog" "sentiment-memory-hog")
+            SELECTED=${CHAOS_TYPES[$RANDOM % ${#CHAOS_TYPES[@]}]}
+            echo $SELECTED
+
+      - name: run-selected-chaos
+        inputs:
+          parameters:
+            - name: chaosType
+        script:
+          image: litmuschaos/k8s:latest
+          command: [sh]
+          source: |
+            kubectl apply -f chaos/litmus/{{inputs.parameters.chaosType}}.yaml
+            kubectl wait --for=condition=ChaosEngineCompleted \
+              chaosengine/{{inputs.parameters.chaosType}} \
+              --timeout=600s

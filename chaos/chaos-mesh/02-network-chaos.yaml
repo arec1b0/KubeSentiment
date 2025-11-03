@@ -1,0 +1,111 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: sentiment-network-delay
+  namespace: default
+spec:
+  action: delay
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  delay:
+    latency: '100ms'
+    correlation: '25'
+    jitter: '10ms'
+  duration: '5m'
+  scheduler:
+    cron: '@every 1h'
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: sentiment-network-loss
+  namespace: default
+spec:
+  action: loss
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  loss:
+    loss: '25'
+    correlation: '25'
+  duration: '3m'
+  scheduler:
+    cron: '@every 2h'
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: sentiment-network-partition
+  namespace: default
+spec:
+  action: partition
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  direction: to
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - default
+      labelSelectors:
+        app: redis
+  duration: '1m'
+  scheduler:
+    cron: '@every 3h'
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: sentiment-kafka-partition
+  namespace: default
+spec:
+  action: partition
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  direction: to
+  target:
+    mode: all
+    selector:
+      namespaces:
+        - default
+      labelSelectors:
+        app: kafka
+  duration: '2m'
+  scheduler:
+    cron: '@every 4h'
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: NetworkChaos
+metadata:
+  name: sentiment-bandwidth-limit
+  namespace: default
+spec:
+  action: bandwidth
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  bandwidth:
+    rate: '1mbps'
+    limit: 20971520
+    buffer: 10000
+  duration: '3m'
+  scheduler:
+    cron: '@every 6h'

@@ -1,0 +1,334 @@
+{
+  "dashboard": {
+    "title": "Chaos Engineering Monitoring",
+    "tags": ["chaos", "resilience", "mlops"],
+    "timezone": "browser",
+    "schemaVersion": 30,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "title": "Request Success Rate During Chaos",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(sentiment_requests_total{status=\"success\"}[1m])) / sum(rate(sentiment_requests_total[1m])) * 100",
+            "legendFormat": "Success Rate %",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "min": 0, "max": 100},
+          {"format": "short"}
+        ],
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {"params": [95], "type": "lt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A", "5m", "now"]},
+              "reducer": {"params": [], "type": "avg"},
+              "type": "query"
+            }
+          ],
+          "frequency": "60s",
+          "handler": 1,
+          "name": "Low Success Rate During Chaos",
+          "notifications": []
+        }
+      },
+      {
+        "id": 2,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "title": "Request Latency (p95, p99)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(sentiment_request_duration_seconds_bucket[1m])) by (le))",
+            "legendFormat": "p95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(sentiment_request_duration_seconds_bucket[1m])) by (le))",
+            "legendFormat": "p99",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"format": "s"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 3,
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 8},
+        "title": "Pod Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(kube_pod_status_phase{namespace=\"default\",pod=~\"mlops-sentiment.*\",phase=\"Running\"})",
+            "legendFormat": "Running Pods",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value",
+          "textMode": "value_and_name"
+        }
+      },
+      {
+        "id": 4,
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 8},
+        "title": "Active Chaos Experiments",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(chaos_mesh_experiments{status=\"running\"})",
+            "legendFormat": "Active Experiments",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background",
+          "textMode": "value"
+        }
+      },
+      {
+        "id": 5,
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 8},
+        "title": "HPA Current Replicas",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"mlops-sentiment\"}",
+            "legendFormat": "Current",
+            "refId": "A"
+          },
+          {
+            "expr": "kube_horizontalpodautoscaler_status_desired_replicas{horizontalpodautoscaler=\"mlops-sentiment\"}",
+            "legendFormat": "Desired",
+            "refId": "B"
+          }
+        ],
+        "options": {
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 6,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+        "title": "Error Rate by Type",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(sentiment_requests_total{status!=\"success\"}[1m])) by (status)",
+            "legendFormat": "{{status}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 7,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+        "title": "Pod Restarts",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(kube_pod_container_status_restarts_total{namespace=\"default\",pod=~\"mlops-sentiment.*\"}[5m])) by (pod)",
+            "legendFormat": "{{pod}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "short"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 8,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 22},
+        "title": "CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"default\",pod=~\"mlops-sentiment.*\"}[1m])) by (pod)",
+            "legendFormat": "{{pod}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "percentunit"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 9,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 22},
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(container_memory_usage_bytes{namespace=\"default\",pod=~\"mlops-sentiment.*\"}) by (pod)",
+            "legendFormat": "{{pod}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "bytes"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 10,
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 30},
+        "title": "Chaos Events Timeline",
+        "type": "logs",
+        "targets": [
+          {
+            "expr": "{namespace=\"default\"} |= \"chaos\" | json",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 38},
+        "title": "Network Throughput",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(container_network_receive_bytes_total{namespace=\"default\",pod=~\"mlops-sentiment.*\"}[1m])) by (pod)",
+            "legendFormat": "RX {{pod}}",
+            "refId": "A"
+          },
+          {
+            "expr": "sum(rate(container_network_transmit_bytes_total{namespace=\"default\",pod=~\"mlops-sentiment.*\"}[1m])) by (pod)",
+            "legendFormat": "TX {{pod}}",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"format": "Bps"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 12,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 38},
+        "title": "Model Inference Performance",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(sentiment_inference_duration_seconds_bucket[1m])) by (le))",
+            "legendFormat": "Inference p95",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "s"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 13,
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 46},
+        "title": "Cache Hit Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(redis_cache_hits_total[1m])) / (sum(rate(redis_cache_hits_total[1m])) + sum(rate(redis_cache_misses_total[1m]))) * 100",
+            "legendFormat": "Hit Rate %",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        }
+      },
+      {
+        "id": 14,
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 46},
+        "title": "Kafka Consumer Lag",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(kafka_consumer_lag_messages) by (topic)",
+            "legendFormat": "{{topic}}",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 15,
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 46},
+        "title": "Service Availability",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "(sum(up{job=\"mlops-sentiment\"}) / count(up{job=\"mlops-sentiment\"})) * 100",
+            "legendFormat": "Availability %",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background",
+          "textMode": "value"
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "namespace",
+          "type": "query",
+          "query": "label_values(kube_pod_info, namespace)",
+          "current": {"value": "default"}
+        },
+        {
+          "name": "pod",
+          "type": "query",
+          "query": "label_values(kube_pod_info{namespace=\"$namespace\",pod=~\"mlops-sentiment.*\"}, pod)",
+          "multi": true
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Chaos Events",
+          "datasource": "Prometheus",
+          "enable": true,
+          "expr": "changes(chaos_mesh_experiments_total[1m]) > 0",
+          "iconColor": "red"
+        },
+        {
+          "name": "Pod Restarts",
+          "datasource": "Prometheus",
+          "enable": true,
+          "expr": "changes(kube_pod_container_status_restarts_total{namespace=\"default\",pod=~\"mlops-sentiment.*\"}[1m]) > 0",
+          "iconColor": "orange"
+        },
+        {
+          "name": "HPA Scaling",
+          "datasource": "Prometheus",
+          "enable": true,
+          "expr": "changes(kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=\"mlops-sentiment\"}[1m]) > 0",
+          "iconColor": "blue"
+        }
+      ]
+    }
+  }
+}

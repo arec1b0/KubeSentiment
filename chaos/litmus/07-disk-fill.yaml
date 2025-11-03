@@ -1,0 +1,45 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: sentiment-disk-fill
+  namespace: default
+spec:
+  appinfo:
+    appns: default
+    applabel: 'app.kubernetes.io/name=mlops-sentiment'
+    appkind: deployment
+  engineState: 'active'
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: disk-fill
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: '120'
+            - name: FILL_PERCENTAGE
+              value: '80'
+            - name: TARGET_CONTAINER
+              value: 'mlops-sentiment'
+            - name: EPHEMERAL_STORAGE_MEBIBYTES
+              value: '512'
+            - name: PODS_AFFECTED_PERC
+              value: '25'
+            - name: CONTAINER_RUNTIME
+              value: 'containerd'
+            - name: SOCKET_PATH
+              value: '/run/containerd/containerd.sock'
+        probe:
+          - name: check-disk-io
+            type: cmdProbe
+            mode: Continuous
+            cmdProbe/inputs:
+              command: 'df -h /app/model_cache | tail -1 | awk "{print $5}" | sed "s/%//"'
+              comparator:
+                type: int
+                criteria: '<='
+                value: '90'
+            runProperties:
+              probeTimeout: 5
+              interval: 10
+              retry: 2

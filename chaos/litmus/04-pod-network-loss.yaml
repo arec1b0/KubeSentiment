@@ -1,0 +1,44 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: sentiment-network-loss
+  namespace: default
+spec:
+  appinfo:
+    appns: default
+    applabel: 'app.kubernetes.io/name=mlops-sentiment'
+    appkind: deployment
+  engineState: 'active'
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-network-loss
+      spec:
+        components:
+          env:
+            - name: NETWORK_INTERFACE
+              value: 'eth0'
+            - name: NETWORK_PACKET_LOSS_PERCENTAGE
+              value: '30'
+            - name: TOTAL_CHAOS_DURATION
+              value: '90'
+            - name: PODS_AFFECTED_PERC
+              value: '25'
+            - name: CONTAINER_RUNTIME
+              value: 'containerd'
+            - name: SOCKET_PATH
+              value: '/run/containerd/containerd.sock'
+        probe:
+          - name: check-service-availability
+            type: httpProbe
+            mode: Continuous
+            httpProbe/inputs:
+              url: 'http://mlops-sentiment.default.svc.cluster.local/health'
+              insecureSkipVerify: false
+              method:
+                get:
+                  criteria: '=='
+                  responseCode: '200'
+            runProperties:
+              probeTimeout: 10
+              interval: 5
+              retry: 5

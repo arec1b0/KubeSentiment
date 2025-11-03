@@ -1,0 +1,41 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: sentiment-pod-delete
+  namespace: default
+spec:
+  appinfo:
+    appns: default
+    applabel: 'app.kubernetes.io/name=mlops-sentiment'
+    appkind: deployment
+  engineState: 'active'
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-delete
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: '60'
+            - name: CHAOS_INTERVAL
+              value: '10'
+            - name: FORCE
+              value: 'false'
+            - name: PODS_AFFECTED_PERC
+              value: '33'
+        probe:
+          - name: check-sentiment-api-health
+            type: httpProbe
+            mode: Continuous
+            httpProbe/inputs:
+              url: 'http://mlops-sentiment.default.svc.cluster.local/health'
+              insecureSkipVerify: false
+              method:
+                get:
+                  criteria: '=='
+                  responseCode: '200'
+            runProperties:
+              probeTimeout: 5
+              interval: 2
+              retry: 3
+              probePollingInterval: 2
