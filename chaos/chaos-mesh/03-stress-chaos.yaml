@@ -1,0 +1,63 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: sentiment-cpu-stress
+  namespace: default
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  stressors:
+    cpu:
+      workers: 2
+      load: 80
+  duration: '5m'
+  scheduler:
+    cron: '@every 1h'
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: sentiment-memory-stress
+  namespace: default
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  stressors:
+    memory:
+      workers: 2
+      size: '512MB'
+  duration: '3m'
+  scheduler:
+    cron: '@every 2h'
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: sentiment-mixed-stress
+  namespace: default
+spec:
+  mode: fixed
+  value: '1'
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  stressors:
+    cpu:
+      workers: 1
+      load: 50
+    memory:
+      workers: 1
+      size: '256MB'
+  duration: '4m'
+  scheduler:
+    cron: '@every 3h'

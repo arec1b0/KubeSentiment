@@ -1,0 +1,42 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: sentiment-memory-hog
+  namespace: default
+spec:
+  appinfo:
+    appns: default
+    applabel: 'app.kubernetes.io/name=mlops-sentiment'
+    appkind: deployment
+  engineState: 'active'
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-memory-hog
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: '180'
+            - name: MEMORY_CONSUMPTION
+              value: '512'
+            - name: PODS_AFFECTED_PERC
+              value: '33'
+            - name: CONTAINER_RUNTIME
+              value: 'containerd'
+            - name: SOCKET_PATH
+              value: '/run/containerd/containerd.sock'
+        probe:
+          - name: check-memory-usage
+            type: promProbe
+            mode: Continuous
+            promProbe/inputs:
+              endpoint: 'http://prometheus.monitoring.svc.cluster.local:9090'
+              query: 'sum(container_memory_usage_bytes{pod=~"mlops-sentiment.*"}) by (pod)'
+              comparator:
+                type: float
+                criteria: '<='
+                value: '1073741824'  # 1GB
+            runProperties:
+              probeTimeout: 5
+              interval: 10
+              retry: 2

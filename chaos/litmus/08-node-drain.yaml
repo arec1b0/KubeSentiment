@@ -1,0 +1,49 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: sentiment-node-drain
+  namespace: default
+spec:
+  engineState: 'active'
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: node-drain
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: '180'
+            - name: TARGET_NODES
+              value: ''  # Leave empty to randomly select
+            - name: NODES_AFFECTED_PERC
+              value: '25'
+        probe:
+          - name: check-pod-rescheduling
+            type: k8sProbe
+            mode: Continuous
+            k8sProbe/inputs:
+              group: ''
+              version: v1
+              resource: pods
+              namespace: default
+              labelSelector: 'app.kubernetes.io/name=mlops-sentiment'
+              fieldSelector: 'status.phase=Running'
+              operation: present
+            runProperties:
+              probeTimeout: 10
+              interval: 15
+              retry: 5
+          - name: check-service-health
+            type: httpProbe
+            mode: Continuous
+            httpProbe/inputs:
+              url: 'http://mlops-sentiment.default.svc.cluster.local/health'
+              insecureSkipVerify: false
+              method:
+                get:
+                  criteria: '=='
+                  responseCode: '200'
+            runProperties:
+              probeTimeout: 10
+              interval: 10
+              retry: 5

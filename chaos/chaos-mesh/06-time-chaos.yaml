@@ -1,0 +1,33 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: TimeChaos
+metadata:
+  name: sentiment-clock-skew
+  namespace: default
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  timeOffset: '-1h'
+  duration: '5m'
+  scheduler:
+    cron: '@every 12h'
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: TimeChaos
+metadata:
+  name: sentiment-clock-forward
+  namespace: default
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  timeOffset: '+30m'
+  duration: '3m'
+  scheduler:
+    cron: '@every 8h'

@@ -1,0 +1,46 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: sentiment-network-latency
+  namespace: default
+spec:
+  appinfo:
+    appns: default
+    applabel: 'app.kubernetes.io/name=mlops-sentiment'
+    appkind: deployment
+  engineState: 'active'
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-network-latency
+      spec:
+        components:
+          env:
+            - name: NETWORK_INTERFACE
+              value: 'eth0'
+            - name: NETWORK_LATENCY
+              value: '2000'
+            - name: TOTAL_CHAOS_DURATION
+              value: '120'
+            - name: JITTER
+              value: '500'
+            - name: PODS_AFFECTED_PERC
+              value: '33'
+            - name: CONTAINER_RUNTIME
+              value: 'containerd'
+            - name: SOCKET_PATH
+              value: '/run/containerd/containerd.sock'
+        probe:
+          - name: check-response-time
+            type: httpProbe
+            mode: Continuous
+            httpProbe/inputs:
+              url: 'http://mlops-sentiment.default.svc.cluster.local/health'
+              insecureSkipVerify: false
+              method:
+                get:
+                  criteria: '<='
+                  responseCode: '3000'
+            runProperties:
+              probeTimeout: 5
+              interval: 5
+              retry: 3

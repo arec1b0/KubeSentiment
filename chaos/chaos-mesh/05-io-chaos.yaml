@@ -1,0 +1,63 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: sentiment-io-delay
+  namespace: default
+spec:
+  action: latency
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  volumePath: /app/model_cache
+  path: '**/*'
+  delay: '100ms'
+  percent: 50
+  duration: '3m'
+  scheduler:
+    cron: '@every 4h'
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: sentiment-io-errno
+  namespace: default
+spec:
+  action: fault
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  volumePath: /app/model_cache
+  path: '**/*'
+  errno: 5  # EIO - I/O error
+  percent: 10
+  duration: '2m'
+  scheduler:
+    cron: '@every 6h'
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: IOChaos
+metadata:
+  name: sentiment-io-mixed
+  namespace: default
+spec:
+  action: mixed
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  volumePath: /app/model_cache
+  path: '**/*'
+  delay: '50ms'
+  errno: 28  # ENOSPC - No space left on device
+  percent: 25
+  duration: '2m'
+  scheduler:
+    cron: '@every 8h'

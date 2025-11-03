@@ -1,0 +1,44 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: sentiment-cpu-hog
+  namespace: default
+spec:
+  appinfo:
+    appns: default
+    applabel: 'app.kubernetes.io/name=mlops-sentiment'
+    appkind: deployment
+  engineState: 'active'
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-cpu-hog
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: '180'
+            - name: CPU_CORES
+              value: '2'
+            - name: CPU_LOAD
+              value: '80'
+            - name: PODS_AFFECTED_PERC
+              value: '50'
+            - name: CONTAINER_RUNTIME
+              value: 'containerd'
+            - name: SOCKET_PATH
+              value: '/run/containerd/containerd.sock'
+        probe:
+          - name: check-hpa-scaling
+            type: k8sProbe
+            mode: Edge
+            k8sProbe/inputs:
+              group: autoscaling
+              version: v2
+              resource: horizontalpodautoscalers
+              namespace: default
+              fieldSelector: metadata.name=mlops-sentiment
+              operation: present
+            runProperties:
+              probeTimeout: 5
+              interval: 10
+              retry: 3

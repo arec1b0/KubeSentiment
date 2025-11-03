@@ -1,0 +1,64 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: HTTPChaos
+metadata:
+  name: sentiment-http-delay
+  namespace: default
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  target: Request
+  port: 8000
+  path: '/api/v1/predict'
+  delay: '2s'
+  duration: '5m'
+  scheduler:
+    cron: '@every 2h'
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: HTTPChaos
+metadata:
+  name: sentiment-http-abort
+  namespace: default
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  target: Request
+  port: 8000
+  path: '/api/v1/predict'
+  abort: true
+  duration: '1m'
+  scheduler:
+    cron: '@every 4h'
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: HTTPChaos
+metadata:
+  name: sentiment-http-patch-response
+  namespace: default
+spec:
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  target: Response
+  port: 8000
+  path: '/api/v1/predict'
+  patch:
+    body:
+      type: JSON
+      value: '{"error": "Chaos injected error", "status": "chaos"}'
+    headers:
+      - ['X-Chaos-Injected', 'true']
+  duration: '2m'
+  scheduler:
+    cron: '@every 6h'

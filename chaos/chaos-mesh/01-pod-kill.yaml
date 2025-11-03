@@ -1,0 +1,52 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: sentiment-pod-kill
+  namespace: default
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  scheduler:
+    cron: '@every 10m'
+  duration: '30s'
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: sentiment-pod-failure
+  namespace: default
+spec:
+  action: pod-failure
+  mode: fixed
+  value: '1'
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  duration: '2m'
+  scheduler:
+    cron: '@every 30m'
+---
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: sentiment-container-kill
+  namespace: default
+spec:
+  action: container-kill
+  mode: one
+  containerNames:
+    - mlops-sentiment
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  scheduler:
+    cron: '@every 20m'

@@ -1,0 +1,44 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: sentiment-container-kill
+  namespace: default
+spec:
+  appinfo:
+    appns: default
+    applabel: 'app.kubernetes.io/name=mlops-sentiment'
+    appkind: deployment
+  engineState: 'active'
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: container-kill
+      spec:
+        components:
+          env:
+            - name: TARGET_CONTAINER
+              value: 'mlops-sentiment'
+            - name: CHAOS_INTERVAL
+              value: '10'
+            - name: TOTAL_CHAOS_DURATION
+              value: '60'
+            - name: CONTAINER_RUNTIME
+              value: 'containerd'
+            - name: SOCKET_PATH
+              value: '/run/containerd/containerd.sock'
+            - name: PODS_AFFECTED_PERC
+              value: '50'
+        probe:
+          - name: check-predictions-endpoint
+            type: httpProbe
+            mode: Continuous
+            httpProbe/inputs:
+              url: 'http://mlops-sentiment.default.svc.cluster.local/api/v1/model/info'
+              insecureSkipVerify: false
+              method:
+                get:
+                  criteria: '=='
+                  responseCode: '200'
+            runProperties:
+              probeTimeout: 5
+              interval: 3
+              retry: 2
