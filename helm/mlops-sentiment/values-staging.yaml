@@ -156,3 +156,17 @@ securityContext:
   readOnlyRootFilesystem: true
   runAsNonRoot: true
   runAsUser: 1000
+
+# Enable Istio with STRICT mTLS in staging
+istio:
+  enabled: true
+  enableNamespaceInjection: true
+  http:
+    timeout: 5s
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+      retryOn: "5xx,connect-failure,refused-stream,reset"
+  mtls:
+    mode: ISTIO_MUTUAL
+    strictNamespace: true

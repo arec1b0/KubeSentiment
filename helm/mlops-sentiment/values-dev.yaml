@@ -66,3 +66,14 @@ networkPolicy:
           port: 443
         - protocol: UDP
           port: 53
+
+# Enable Istio mesh for advanced resilience in dev
+istio:
+  enabled: true
+  enableNamespaceInjection: true
+  http:
+    timeout: 3s
+    retries:
+      attempts: 2
+      perTryTimeout: 1s
+      retryOn: "5xx,connect-failure,refused-stream,reset"

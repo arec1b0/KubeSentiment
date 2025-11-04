@@ -217,3 +217,28 @@ affinity:
               values:
                 - mlops-sentiment
         topologyKey: kubernetes.io/hostname
+
+# Enable Istio with STRICT mTLS and stronger policies in production
+istio:
+  enabled: true
+  enableNamespaceInjection: true
+  http:
+    timeout: 5s
+    retries:
+      attempts: 5
+      perTryTimeout: 2s
+      retryOn: "5xx,connect-failure,refused-stream,reset,gateway-error,retriable-4xx"
+  connectionPool:
+    tcp:
+      maxConnections: 200
+    http:
+      http1MaxPendingRequests: 2000
+      maxRequestsPerConnection: 200
+  outlierDetection:
+    consecutive5xx: 2
+    interval: 5s
+    baseEjectionTime: 60s
+    maxEjectionPercent: 80
+  mtls:
+    mode: ISTIO_MUTUAL
+    strictNamespace: true

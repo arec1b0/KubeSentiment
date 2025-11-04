@@ -399,3 +399,64 @@ alertmanager:
         channel: '#alerts'
         title: 'MLOps Alert'
         text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+
+# Istio service mesh configuration
+istio:
+  # Master switch to render Istio resources and annotations
+  enabled: false
+
+  # Label namespace for automatic sidecar injection
+  enableNamespaceInjection: true
+
+  # Optional pod annotations for Istio proxy behavior
+  # Example: hold application start until proxy is ready
+  podAnnotations: {}
+    # proxy.istio.io/config: '{ "holdApplicationUntilProxyStarts": true }'
+
+  # Ingress via Istio Gateway (alternative to standard Ingress)
+  gateway:
+    enabled: false
+    # Namespace/name of the Istio ingress gateway
+    name: istio-system/istio-ingressgateway
+    # Public hosts served by the gateway (required when enabled)
+    hosts: []
+
+  # HTTP routing policies
+  http:
+    timeout: 5s
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+      retryOn: "5xx,connect-failure,refused-stream,reset"
+
+  # Traffic policy: connection pools and circuit breaking
+  connectionPool:
+    tcp:
+      maxConnections: 100
+    http:
+      http1MaxPendingRequests: 1000
+      maxRequestsPerConnection: 100
+
+  # Outlier detection (passive health checks)
+  outlierDetection:
+    consecutive5xx: 3
+    interval: 5s
+    baseEjectionTime: 30s
+    maxEjectionPercent: 50
+
+  # Mutual TLS between services
+  mtls:
+    # DestinationRule TLS mode (DISABLE | SIMPLE | MUTUAL | ISTIO_MUTUAL)
+    mode: ISTIO_MUTUAL
+    # Enforce STRICT mTLS in the namespace with PeerAuthentication
+    strictNamespace: false
+
+  # Optional fault injection for resilience testing
+  faultInjection:
+    enabled: false
+    abort:
+      httpStatus: 500
+      percentage: 0
+    delay:
+      fixedDelay: 0s
+      percentage: 0
