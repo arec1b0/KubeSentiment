@@ -1,6 +1,6 @@
 # MLOps Sentiment Analysis - Development Commands
 
-.PHONY: help install test lint format clean build deploy dev docs
+.PHONY: help install test lint format clean build deploy dev docs chaos-install chaos-test-pod-kill chaos-test-network-partition chaos-test-suite chaos-cleanup chaos-status
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -70,5 +70,42 @@ docs: ## Generate documentation (if applicable)
 
 benchmark: ## Run benchmarking suite
 	cd benchmarking && ./quick-benchmark.sh
+
+# Chaos Engineering Targets
+CHAOS_NAMESPACE ?= default
+CHAOS_DURATION ?= 300
+
+chaos-install: ## Install Chaos Mesh and Litmus tools
+	@echo "Installing chaos engineering tools..."
+	@bash chaos/scripts/install_chaos_tools.sh
+
+chaos-test-pod-kill: ## Run pod kill chaos experiment
+	@echo "Running pod kill chaos experiment..."
+	@bash chaos/scripts/test_pod_kill_and_partition.sh pod-kill $(CHAOS_NAMESPACE) $(CHAOS_DURATION)
+
+chaos-test-network-partition: ## Run network partition chaos experiment
+	@echo "Running network partition chaos experiment..."
+	@bash chaos/scripts/test_pod_kill_and_partition.sh network-partition $(CHAOS_NAMESPACE) $(CHAOS_DURATION)
+
+chaos-test-suite: ## Run full chaos engineering test suite
+	@echo "Running chaos engineering test suite..."
+	@python3 chaos/scripts/chaos_test_suite.py --namespace $(CHAOS_NAMESPACE) --output chaos_report.json
+
+chaos-cleanup: ## Clean up all chaos experiments
+	@echo "Cleaning up chaos experiments..."
+	@kubectl delete podchaos,networkchaos,stresschaos,httpchaos,iochaos,timechaos --all -n $(CHAOS_NAMESPACE) 2>/dev/null || true
+	@kubectl delete chaosengine --all -n $(CHAOS_NAMESPACE) 2>/dev/null || true
+	@echo "Cleanup completed"
+
+chaos-status: ## Check chaos tools and experiment status
+	@echo "=== Chaos Mesh Status ==="
+	@kubectl get pods -n chaos-mesh 2>/dev/null || echo "Chaos Mesh not installed"
+	@echo ""
+	@echo "=== Litmus Status ==="
+	@kubectl get pods -n litmus 2>/dev/null || echo "Litmus not installed"
+	@echo ""
+	@echo "=== Active Chaos Experiments ==="
+	@kubectl get podchaos,networkchaos,stresschaos,httpchaos,iochaos,timechaos -n $(CHAOS_NAMESPACE) 2>/dev/null || echo "No active experiments"
+	@kubectl get chaosengine,chaosresult -n $(CHAOS_NAMESPACE) 2>/dev/null || echo "No active Litmus experiments"
 
 all: clean install lint test build ## Run full CI pipeline locally

@@ -73,10 +73,21 @@ check_prerequisites() {
         exit 1
     fi
 
-    # Check if application is running
-    if ! kubectl get deployment mlops-sentiment -n "$NAMESPACE" &> /dev/null; then
-        log_warning "mlops-sentiment deployment not found in namespace $NAMESPACE"
+    # Check if application is running (using label selector for flexibility)
+    if ! kubectl get deployment -n "$NAMESPACE" -l app.kubernetes.io/name=mlops-sentiment &> /dev/null; then
+        log_error "mlops-sentiment deployment not found in namespace $NAMESPACE"
+        log_error "Please ensure the service is deployed before running chaos experiments"
+        exit 1
     fi
+
+    # Check if at least one pod is healthy
+    READY_PODS=$(kubectl get pods -n "$NAMESPACE" -l app.kubernetes.io/name=mlops-sentiment \
+        -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' 2>/dev/null | wc -w)
+    if [ "$READY_PODS" -eq 0 ]; then
+        log_error "No healthy pods found for mlops-sentiment in namespace $NAMESPACE"
+        exit 1
+    fi
+    log_info "Found $READY_PODS healthy pod(s)"
 
     log_success "Prerequisites check passed"
 }
@@ -315,20 +326,24 @@ main() {
 
     check_prerequisites
 
-    # Determine experiment file
+    # Determine experiment file and check tool installation
     local experiment_file=""
     if [ -n "${CHAOS_MESH_EXPERIMENTS[$EXPERIMENT_TYPE]}" ]; then
         experiment_file="${CHAOS_MESH_EXPERIMENTS[$EXPERIMENT_TYPE]}"
         if ! check_chaos_mesh; then
             log_error "Chaos Mesh not installed. Please install Chaos Mesh first."
+            log_error "Run: make chaos-install"
             exit 1
         fi
+        log_info "Chaos Mesh is installed and ready"
     elif [ -n "${LITMUS_EXPERIMENTS[$EXPERIMENT_TYPE]}" ]; then
         experiment_file="${LITMUS_EXPERIMENTS[$EXPERIMENT_TYPE]}"
         if ! check_litmus; then
             log_error "Litmus not installed. Please install Litmus first."
+            log_error "Run: make chaos-install"
             exit 1
         fi
+        log_info "Litmus is installed and ready"
     else
         log_error "Unknown experiment type: $EXPERIMENT_TYPE"
         show_usage

@@ -1,3 +1,7 @@
+# Pod Kill Chaos Experiment
+# This manifest kills a random pod matching the label selector
+# Note: Namespace can be overridden when applying: kubectl apply -f <file> -n <namespace>
+# Label selector matches Helm deployment: app.kubernetes.io/name=mlops-sentiment
 apiVersion: chaos-mesh.org/v1alpha1
 kind: PodChaos
 metadata:

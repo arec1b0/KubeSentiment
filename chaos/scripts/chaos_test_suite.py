@@ -89,6 +89,43 @@ class ChaosTestSuite:
         self.dry_run = dry_run
         self.results: List[ExperimentResult] = []
 
+    def check_prerequisites(self) -> tuple[bool, List[str]]:
+        """Check prerequisites for running chaos experiments"""
+        errors = []
+
+        # Check kubectl
+        returncode, _, stderr = self.run_kubectl_command(["kubectl", "version", "--client"])
+        if returncode != 0:
+            errors.append(f"kubectl not available: {stderr}")
+
+        # Check cluster connectivity
+        returncode, _, stderr = self.run_kubectl_command(["kubectl", "cluster-info"])
+        if returncode != 0:
+            errors.append(f"Cannot connect to Kubernetes cluster: {stderr}")
+
+        # Check if service deployment exists
+        cmd = [
+            "kubectl", "get", "deployment",
+            "-n", self.namespace,
+            "-l", "app.kubernetes.io/name=mlops-sentiment",
+            "--no-headers"
+        ]
+        returncode, stdout, stderr = self.run_kubectl_command(cmd)
+        if returncode != 0 or not stdout.strip():
+            errors.append(f"mlops-sentiment deployment not found in namespace {self.namespace}")
+
+        # Check Chaos Mesh installation
+        cmd = ["kubectl", "get", "crd", "podchaos.chaos-mesh.org"]
+        returncode, _, _ = self.run_kubectl_command(cmd)
+        if returncode != 0:
+            errors.append("Chaos Mesh not installed (podchaos CRD not found)")
+
+        # Check if at least one pod is healthy
+        if not self.check_pod_health():
+            errors.append(f"No healthy pods found for mlops-sentiment in namespace {self.namespace}")
+
+        return len(errors) == 0, errors
+
     def run_kubectl_command(self, command: List[str]) -> tuple[int, str, str]:
         """Run a kubectl command"""
         try:
@@ -213,7 +250,11 @@ class ChaosTestSuite:
 
             # Cleanup chaos
             logger.info("Cleaning up chaos experiment...")
-            self.cleanup_chaos(experiment.resource_type)
+            # Cleanup multiple resource types for network chaos
+            if experiment.resource_type == "networkchaos":
+                self.cleanup_chaos("networkchaos")
+            else:
+                self.cleanup_chaos(experiment.resource_type)
 
             # Wait for recovery
             logger.info("Waiting for system recovery...")
@@ -325,6 +366,7 @@ async def main():
     parser.add_argument("--dry-run", action="store_true", help="Dry run mode")
     parser.add_argument("--output", default="chaos_report.json", help="Output report file")
     parser.add_argument("--experiments", nargs="+", help="Specific experiments to run")
+    parser.add_argument("--skip-prereq-check", action="store_true", help="Skip prerequisite checks")
     args = parser.parse_args()
 
     # Define experiments
@@ -342,11 +384,53 @@ async def main():
             ]
         ),
         ChaosExperiment(
+            name="pod-kill-multiple",
+            description="Kill multiple pods simultaneously to test resilience",
+            manifest_path="chaos/chaos-mesh/01-pod-kill.yaml",
+            duration_seconds=90,
+            severity=Severity.MEDIUM,
+            expected_behavior=[
+                "All pods are recreated automatically",
+                "Service remains available throughout",
+                "HPA maintains desired replica count",
+                "Recovery time < 2 minutes"
+            ]
+        ),
+        ChaosExperiment(
+            name="network-partition-redis",
+            description="Partition network connection to Redis to test graceful degradation",
+            manifest_path="chaos/chaos-mesh/02-network-chaos.yaml",
+            duration_seconds=120,
+            severity=Severity.MEDIUM,
+            resource_type="networkchaos",
+            expected_behavior=[
+                "Service continues to operate without cache",
+                "Fallback to non-cached operation",
+                "No complete service outage",
+                "Graceful degradation observed"
+            ]
+        ),
+        ChaosExperiment(
+            name="network-partition-pods",
+            description="Partition network between pods to test inter-pod communication resilience",
+            manifest_path="chaos/chaos-mesh/02-network-chaos.yaml",
+            duration_seconds=90,
+            severity=Severity.HIGH,
+            resource_type="networkchaos",
+            expected_behavior=[
+                "Individual pods remain functional",
+                "Service remains available via remaining pods",
+                "No request failures",
+                "Load balancing adapts"
+            ]
+        ),
+        ChaosExperiment(
             name="network-delay",
             description="Add network latency to test performance degradation",
             manifest_path="chaos/chaos-mesh/02-network-chaos.yaml",
             duration_seconds=120,
             severity=Severity.MEDIUM,
+            resource_type="networkchaos",
             expected_behavior=[
                 "Increased response times",
                 "No request failures",
@@ -382,6 +466,19 @@ async def main():
     logger.info(f"Namespace: {args.namespace}")
     logger.info(f"Experiments: {len(experiments)}")
     logger.info(f"Dry Run: {args.dry_run}\n")
+
+    # Check prerequisites
+    if not args.skip_prereq_check:
+        logger.info("Checking prerequisites...")
+        prereq_ok, errors = suite.check_prerequisites()
+        if not prereq_ok:
+            logger.error("Prerequisites check failed:")
+            for error in errors:
+                logger.error(f"  - {error}")
+            logger.error("\nPlease fix the issues above before running chaos experiments.")
+            logger.error("You can skip this check with --skip-prereq-check (not recommended)")
+            return 1
+        logger.info("Prerequisites check passed\n")
 
     for experiment in experiments:
         await suite.run_experiment(experiment)

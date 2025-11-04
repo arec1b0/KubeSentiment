@@ -39,6 +39,11 @@ spec:
   scheduler:
     cron: '@every 2h'
 ---
+# Network Partition Chaos Experiment
+# Partitions network connection from mlops-sentiment pods to Redis
+# Tests graceful degradation when cache is unavailable
+# Note: Namespace can be overridden when applying: kubectl apply -f <file> -n <namespace>
+# Label selectors match: app.kubernetes.io/name=mlops-sentiment (source) and app=redis (target)
 apiVersion: chaos-mesh.org/v1alpha1
 kind: NetworkChaos
 metadata:
