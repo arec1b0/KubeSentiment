@@ -5,29 +5,26 @@ Comprehensive Chaos Engineering Test Suite
 Runs a series of chaos experiments and generates a detailed report.
 """
 
+import argparse
 import asyncio
 import json
 import logging
 import subprocess
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import List, Dict, Any, Optional
-import argparse
-
+from typing import Any, Dict, List, Optional
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
 class ExperimentStatus(str, Enum):
     """Status of a chaos experiment"""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -37,6 +34,7 @@ class ExperimentStatus(str, Enum):
 
 class Severity(str, Enum):
     """Severity level of chaos experiment"""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -46,6 +44,7 @@ class Severity(str, Enum):
 @dataclass
 class ExperimentResult:
     """Result of a chaos experiment"""
+
     name: str
     status: ExperimentStatus
     severity: Severity
@@ -71,15 +70,16 @@ class ExperimentResult:
         """Convert to dictionary"""
         d = asdict(self)
         if self.start_time:
-            d['start_time'] = self.start_time.isoformat()
+            d["start_time"] = self.start_time.isoformat()
         if self.end_time:
-            d['end_time'] = self.end_time.isoformat()
+            d["end_time"] = self.end_time.isoformat()
         return d
 
 
 @dataclass
 class ChaosExperiment:
     """Definition of a chaos experiment"""
+
     name: str
     description: str
     manifest_path: str
@@ -113,10 +113,14 @@ class ChaosTestSuite:
 
         # Check if service deployment exists
         cmd = [
-            "kubectl", "get", "deployment",
-            "-n", self.namespace,
-            "-l", "app.kubernetes.io/name=mlops-sentiment",
-            "--no-headers"
+            "kubectl",
+            "get",
+            "deployment",
+            "-n",
+            self.namespace,
+            "-l",
+            "app.kubernetes.io/name=mlops-sentiment",
+            "--no-headers",
         ]
         returncode, stdout, stderr = self.run_kubectl_command(cmd)
         if returncode != 0 or not stdout.strip():
@@ -130,7 +134,9 @@ class ChaosTestSuite:
 
         # Check if at least one pod is healthy
         if not self.check_pod_health():
-            errors.append(f"No healthy pods found for mlops-sentiment in namespace {self.namespace}")
+            errors.append(
+                f"No healthy pods found for mlops-sentiment in namespace {self.namespace}"
+            )
 
         return len(errors) == 0, errors
 
@@ -141,7 +147,9 @@ class ChaosTestSuite:
         # Check if HPA exists
         hpa_name = self.find_hpa_name()
         if not hpa_name:
-            errors.append(f"HPA not found for mlops-sentiment deployment in namespace {self.namespace}")
+            errors.append(
+                f"HPA not found for mlops-sentiment deployment in namespace {self.namespace}"
+            )
         else:
             # Check HPA status
             hpa_status = self.get_hpa_status()
@@ -150,11 +158,21 @@ class ChaosTestSuite:
             else:
                 min_replicas = hpa_status.get("min_replicas")
                 max_replicas = hpa_status.get("max_replicas")
-                if not min_replicas or not max_replicas:
-                    errors.append(f"HPA {hpa_name} has invalid configuration (min: {min_replicas}, max: {max_replicas})")
+                if min_replicas is None or max_replicas is None:
+                    errors.append(
+                        f"HPA {hpa_name} has invalid configuration (min: {min_replicas}, max: {max_replicas})"
+                    )
 
         # Check metrics-server (required for HPA)
-        cmd = ["kubectl", "get", "deployment", "metrics-server", "-n", "kube-system", "--no-headers"]
+        cmd = [
+            "kubectl",
+            "get",
+            "deployment",
+            "metrics-server",
+            "-n",
+            "kube-system",
+            "--no-headers",
+        ]
         returncode, _, _ = self.run_kubectl_command(cmd)
         if returncode != 0:
             errors.append("Metrics-server not found (required for HPA)")
@@ -164,12 +182,7 @@ class ChaosTestSuite:
     def run_kubectl_command(self, command: List[str]) -> tuple[int, str, str]:
         """Run a kubectl command"""
         try:
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
+            result = subprocess.run(command, capture_output=True, text=True, timeout=60)
             return result.returncode, result.stdout, result.stderr
         except subprocess.TimeoutExpired:
             return 1, "", "Command timed out"
@@ -179,23 +192,32 @@ class ChaosTestSuite:
     def get_pod_count(self) -> int:
         """Get current number of sentiment pods"""
         cmd = [
-            "kubectl", "get", "pods",
-            "-n", self.namespace,
-            "-l", "app.kubernetes.io/name=mlops-sentiment",
-            "--no-headers"
+            "kubectl",
+            "get",
+            "pods",
+            "-n",
+            self.namespace,
+            "-l",
+            "app.kubernetes.io/name=mlops-sentiment",
+            "--no-headers",
         ]
         returncode, stdout, stderr = self.run_kubectl_command(cmd)
         if returncode == 0:
-            return len(stdout.strip().split('\n')) if stdout.strip() else 0
+            return len(stdout.strip().split("\n")) if stdout.strip() else 0
         return 0
 
     def check_pod_health(self) -> bool:
         """Check if at least one pod is healthy"""
         cmd = [
-            "kubectl", "get", "pods",
-            "-n", self.namespace,
-            "-l", "app.kubernetes.io/name=mlops-sentiment",
-            "-o", "jsonpath={.items[?(@.status.phase=='Running')].metadata.name}"
+            "kubectl",
+            "get",
+            "pods",
+            "-n",
+            self.namespace,
+            "-l",
+            "app.kubernetes.io/name=mlops-sentiment",
+            "-o",
+            "jsonpath={.items[?(@.status.phase=='Running')].metadata.name}",
         ]
         returncode, stdout, stderr = self.run_kubectl_command(cmd)
         return returncode == 0 and bool(stdout.strip())
@@ -246,10 +268,15 @@ class ChaosTestSuite:
         """Find HPA name for mlops-sentiment deployment"""
         # Try to find HPA by label selector matching the deployment
         cmd = [
-            "kubectl", "get", "hpa",
-            "-n", self.namespace,
-            "-l", "app.kubernetes.io/name=mlops-sentiment",
-            "-o", "jsonpath={.items[0].metadata.name}"
+            "kubectl",
+            "get",
+            "hpa",
+            "-n",
+            self.namespace,
+            "-l",
+            "app.kubernetes.io/name=mlops-sentiment",
+            "-o",
+            "jsonpath={.items[0].metadata.name}",
         ]
         returncode, stdout, _ = self.run_kubectl_command(cmd)
         if returncode == 0 and stdout.strip():
@@ -257,9 +284,13 @@ class ChaosTestSuite:
 
         # Fallback: try to find HPA that targets deployment with mlops-sentiment label
         cmd = [
-            "kubectl", "get", "hpa",
-            "-n", self.namespace,
-            "-o", "jsonpath={.items[?(@.spec.scaleTargetRef.name=~'.*mlops-sentiment.*')].metadata.name}"
+            "kubectl",
+            "get",
+            "hpa",
+            "-n",
+            self.namespace,
+            "-o",
+            "jsonpath={.items[?(@.spec.scaleTargetRef.name=~'.*mlops-sentiment.*')].metadata.name}",
         ]
         returncode, stdout, _ = self.run_kubectl_command(cmd)
         if returncode == 0 and stdout.strip():
@@ -273,12 +304,7 @@ class ChaosTestSuite:
         if not hpa_name:
             return None
 
-        cmd = [
-            "kubectl", "get", "hpa",
-            hpa_name,
-            "-n", self.namespace,
-            "-o", "json"
-        ]
+        cmd = ["kubectl", "get", "hpa", hpa_name, "-n", self.namespace, "-o", "json"]
         returncode, stdout, stderr = self.run_kubectl_command(cmd)
         if returncode != 0:
             logger.warning(f"Failed to get HPA status: {stderr}")
@@ -292,7 +318,15 @@ class ChaosTestSuite:
                 "desired_replicas": hpa_data.get("status", {}).get("desiredReplicas", 0),
                 "min_replicas": hpa_data.get("spec", {}).get("minReplicas", 0),
                 "max_replicas": hpa_data.get("spec", {}).get("maxReplicas", 0),
-                "current_cpu_utilization": hpa_data.get("status", {}).get("currentMetrics", [{}])[0].get("resource", {}).get("current", {}).get("averageUtilization", 0) if hpa_data.get("status", {}).get("currentMetrics") else None
+                "current_cpu_utilization": (
+                    hpa_data.get("status", {})
+                    .get("currentMetrics", [{}])[0]
+                    .get("resource", {})
+                    .get("current", {})
+                    .get("averageUtilization", 0)
+                    if hpa_data.get("status", {}).get("currentMetrics")
+                    else None
+                ),
             }
         except (json.JSONDecodeError, KeyError) as e:
             logger.warning(f"Failed to parse HPA status: {e}")
@@ -306,9 +340,7 @@ class ChaosTestSuite:
     async def run_hpa_experiment(self, experiment: ChaosExperiment) -> ExperimentResult:
         """Run HPA-specific chaos experiment with detailed HPA monitoring"""
         result = ExperimentResult(
-            name=experiment.name,
-            status=ExperimentStatus.PENDING,
-            severity=experiment.severity
+            name=experiment.name, status=ExperimentStatus.PENDING, severity=experiment.severity
         )
 
         logger.info(f"\n{'='*60}")
@@ -368,8 +400,10 @@ class ChaosTestSuite:
                     current_replicas = hpa_status.get("current_replicas", 0)
                     cpu_util = hpa_status.get("current_cpu_utilization")
 
-                    logger.info(f"  [{i+1}/{poll_count}] HPA: {current_replicas} replicas" +
-                              (f", CPU: {cpu_util}%" if cpu_util else ""))
+                    logger.info(
+                        f"  [{i+1}/{poll_count}] HPA: {current_replicas} replicas"
+                        + (f", CPU: {cpu_util}%" if cpu_util else "")
+                    )
 
                     # Track peak replicas
                     if current_replicas > peak_replicas:
@@ -412,7 +446,9 @@ class ChaosTestSuite:
                     if current_replicas <= result.hpa_min_replicas:
                         scale_down_complete = time.time()
                         result.hpa_scale_down_time = scale_down_complete - scale_down_start
-                        logger.info(f"  HPA scaled down to min replicas ({result.hpa_min_replicas}) in {result.hpa_scale_down_time:.1f}s")
+                        logger.info(
+                            f"  HPA scaled down to min replicas ({result.hpa_min_replicas}) in {result.hpa_scale_down_time:.1f}s"
+                        )
                         break
 
             # Get final metrics
@@ -422,15 +458,15 @@ class ChaosTestSuite:
 
             result.pods_after = self.get_pod_count()
             result.end_time = datetime.now()
-            result.duration_seconds = (
-                result.end_time - result.start_time
-            ).total_seconds()
+            result.duration_seconds = (result.end_time - result.start_time).total_seconds()
 
             # Validate HPA behavior
             validation_errors = []
 
             if result.hpa_replicas_during and result.hpa_replicas_during < result.hpa_min_replicas:
-                validation_errors.append(f"HPA did not scale up (stayed at {result.hpa_replicas_during} replicas)")
+                validation_errors.append(
+                    f"HPA did not scale up (stayed at {result.hpa_replicas_during} replicas)"
+                )
 
             if result.hpa_replicas_after and result.hpa_replicas_after > result.hpa_min_replicas:
                 result.observations.append(
@@ -438,13 +474,17 @@ class ChaosTestSuite:
                 )
 
             if result.hpa_replicas_during and result.hpa_replicas_during >= result.hpa_max_replicas:
-                result.observations.append(f"HPA successfully scaled to max replicas ({result.hpa_max_replicas})")
+                result.observations.append(
+                    f"HPA successfully scaled to max replicas ({result.hpa_max_replicas})"
+                )
 
             if result.hpa_scale_up_time and result.hpa_scale_up_time > 120:
                 result.observations.append(f"Slow scale-up time: {result.hpa_scale_up_time:.1f}s")
 
             if result.hpa_scale_down_time and result.hpa_scale_down_time > 600:
-                result.observations.append(f"Slow scale-down time: {result.hpa_scale_down_time:.1f}s")
+                result.observations.append(
+                    f"Slow scale-down time: {result.hpa_scale_down_time:.1f}s"
+                )
 
             # Validate recovery
             if result.pods_after >= result.hpa_min_replicas and self.check_pod_health():
@@ -472,9 +512,7 @@ class ChaosTestSuite:
     async def run_experiment(self, experiment: ChaosExperiment) -> ExperimentResult:
         """Run a single chaos experiment"""
         result = ExperimentResult(
-            name=experiment.name,
-            status=ExperimentStatus.PENDING,
-            severity=experiment.severity
+            name=experiment.name, status=ExperimentStatus.PENDING, severity=experiment.severity
         )
 
         logger.info(f"\n{'='*60}")
@@ -527,9 +565,7 @@ class ChaosTestSuite:
             # Get post-experiment metrics
             result.pods_after = self.get_pod_count()
             result.end_time = datetime.now()
-            result.duration_seconds = (
-                result.end_time - result.start_time
-            ).total_seconds()
+            result.duration_seconds = (result.end_time - result.start_time).total_seconds()
 
             # Validate recovery
             if result.pods_after >= 1 and self.check_pod_health():
@@ -573,30 +609,30 @@ class ChaosTestSuite:
                 "failed": sum(1 for r in self.results if r.status == ExperimentStatus.FAILED),
                 "skipped": sum(1 for r in self.results if r.status == ExperimentStatus.SKIPPED),
             },
-            "experiments": [r.to_dict() for r in self.results]
+            "experiments": [r.to_dict() for r in self.results],
         }
 
         # Write JSON report
-        with open(output_path, 'w') as f:
+        with open(output_path, "w") as f:
             json.dump(report, f, indent=2, default=str)
 
         # Write text report
-        text_report = output_path.replace('.json', '.txt')
-        with open(text_report, 'w') as f:
-            f.write("="*80 + "\n")
+        text_report = output_path.replace(".json", ".txt")
+        with open(text_report, "w") as f:
+            f.write("=" * 80 + "\n")
             f.write("CHAOS ENGINEERING TEST REPORT\n")
-            f.write("="*80 + "\n\n")
+            f.write("=" * 80 + "\n\n")
             f.write(f"Generated: {report['generated_at']}\n")
             f.write(f"Namespace: {report['namespace']}\n\n")
 
             f.write("SUMMARY\n")
-            f.write("-"*80 + "\n")
-            for key, value in report['summary'].items():
+            f.write("-" * 80 + "\n")
+            for key, value in report["summary"].items():
                 f.write(f"{key.replace('_', ' ').title()}: {value}\n")
             f.write("\n")
 
             f.write("EXPERIMENT RESULTS\n")
-            f.write("-"*80 + "\n\n")
+            f.write("-" * 80 + "\n\n")
 
             for result in self.results:
                 f.write(f"Experiment: {result.name}\n")
@@ -608,9 +644,13 @@ class ChaosTestSuite:
 
                 # Add HPA-specific metrics if available
                 if result.hpa_replicas_before is not None:
-                    f.write(f"HPA Replicas: {result.hpa_replicas_before} → {result.hpa_replicas_during or 'N/A'} → {result.hpa_replicas_after or 'N/A'}\n")
+                    f.write(
+                        f"HPA Replicas: {result.hpa_replicas_before} → {result.hpa_replicas_during or 'N/A'} → {result.hpa_replicas_after or 'N/A'}\n"
+                    )
                     if result.hpa_min_replicas:
-                        f.write(f"HPA Range: {result.hpa_min_replicas} - {result.hpa_max_replicas}\n")
+                        f.write(
+                            f"HPA Range: {result.hpa_min_replicas} - {result.hpa_max_replicas}\n"
+                        )
                     if result.hpa_scale_up_time:
                         f.write(f"HPA Scale-Up Time: {result.hpa_scale_up_time:.2f}s\n")
                     if result.hpa_scale_down_time:
@@ -626,7 +666,7 @@ class ChaosTestSuite:
                     for err in result.errors:
                         f.write(f"  - {err}\n")
 
-                f.write("\n" + "-"*80 + "\n\n")
+                f.write("\n" + "-" * 80 + "\n\n")
 
         logger.info(f"Report generated: {output_path}")
         logger.info(f"Text report: {text_report}")
@@ -654,8 +694,8 @@ async def main():
             expected_behavior=[
                 "Pod is recreated automatically",
                 "Service remains available",
-                "No data loss"
-            ]
+                "No data loss",
+            ],
         ),
         ChaosExperiment(
             name="pod-kill-multiple",
@@ -667,8 +707,8 @@ async def main():
                 "All pods are recreated automatically",
                 "Service remains available throughout",
                 "HPA maintains desired replica count",
-                "Recovery time < 2 minutes"
-            ]
+                "Recovery time < 2 minutes",
+            ],
         ),
         ChaosExperiment(
             name="network-partition-redis",
@@ -681,8 +721,8 @@ async def main():
                 "Service continues to operate without cache",
                 "Fallback to non-cached operation",
                 "No complete service outage",
-                "Graceful degradation observed"
-            ]
+                "Graceful degradation observed",
+            ],
         ),
         ChaosExperiment(
             name="network-partition-pods",
@@ -695,8 +735,8 @@ async def main():
                 "Individual pods remain functional",
                 "Service remains available via remaining pods",
                 "No request failures",
-                "Load balancing adapts"
-            ]
+                "Load balancing adapts",
+            ],
         ),
         ChaosExperiment(
             name="network-delay",
@@ -708,8 +748,8 @@ async def main():
             expected_behavior=[
                 "Increased response times",
                 "No request failures",
-                "Graceful degradation"
-            ]
+                "Graceful degradation",
+            ],
         ),
         ChaosExperiment(
             name="cpu-stress",
@@ -721,8 +761,8 @@ async def main():
             expected_behavior=[
                 "HPA triggers scale-up",
                 "Service remains responsive",
-                "No pod evictions"
-            ]
+                "No pod evictions",
+            ],
         ),
         ChaosExperiment(
             name="hpa-stress-test",
@@ -737,8 +777,8 @@ async def main():
                 "HPA scales down to minReplicas after stress ends",
                 "Scaling completes within HPA behavior windows",
                 "Scale-up completes within 60-90 seconds",
-                "Scale-down completes within 5 minutes"
-            ]
+                "Scale-down completes within 5 minutes",
+            ],
         ),
     ]
 

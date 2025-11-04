@@ -142,6 +142,11 @@ After benchmark completion, the following will be created:
 3. **CSV files** - data for import to Excel/Google Sheets
 4. **Grafana dashboard** - real-time monitoring
 
+## 📚 Documentation
+
+- **[Benchmark Results Guide](BENCHMARK_RESULTS.md)** - Comprehensive guide for running benchmarks and interpreting results
+- **[Results Template](BENCHMARK_RESULTS_TEMPLATE.md)** - Template for documenting benchmark results
+
 ## 🎯 Usage Examples
 
 ### Compare CPU vs GPU
