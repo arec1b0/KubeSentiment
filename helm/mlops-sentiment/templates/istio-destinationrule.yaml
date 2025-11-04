@@ -1,0 +1,35 @@
+{{- if .Values.istio.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "mlops-sentiment.fullname" . }}
+  labels:
+    {{- include "mlops-sentiment.labels" . | nindent 4 }}
+spec:
+  host: {{ include "mlops-sentiment.fullname" . }}
+  trafficPolicy:
+    tls:
+      mode: {{ .Values.istio.mtls.mode }}
+    {{- with .Values.istio.connectionPool }}
+    connectionPool:
+      {{- if .tcp }}
+      tcp:
+        {{- toYaml .tcp | nindent 8 }}
+      {{- end }}
+      {{- if .http }}
+      http:
+        {{- toYaml .http | nindent 8 }}
+      {{- end }}
+    {{- end }}
+    {{- with .Values.istio.outlierDetection }}
+    outlierDetection:
+      consecutive5xx: {{ .consecutive5xx }}
+      interval: {{ .interval }}
+      baseEjectionTime: {{ .baseEjectionTime }}
+      maxEjectionPercent: {{ .maxEjectionPercent }}
+    {{- end }}
+  subsets:
+    - name: {{ .Chart.AppVersion | quote }}
+      labels:
+        version: {{ .Chart.AppVersion | quote }}
+{{- end }}

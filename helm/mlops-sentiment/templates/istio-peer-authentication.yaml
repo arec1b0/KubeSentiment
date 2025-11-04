@@ -1,0 +1,12 @@
+{{- if and .Values.istio.enabled .Values.istio.mtls.strictNamespace }}
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: {{ include "mlops-sentiment.fullname" . }}-mtls
+  namespace: {{ .Values.namespace.name | default .Release.Namespace }}
+  labels:
+    {{- include "mlops-sentiment.labels" . | nindent 4 }}
+spec:
+  mtls:
+    mode: STRICT
+{{- end }}

@@ -5,6 +5,9 @@ metadata:
   name: {{ .Values.namespace.name | default "mlops" }}
   labels:
     {{- include "mlops-sentiment.labels" . | nindent 4 }}
+    {{- if and .Values.istio.enabled .Values.istio.enableNamespaceInjection }}
+    istio-injection: enabled
+    {{- end }}
     # Pod Security Admission labels (Kubernetes 1.23+)
     # Enforce restricted security standards for all pods in this namespace
     pod-security.kubernetes.io/enforce: restricted

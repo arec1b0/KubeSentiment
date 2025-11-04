@@ -1,0 +1,53 @@
+{{- if .Values.istio.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "mlops-sentiment.fullname" . }}
+  labels:
+    {{- include "mlops-sentiment.labels" . | nindent 4 }}
+spec:
+  {{- if and .Values.istio.gateway.enabled (gt (len .Values.istio.gateway.hosts) 0) }}
+  hosts:
+    {{- range .Values.istio.gateway.hosts }}
+    - {{ . | quote }}
+    {{- end }}
+  gateways:
+    - {{ .Values.istio.gateway.name }}
+  {{- else }}
+  hosts:
+    - {{ include "mlops-sentiment.fullname" . }}
+  gateways:
+    - mesh
+  {{- end }}
+  http:
+    - name: primary
+      {{- with .Values.istio.http.timeout }}
+      timeout: {{ . }}
+      {{- end }}
+      {{- with .Values.istio.http.retries }}
+      retries:
+        attempts: {{ .attempts }}
+        perTryTimeout: {{ .perTryTimeout }}
+        retryOn: {{ .retryOn | quote }}
+      {{- end }}
+      {{- if .Values.istio.faultInjection.enabled }}
+      fault:
+        {{- if .Values.istio.faultInjection.abort.percentage }}
+        abort:
+          httpStatus: {{ .Values.istio.faultInjection.abort.httpStatus }}
+          percentage:
+            value: {{ .Values.istio.faultInjection.abort.percentage }}
+        {{- end }}
+        {{- if .Values.istio.faultInjection.delay.percentage }}
+        delay:
+          fixedDelay: {{ .Values.istio.faultInjection.delay.fixedDelay }}
+          percentage:
+            value: {{ .Values.istio.faultInjection.delay.percentage }}
+        {{- end }}
+      {{- end }}
+      route:
+        - destination:
+            host: {{ include "mlops-sentiment.fullname" . }}
+            subset: {{ .Chart.AppVersion | quote }}
+          weight: 100
+{{- end }}
