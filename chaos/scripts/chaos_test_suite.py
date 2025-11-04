@@ -58,6 +58,14 @@ class ExperimentResult:
     errors: List[str] = field(default_factory=list)
     metrics: Dict[str, Any] = field(default_factory=dict)
     observations: List[str] = field(default_factory=list)
+    # HPA-specific fields
+    hpa_min_replicas: Optional[int] = None
+    hpa_max_replicas: Optional[int] = None
+    hpa_replicas_before: Optional[int] = None
+    hpa_replicas_during: Optional[int] = None
+    hpa_replicas_after: Optional[int] = None
+    hpa_scale_up_time: Optional[float] = None
+    hpa_scale_down_time: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -123,6 +131,33 @@ class ChaosTestSuite:
         # Check if at least one pod is healthy
         if not self.check_pod_health():
             errors.append(f"No healthy pods found for mlops-sentiment in namespace {self.namespace}")
+
+        return len(errors) == 0, errors
+
+    def check_hpa_prerequisites(self) -> tuple[bool, List[str]]:
+        """Check prerequisites specifically for HPA experiments"""
+        errors = []
+
+        # Check if HPA exists
+        hpa_name = self.find_hpa_name()
+        if not hpa_name:
+            errors.append(f"HPA not found for mlops-sentiment deployment in namespace {self.namespace}")
+        else:
+            # Check HPA status
+            hpa_status = self.get_hpa_status()
+            if not hpa_status:
+                errors.append(f"Could not retrieve HPA status for {hpa_name}")
+            else:
+                min_replicas = hpa_status.get("min_replicas")
+                max_replicas = hpa_status.get("max_replicas")
+                if not min_replicas or not max_replicas:
+                    errors.append(f"HPA {hpa_name} has invalid configuration (min: {min_replicas}, max: {max_replicas})")
+
+        # Check metrics-server (required for HPA)
+        cmd = ["kubectl", "get", "deployment", "metrics-server", "-n", "kube-system", "--no-headers"]
+        returncode, _, _ = self.run_kubectl_command(cmd)
+        if returncode != 0:
+            errors.append("Metrics-server not found (required for HPA)")
 
         return len(errors) == 0, errors
 
@@ -207,6 +242,233 @@ class ChaosTestSuite:
         logger.warning(f"Recovery timeout after {timeout}s")
         return timeout
 
+    def find_hpa_name(self) -> Optional[str]:
+        """Find HPA name for mlops-sentiment deployment"""
+        # Try to find HPA by label selector matching the deployment
+        cmd = [
+            "kubectl", "get", "hpa",
+            "-n", self.namespace,
+            "-l", "app.kubernetes.io/name=mlops-sentiment",
+            "-o", "jsonpath={.items[0].metadata.name}"
+        ]
+        returncode, stdout, _ = self.run_kubectl_command(cmd)
+        if returncode == 0 and stdout.strip():
+            return stdout.strip()
+
+        # Fallback: try to find HPA that targets deployment with mlops-sentiment label
+        cmd = [
+            "kubectl", "get", "hpa",
+            "-n", self.namespace,
+            "-o", "jsonpath={.items[?(@.spec.scaleTargetRef.name=~'.*mlops-sentiment.*')].metadata.name}"
+        ]
+        returncode, stdout, _ = self.run_kubectl_command(cmd)
+        if returncode == 0 and stdout.strip():
+            return stdout.strip().split()[0] if stdout.strip() else None
+
+        return None
+
+    def get_hpa_status(self) -> Optional[Dict[str, Any]]:
+        """Get HPA status including current and desired replicas"""
+        hpa_name = self.find_hpa_name()
+        if not hpa_name:
+            return None
+
+        cmd = [
+            "kubectl", "get", "hpa",
+            hpa_name,
+            "-n", self.namespace,
+            "-o", "json"
+        ]
+        returncode, stdout, stderr = self.run_kubectl_command(cmd)
+        if returncode != 0:
+            logger.warning(f"Failed to get HPA status: {stderr}")
+            return None
+
+        try:
+            hpa_data = json.loads(stdout)
+            return {
+                "name": hpa_name,
+                "current_replicas": hpa_data.get("status", {}).get("currentReplicas", 0),
+                "desired_replicas": hpa_data.get("status", {}).get("desiredReplicas", 0),
+                "min_replicas": hpa_data.get("spec", {}).get("minReplicas", 0),
+                "max_replicas": hpa_data.get("spec", {}).get("maxReplicas", 0),
+                "current_cpu_utilization": hpa_data.get("status", {}).get("currentMetrics", [{}])[0].get("resource", {}).get("current", {}).get("averageUtilization", 0) if hpa_data.get("status", {}).get("currentMetrics") else None
+            }
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.warning(f"Failed to parse HPA status: {e}")
+            return None
+
+    def get_hpa_replicas(self) -> Optional[int]:
+        """Get current HPA replica count"""
+        hpa_status = self.get_hpa_status()
+        return hpa_status.get("current_replicas") if hpa_status else None
+
+    async def run_hpa_experiment(self, experiment: ChaosExperiment) -> ExperimentResult:
+        """Run HPA-specific chaos experiment with detailed HPA monitoring"""
+        result = ExperimentResult(
+            name=experiment.name,
+            status=ExperimentStatus.PENDING,
+            severity=experiment.severity
+        )
+
+        logger.info(f"\n{'='*60}")
+        logger.info(f"Starting HPA experiment: {experiment.name}")
+        logger.info(f"Description: {experiment.description}")
+        logger.info(f"Severity: {experiment.severity.value}")
+        logger.info(f"Duration: {experiment.duration_seconds}s")
+        logger.info(f"{'='*60}\n")
+
+        try:
+            # Get HPA status before experiment
+            hpa_status_before = self.get_hpa_status()
+            if not hpa_status_before:
+                result.status = ExperimentStatus.FAILED
+                result.errors.append("HPA not found for mlops-sentiment deployment")
+                return result
+
+            result.hpa_min_replicas = hpa_status_before.get("min_replicas")
+            result.hpa_max_replicas = hpa_status_before.get("max_replicas")
+            result.hpa_replicas_before = hpa_status_before.get("current_replicas")
+            result.pods_before = self.get_pod_count()
+
+            logger.info(f"HPA Status Before:")
+            logger.info(f"  Min Replicas: {result.hpa_min_replicas}")
+            logger.info(f"  Max Replicas: {result.hpa_max_replicas}")
+            logger.info(f"  Current Replicas: {result.hpa_replicas_before}")
+            logger.info(f"  Pods: {result.pods_before}")
+
+            # Check if manifest exists
+            if not Path(experiment.manifest_path).exists():
+                result.status = ExperimentStatus.FAILED
+                result.errors.append(f"Manifest not found: {experiment.manifest_path}")
+                return result
+
+            # Apply chaos
+            result.start_time = datetime.now()
+            result.status = ExperimentStatus.RUNNING
+
+            if not self.apply_chaos(experiment.manifest_path):
+                result.status = ExperimentStatus.FAILED
+                result.errors.append("Failed to apply chaos manifest")
+                return result
+
+            # Monitor HPA during experiment (poll every 15 seconds)
+            logger.info(f"Monitoring HPA scaling behavior for {experiment.duration_seconds}s...")
+            poll_interval = 15
+            poll_count = experiment.duration_seconds // poll_interval
+            peak_replicas = result.hpa_replicas_before
+            scale_up_start = None
+            scale_up_complete = None
+
+            for i in range(poll_count):
+                await asyncio.sleep(poll_interval)
+
+                hpa_status = self.get_hpa_status()
+                if hpa_status:
+                    current_replicas = hpa_status.get("current_replicas", 0)
+                    cpu_util = hpa_status.get("current_cpu_utilization")
+
+                    logger.info(f"  [{i+1}/{poll_count}] HPA: {current_replicas} replicas" +
+                              (f", CPU: {cpu_util}%" if cpu_util else ""))
+
+                    # Track peak replicas
+                    if current_replicas > peak_replicas:
+                        peak_replicas = current_replicas
+                        if scale_up_start is None:
+                            scale_up_start = time.time()
+
+                    # Check if we've reached max replicas
+                    if current_replicas >= result.hpa_max_replicas and scale_up_complete is None:
+                        scale_up_complete = time.time()
+                        logger.info(f"  HPA reached max replicas ({result.hpa_max_replicas})")
+
+            result.hpa_replicas_during = peak_replicas
+
+            if scale_up_start and scale_up_complete:
+                result.hpa_scale_up_time = scale_up_complete - scale_up_start
+                result.observations.append(
+                    f"HPA scaled up to {peak_replicas} replicas in {result.hpa_scale_up_time:.1f}s"
+                )
+
+            # Cleanup chaos
+            logger.info("Cleaning up chaos experiment...")
+            self.cleanup_chaos("stresschaos")
+
+            # Monitor scale-down after chaos ends
+            logger.info("Monitoring HPA scale-down behavior...")
+            scale_down_start = time.time()
+            scale_down_complete = None
+            scale_down_timeout = 600  # 10 minutes max for scale-down
+
+            while time.time() - scale_down_start < scale_down_timeout:
+                await asyncio.sleep(15)
+
+                hpa_status = self.get_hpa_status()
+                if hpa_status:
+                    current_replicas = hpa_status.get("current_replicas", 0)
+                    logger.info(f"  HPA scale-down: {current_replicas} replicas")
+
+                    # Check if we've reached min replicas
+                    if current_replicas <= result.hpa_min_replicas:
+                        scale_down_complete = time.time()
+                        result.hpa_scale_down_time = scale_down_complete - scale_down_start
+                        logger.info(f"  HPA scaled down to min replicas ({result.hpa_min_replicas}) in {result.hpa_scale_down_time:.1f}s")
+                        break
+
+            # Get final metrics
+            hpa_status_after = self.get_hpa_status()
+            if hpa_status_after:
+                result.hpa_replicas_after = hpa_status_after.get("current_replicas")
+
+            result.pods_after = self.get_pod_count()
+            result.end_time = datetime.now()
+            result.duration_seconds = (
+                result.end_time - result.start_time
+            ).total_seconds()
+
+            # Validate HPA behavior
+            validation_errors = []
+
+            if result.hpa_replicas_during and result.hpa_replicas_during < result.hpa_min_replicas:
+                validation_errors.append(f"HPA did not scale up (stayed at {result.hpa_replicas_during} replicas)")
+
+            if result.hpa_replicas_after and result.hpa_replicas_after > result.hpa_min_replicas:
+                result.observations.append(
+                    f"HPA has not fully scaled down (currently {result.hpa_replicas_after} replicas, min: {result.hpa_min_replicas})"
+                )
+
+            if result.hpa_replicas_during and result.hpa_replicas_during >= result.hpa_max_replicas:
+                result.observations.append(f"HPA successfully scaled to max replicas ({result.hpa_max_replicas})")
+
+            if result.hpa_scale_up_time and result.hpa_scale_up_time > 120:
+                result.observations.append(f"Slow scale-up time: {result.hpa_scale_up_time:.1f}s")
+
+            if result.hpa_scale_down_time and result.hpa_scale_down_time > 600:
+                result.observations.append(f"Slow scale-down time: {result.hpa_scale_down_time:.1f}s")
+
+            # Validate recovery
+            if result.pods_after >= result.hpa_min_replicas and self.check_pod_health():
+                if validation_errors:
+                    result.status = ExperimentStatus.COMPLETED
+                    result.errors.extend(validation_errors)
+                else:
+                    result.status = ExperimentStatus.COMPLETED
+                    result.observations.append("HPA behavior validated successfully")
+            else:
+                result.status = ExperimentStatus.FAILED
+                result.errors.append("System did not recover properly")
+                result.errors.extend(validation_errors)
+
+        except Exception as e:
+            logger.error(f"Experiment failed with exception: {e}", exc_info=True)
+            result.status = ExperimentStatus.FAILED
+            result.errors.append(str(e))
+            result.end_time = datetime.now()
+
+        logger.info(f"\nExperiment {experiment.name} status: {result.status.value}\n")
+        self.results.append(result)
+        return result
+
     async def run_experiment(self, experiment: ChaosExperiment) -> ExperimentResult:
         """Run a single chaos experiment"""
         result = ExperimentResult(
@@ -253,6 +515,8 @@ class ChaosTestSuite:
             # Cleanup multiple resource types for network chaos
             if experiment.resource_type == "networkchaos":
                 self.cleanup_chaos("networkchaos")
+            elif experiment.resource_type == "stresschaos":
+                self.cleanup_chaos("stresschaos")
             else:
                 self.cleanup_chaos(experiment.resource_type)
 
@@ -341,6 +605,16 @@ class ChaosTestSuite:
                 f.write(f"Duration: {result.duration_seconds:.2f}s\n")
                 f.write(f"Recovery Time: {result.recovery_time_seconds:.2f}s\n")
                 f.write(f"Pods: {result.pods_before} → {result.pods_after}\n")
+
+                # Add HPA-specific metrics if available
+                if result.hpa_replicas_before is not None:
+                    f.write(f"HPA Replicas: {result.hpa_replicas_before} → {result.hpa_replicas_during or 'N/A'} → {result.hpa_replicas_after or 'N/A'}\n")
+                    if result.hpa_min_replicas:
+                        f.write(f"HPA Range: {result.hpa_min_replicas} - {result.hpa_max_replicas}\n")
+                    if result.hpa_scale_up_time:
+                        f.write(f"HPA Scale-Up Time: {result.hpa_scale_up_time:.2f}s\n")
+                    if result.hpa_scale_down_time:
+                        f.write(f"HPA Scale-Down Time: {result.hpa_scale_down_time:.2f}s\n")
 
                 if result.observations:
                     f.write("Observations:\n")
@@ -443,10 +717,27 @@ async def main():
             manifest_path="chaos/chaos-mesh/03-stress-chaos.yaml",
             duration_seconds=180,
             severity=Severity.MEDIUM,
+            resource_type="stresschaos",
             expected_behavior=[
                 "HPA triggers scale-up",
                 "Service remains responsive",
                 "No pod evictions"
+            ]
+        ),
+        ChaosExperiment(
+            name="hpa-stress-test",
+            description="Test HPA scaling behavior under CPU stress - validates scale-up to maxReplicas and scale-down to minReplicas",
+            manifest_path="chaos/chaos-mesh/04-hpa-stress-chaos.yaml",
+            duration_seconds=300,  # 5 minutes active stress
+            severity=Severity.HIGH,
+            resource_type="stresschaos",
+            expected_behavior=[
+                "HPA scales up to maxReplicas when CPU > 70%",
+                "Service remains available during scaling",
+                "HPA scales down to minReplicas after stress ends",
+                "Scaling completes within HPA behavior windows",
+                "Scale-up completes within 60-90 seconds",
+                "Scale-down completes within 5 minutes"
             ]
         ),
     ]
@@ -478,10 +769,26 @@ async def main():
             logger.error("\nPlease fix the issues above before running chaos experiments.")
             logger.error("You can skip this check with --skip-prereq-check (not recommended)")
             return 1
+
+        # Check HPA prerequisites if running HPA test
+        if any(e.name == "hpa-stress-test" for e in experiments):
+            logger.info("Checking HPA prerequisites...")
+            hpa_prereq_ok, hpa_errors = suite.check_hpa_prerequisites()
+            if not hpa_prereq_ok:
+                logger.error("HPA prerequisites check failed:")
+                for error in hpa_errors:
+                    logger.error(f"  - {error}")
+                logger.error("\nPlease fix the issues above before running HPA chaos experiments.")
+                return 1
+
         logger.info("Prerequisites check passed\n")
 
     for experiment in experiments:
-        await suite.run_experiment(experiment)
+        # Use specialized HPA experiment runner for HPA tests
+        if experiment.name == "hpa-stress-test":
+            await suite.run_hpa_experiment(experiment)
+        else:
+            await suite.run_experiment(experiment)
         # Wait between experiments
         if not args.dry_run:
             logger.info("Waiting 30s before next experiment...\n")

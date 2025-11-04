@@ -167,7 +167,54 @@ Tests resource management:
 - ✅ No OOMKilled events
 - ✅ Resource limits respected
 
-### 4. Dependency Chaos
+### 4. HPA Stress Testing
+
+Tests Horizontal Pod Autoscaler (HPA) behavior under load:
+- **CPU Stress**: Apply 80% CPU load to trigger HPA scale-up
+- **Scale Monitoring**: Track HPA scaling behavior in real-time
+- **Scale Validation**: Verify scale-up to maxReplicas and scale-down to minReplicas
+
+**Expected Behavior:**
+- ✅ HPA scales up to maxReplicas when CPU utilization exceeds threshold (70%)
+- ✅ Service remains available and responsive during scaling process
+- ✅ Latency stays within acceptable SLOs (< 5x normal P95)
+- ✅ HPA scales down to minReplicas after stress ends
+- ✅ Scale-up completes within 60-90 seconds (HPA stabilization window)
+- ✅ Scale-down completes within 5 minutes (scaleDown stabilizationWindowSeconds: 300)
+
+**Usage:**
+```bash
+# Run HPA-specific chaos test
+make chaos-test-hpa
+
+# Or run directly
+python3 chaos/scripts/chaos_test_suite.py \
+  --namespace default \
+  --experiments hpa-stress-test \
+  --output chaos_report_hpa.json
+```
+
+**What Gets Tested:**
+- HPA configuration validation (min/max replicas)
+- CPU stress application (80% load, above 70% threshold)
+- Real-time HPA replica count monitoring
+- Scale-up timing and validation
+- Scale-down timing and validation
+- Service availability during scaling
+
+**Success Criteria:**
+- HPA reaches maxReplicas during stress
+- Scale-up time < 120 seconds
+- Scale-down time < 600 seconds
+- All pods remain healthy throughout
+- Service endpoints remain responsive
+
+**Troubleshooting:**
+- If HPA doesn't scale up: Check metrics-server is running, verify HPA has CPU metrics configured, ensure resource requests/limits are set on pods
+- If scale-up is slow: Check HPA behavior.scaleUp.stabilizationWindowSeconds, verify metrics-server response times
+- If scale-down doesn't occur: Check HPA behavior.scaleDown.stabilizationWindowSeconds (default 300s), verify CPU utilization has dropped below threshold
+
+### 5. Dependency Chaos
 
 Tests external dependency handling:
 - **Redis Partition**: Cache unavailability
@@ -180,7 +227,7 @@ Tests external dependency handling:
 - ✅ Circuit breakers triggered
 - ✅ Error handling activated
 
-### 5. Application-Level Chaos
+### 6. Application-Level Chaos
 
 Tests application resilience:
 - **HTTP Errors**: 500, 503, 504 responses
@@ -219,6 +266,15 @@ python3 chaos/scripts/chaos_test_suite.py \
 python3 chaos/scripts/chaos_test_suite.py \
   --experiments pod-kill-basic network-delay \
   --namespace default
+
+# Run HPA stress test
+make chaos-test-hpa
+
+# Or run HPA test directly
+python3 chaos/scripts/chaos_test_suite.py \
+  --experiments hpa-stress-test \
+  --namespace default \
+  --output chaos_report_hpa.json
 ```
 
 ### Scheduled Chaos (Game Days)
@@ -254,7 +310,8 @@ Import the chaos monitoring dashboard:
 - Request success rate
 - Response latency (p95, p99)
 - Pod status and restarts
-- HPA scaling behavior
+- HPA scaling behavior (replica counts, scale-up/down timing)
+- HPA CPU utilization vs target threshold
 - Error rates by type
 - Resource utilization
 
@@ -272,6 +329,20 @@ rate(kube_pod_container_status_restarts_total{namespace="default",pod=~"mlops-se
 
 # HPA current replicas
 kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler="mlops-sentiment"}
+
+# HPA desired replicas
+kube_horizontalpodautoscaler_status_desired_replicas{horizontalpodautoscaler="mlops-sentiment"}
+
+# HPA scaling events (changes in replica count)
+changes(kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler="mlops-sentiment"}[1m]) > 0
+
+# HPA CPU utilization target vs current
+kube_horizontalpodautoscaler_spec_target_metric{horizontalpodautoscaler="mlops-sentiment",resource="cpu"}
+kube_horizontalpodautoscaler_status_current_metrics{horizontalpodautoscaler="mlops-sentiment"}
+
+# HPA min/max replicas
+kube_horizontalpodautoscaler_spec_min_replicas{horizontalpodautoscaler="mlops-sentiment"}
+kube_horizontalpodautoscaler_spec_max_replicas{horizontalpodautoscaler="mlops-sentiment"}
 ```
 
 ### Logs

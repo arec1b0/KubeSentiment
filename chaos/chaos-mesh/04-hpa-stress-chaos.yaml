@@ -1,0 +1,19 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: StressChaos
+metadata:
+  name: sentiment-hpa-stress-test
+  namespace: default
+spec:
+  mode: all
+  selector:
+    namespaces:
+      - default
+    labelSelectors:
+      app.kubernetes.io/name: mlops-sentiment
+  stressors:
+    cpu:
+      workers: 2
+      load: 80
+  duration: '5m'
+  # No scheduler - run on-demand for testing
+

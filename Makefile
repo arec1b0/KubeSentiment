@@ -1,6 +1,6 @@
 # MLOps Sentiment Analysis - Development Commands
 
-.PHONY: help install test lint format clean build deploy dev docs chaos-install chaos-test-pod-kill chaos-test-network-partition chaos-test-suite chaos-cleanup chaos-status
+.PHONY: help install test lint format clean build deploy dev docs chaos-install chaos-test-pod-kill chaos-test-network-partition chaos-test-suite chaos-test-hpa chaos-cleanup chaos-status
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -90,6 +90,13 @@ chaos-test-network-partition: ## Run network partition chaos experiment
 chaos-test-suite: ## Run full chaos engineering test suite
 	@echo "Running chaos engineering test suite..."
 	@python3 chaos/scripts/chaos_test_suite.py --namespace $(CHAOS_NAMESPACE) --output chaos_report.json
+
+chaos-test-hpa: ## Run HPA-specific chaos test
+	@echo "Running HPA chaos test..."
+	@python3 chaos/scripts/chaos_test_suite.py \
+		--namespace $(CHAOS_NAMESPACE) \
+		--experiments hpa-stress-test \
+		--output chaos_report_hpa.json
 
 chaos-cleanup: ## Clean up all chaos experiments
 	@echo "Cleaning up chaos experiments..."
