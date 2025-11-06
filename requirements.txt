@@ -62,3 +62,18 @@ opentelemetry-instrumentation-logging==0.42b0
 opentelemetry-exporter-jaeger==1.21.0
 opentelemetry-exporter-zipkin==1.21.0
 opentelemetry-exporter-otlp==1.21.0
+
+# MLflow for model registry and experiment tracking
+mlflow==2.9.2
+mlflow-skinny==2.9.2
+
+# Model explainability and interpretability
+shap==0.44.0
+captum==0.7.0  # For transformer attention visualization
+
+# Drift detection and data quality monitoring
+evidently==0.4.11
+scipy==1.11.4  # For statistical tests
+
+# Advanced analytics
+scikit-learn==1.3.2  # For additional metrics and preprocessing

@@ -64,8 +64,69 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         else:
             logger.warning("Model failed to load", backend=default_backend)
 
+        # Store model in app state
+        app.state.model = model
+
     except Exception as e:
         logger.error("Model initialization failed", error=str(e), exc_info=True)
+
+    # Initialize MLflow Model Registry
+    if settings.mlflow_enabled:
+        try:
+            from app.services.mlflow_registry import initialize_model_registry
+
+            registry = initialize_model_registry(
+                tracking_uri=settings.mlflow_tracking_uri,
+                enabled=settings.mlflow_enabled
+            )
+            logger.info("MLflow Model Registry initialized")
+            app.state.model_registry = registry
+        except Exception as e:
+            logger.error("MLflow initialization failed", error=str(e), exc_info=True)
+
+    # Initialize Drift Detection
+    if settings.drift_detection_enabled:
+        try:
+            from app.services.drift_detection import initialize_drift_detector
+
+            drift_detector = initialize_drift_detector(
+                window_size=settings.drift_window_size,
+                psi_threshold=settings.drift_psi_threshold,
+                enabled=settings.drift_detection_enabled
+            )
+            logger.info("Drift Detection initialized")
+            app.state.drift_detector = drift_detector
+        except Exception as e:
+            logger.error("Drift detection initialization failed", error=str(e), exc_info=True)
+
+    # Initialize Explainability Engine
+    if settings.explainability_enabled:
+        try:
+            from app.services.explainability import initialize_explainability_engine
+
+            explainer = initialize_explainability_engine(
+                model=model if 'model' in locals() else None,
+                model_name=settings.model_name,
+                enabled=settings.explainability_enabled
+            )
+            logger.info("Explainability Engine initialized")
+            app.state.explainability_engine = explainer
+        except Exception as e:
+            logger.error("Explainability engine initialization failed", error=str(e), exc_info=True)
+
+    # Initialize Advanced Metrics Collector
+    if settings.advanced_metrics_enabled:
+        try:
+            from app.monitoring.advanced_metrics import initialize_advanced_metrics_collector
+
+            metrics_collector = initialize_advanced_metrics_collector(
+                enable_detailed_tracking=settings.advanced_metrics_detailed_tracking,
+                cost_per_1k_predictions=settings.advanced_metrics_cost_per_1k
+            )
+            logger.info("Advanced Metrics Collector initialized")
+            app.state.metrics_collector = metrics_collector
+        except Exception as e:
+            logger.error("Advanced metrics initialization failed", error=str(e), exc_info=True)
 
     # Initialize and start the Kafka consumer if enabled
     if settings.kafka_enabled:

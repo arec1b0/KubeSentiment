@@ -140,6 +140,14 @@ def create_app() -> FastAPI:
         tags=["Monitoring"],
     )
 
+    # Include advanced monitoring routes (drift detection, MLflow, explainability, KPIs)
+    from app.api.routes.monitoring_routes import router as advanced_monitoring_router
+    app.include_router(
+        advanced_monitoring_router,
+        prefix="/api/v1" if not settings.debug else "",
+        tags=["Advanced Monitoring"],
+    )
+
     # Add root endpoint
     @app.get("/", tags=["root"])
     async def root() -> dict:
