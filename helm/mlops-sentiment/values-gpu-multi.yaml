@@ -1,0 +1,184 @@
+# GPU Configuration Example: Multi-GPU (2x A10G) for High Performance
+# Use this for high-scale deployments (2000-5000 req/s per pod)
+#
+# Deploy with:
+#   helm upgrade --install mlops-sentiment ./helm/mlops-sentiment \
+#     -f values.yaml \
+#     -f values-gpu-multi.yaml \
+#     --namespace mlops-prod
+
+# Enable multi-GPU support
+gpu:
+  enabled: true
+  vendor: nvidia
+  type: nvidia-a10g
+
+  # Multi-GPU configuration
+  multiGpu:
+    enabled: true
+    gpusPerPod: 2
+    topology: "best-effort"
+
+    # Load balancing strategy
+    loadBalancing:
+      strategy: "gpu-utilization-based"
+      memoryAware: true
+
+  # Resources for multi-GPU pod
+  resources:
+    requests:
+      cpu: 4000m
+      memory: 16Gi
+      # nvidia.com/gpu will be set to gpusPerPod automatically
+    limits:
+      cpu: 8000m
+      memory: 32Gi
+      # nvidia.com/gpu will be set to gpusPerPod automatically
+
+  # Multi-GPU environment variables
+  env:
+    # CUDA settings for multi-GPU
+    CUDA_VISIBLE_DEVICES: "all"
+    NVIDIA_VISIBLE_DEVICES: "all"
+    NVIDIA_DRIVER_CAPABILITIES: "compute,utility"
+
+    # GPU memory management
+    GPU_MEMORY_FRACTION: "0.9"
+    PYTORCH_CUDA_ALLOC_CONF: "max_split_size_mb:512"
+
+    # Model optimizations
+    ENABLE_GPU_OPTIMIZATION: "true"
+    ENABLE_TORCH_COMPILE: "false"
+    ENABLE_TENSORRT: "false"
+
+    # Batch processing for multi-GPU
+    GPU_BATCH_SIZE: "128"
+    GPU_MAX_BATCH_SIZE: "256"
+    GPU_DYNAMIC_BATCHING: "true"
+
+    # Multi-GPU settings
+    MULTI_GPU_ENABLED: "true"
+    GPU_COUNT: "2"
+    DISTRIBUTED_BACKEND: "nccl"
+
+  # Node selector for A10G GPUs
+  nodeSelector:
+    accelerator: nvidia-a10g
+
+  # GPU tolerations
+  tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+
+  # Multi-GPU affinity
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: accelerator
+            operator: In
+            values:
+            - nvidia-a10g
+            - nvidia-a100
+
+      # Prefer nodes with 2+ GPUs
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: gpu-count
+            operator: In
+            values:
+            - "2"
+            - "4"
+            - "8"
+
+    # Spread pods across nodes
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+              - mlops-sentiment
+          topologyKey: kubernetes.io/hostname
+
+  # GPU-specific volumes
+  volumes:
+    sharedMemory:
+      enabled: true
+      sizeLimit: 4Gi
+
+    gpuCache:
+      enabled: true
+      sizeLimit: 8Gi
+
+  # Health checks for multi-GPU
+  healthChecks:
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: http
+      initialDelaySeconds: 120
+      periodSeconds: 20
+      timeoutSeconds: 10
+      failureThreshold: 5
+
+    readinessProbe:
+      httpGet:
+        path: /health
+        port: http
+      initialDelaySeconds: 90
+      periodSeconds: 15
+      timeoutSeconds: 8
+      failureThreshold: 3
+
+    startupProbe:
+      httpGet:
+        path: /health
+        port: http
+      initialDelaySeconds: 60
+      periodSeconds: 20
+      timeoutSeconds: 10
+      failureThreshold: 40
+
+  # Conservative HPA for expensive multi-GPU
+  hpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    behavior:
+      scaleUp:
+        stabilizationWindowSeconds: 300
+        policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 180
+      scaleDown:
+        stabilizationWindowSeconds: 900
+        policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 300
+
+# Start with 1 replica (very powerful)
+deployment:
+  replicaCount: 1
+
+# Large model cache for multi-GPU
+modelPersistence:
+  enabled: true
+  size: 20Gi
+  storageClassName: "fast-ssd"
+
+# Enable comprehensive monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 10s

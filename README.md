@@ -21,13 +21,14 @@ This project was built to serve as a comprehensive, real-world example of MLOps 
 ## 🚀 Key Features
 
 - **High-Performance AI Inference**: Leverages state-of-the-art transformer models for real-time sentiment analysis.
+- **GPU Acceleration & Multi-GPU Support**: Enterprise-grade GPU scheduling with dynamic batch optimization and load balancing for maximum throughput (800-3000 req/s per GPU).
 - **ONNX Optimization**: Supports ONNX Runtime for accelerated inference and reduced resource consumption.
 - **Cloud-Native & Kubernetes-Ready**: Designed for Kubernetes with auto-scaling, health checks, and zero-downtime deployments via Helm.
 - **Full Observability Stack**: Integrated with Prometheus, Grafana, and structured logging for comprehensive monitoring.
 - **Infrastructure as Code (IaC)**: Reproducible infrastructure defined with Terraform.
 - **Automated CI/CD Pipeline**: GitHub Actions for automated testing, security scanning (Trivy), and deployment.
 - **Secure by Design**: Integrates with HashiCorp Vault for secrets management and includes hardened network policies.
-- **Comprehensive Benchmarking**: Includes a full suite for performance and cost analysis across different hardware configurations.
+- **Comprehensive Benchmarking**: Includes a full suite for performance and cost analysis across different hardware configurations (CPU vs GPU).
 
 ## 🏛️ Architecture Overview
 

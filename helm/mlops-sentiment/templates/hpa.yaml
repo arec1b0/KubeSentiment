@@ -1,4 +1,4 @@
-{{- if .Values.hpa.enabled }}
+{{- if or .Values.hpa.enabled (and .Values.gpu.enabled .Values.gpu.hpa.enabled) }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -10,6 +10,14 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: {{ include "mlops-sentiment.fullname" . }}
+  {{- if and .Values.gpu.enabled .Values.gpu.hpa.enabled }}
+  minReplicas: {{ .Values.gpu.hpa.minReplicas }}
+  maxReplicas: {{ .Values.gpu.hpa.maxReplicas }}
+  metrics:
+    {{- toYaml .Values.gpu.hpa.metrics | nindent 4 }}
+  behavior:
+    {{- toYaml .Values.gpu.hpa.behavior | nindent 4 }}
+  {{- else }}
   minReplicas: {{ .Values.hpa.minReplicas }}
   maxReplicas: {{ .Values.hpa.maxReplicas }}
   metrics:
@@ -46,4 +54,5 @@ spec:
         value: 2
         periodSeconds: 60
       selectPolicy: Max
+  {{- end }}
 {{- end }}
