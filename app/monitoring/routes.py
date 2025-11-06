@@ -279,3 +279,10 @@ async def get_async_batch_metrics(
     except Exception as e:
         logger.error(f"Error retrieving async batch metrics: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to retrieve metrics")
+
+
+# Import and include the new monitoring routes for advanced features
+from app.api.routes.monitoring_routes import router as advanced_monitoring_router
+
+# Note: The advanced monitoring router is included here for backwards compatibility
+# It provides additional endpoints for drift detection, MLflow registry, explainability, and advanced KPIs

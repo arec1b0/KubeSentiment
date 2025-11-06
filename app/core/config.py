@@ -477,6 +477,83 @@ class Settings(BaseSettings):
         default="production", description="Deployment environment (dev/staging/prod)"
     )
 
+    # MLflow Model Registry settings
+    mlflow_enabled: bool = Field(
+        default=False, description="Enable MLflow model registry integration"
+    )
+    mlflow_tracking_uri: Optional[str] = Field(
+        default=None, description="MLflow tracking server URI (e.g., http://mlflow:5000)"
+    )
+    mlflow_registry_uri: Optional[str] = Field(
+        default=None, description="MLflow registry URI (defaults to tracking URI)"
+    )
+    mlflow_experiment_name: str = Field(
+        default="sentiment-analysis", description="MLflow experiment name"
+    )
+    mlflow_model_name: str = Field(
+        default="sentiment-model", description="Registered model name in MLflow"
+    )
+
+    # Drift Detection settings
+    drift_detection_enabled: bool = Field(
+        default=True, description="Enable model drift detection"
+    )
+    drift_window_size: int = Field(
+        default=1000,
+        description="Number of samples in drift detection window",
+        ge=100,
+        le=10000,
+    )
+    drift_psi_threshold: float = Field(
+        default=0.1,
+        description="PSI threshold for drift detection (0.1=minor, 0.25=major)",
+        ge=0.0,
+        le=1.0,
+    )
+    drift_ks_threshold: float = Field(
+        default=0.05,
+        description="KS test p-value threshold for drift detection",
+        ge=0.0,
+        le=1.0,
+    )
+    drift_min_samples: int = Field(
+        default=100,
+        description="Minimum samples before checking drift",
+        ge=10,
+        le=1000,
+    )
+
+    # Explainability settings
+    explainability_enabled: bool = Field(
+        default=True, description="Enable model explainability features"
+    )
+    explainability_use_attention: bool = Field(
+        default=True, description="Use attention weights for explanations"
+    )
+    explainability_use_gradients: bool = Field(
+        default=False, description="Use gradient-based explanations (slower)"
+    )
+
+    # Advanced Metrics settings
+    advanced_metrics_enabled: bool = Field(
+        default=True, description="Enable advanced metrics and KPIs tracking"
+    )
+    advanced_metrics_detailed_tracking: bool = Field(
+        default=True, description="Enable detailed per-prediction tracking"
+    )
+    advanced_metrics_history_hours: int = Field(
+        default=24,
+        description="Hours of metrics history to keep in memory",
+        ge=1,
+        le=168,
+    )
+    advanced_metrics_cost_per_1k: float = Field(
+        default=0.01,
+        description="Estimated cost per 1000 predictions in USD",
+        ge=0.0,
+        le=100.0,
+    )
+
     # Jaeger settings
     jaeger_agent_host: str = Field(default="jaeger", description="Jaeger agent hostname")
     jaeger_agent_port: int = Field(default=6831, description="Jaeger agent port", ge=1024, le=65535)
