@@ -253,6 +253,213 @@ affinity:
             - mlops-sentiment
         topologyKey: kubernetes.io/hostname
 
+# GPU Configuration for High-Performance Inference
+gpu:
+  # Enable GPU support for the deployment
+  enabled: false
+
+  # Number of GPUs to request per pod
+  # For multi-GPU support, set this to the number of GPUs you want
+  count: 1
+
+  # GPU vendor (nvidia, amd, intel)
+  vendor: nvidia
+
+  # GPU type/model - used for node selection
+  # Examples: nvidia-tesla-t4, nvidia-tesla-v100, nvidia-a100, nvidia-h100
+  type: nvidia-tesla-t4
+
+  # Multi-GPU strategy
+  multiGpu:
+    # Enable multi-GPU support (data parallelism across GPUs)
+    enabled: false
+
+    # Number of GPUs per pod for multi-GPU workloads
+    gpusPerPod: 2
+
+    # GPU topology preference (prefer same node, same NUMA, etc.)
+    topology: "best-effort"  # Options: "best-effort", "single-numa-node", "preferred"
+
+    # Load balancing strategy
+    loadBalancing:
+      # Strategy: round-robin, least-loaded, gpu-utilization-based
+      strategy: "gpu-utilization-based"
+
+      # Enable GPU memory-based scheduling
+      memoryAware: true
+
+  # GPU resource requests and limits
+  resources:
+    limits:
+      cpu: 4000m
+      memory: 16Gi
+      nvidia.com/gpu: 1  # Will be overridden by gpu.count or multiGpu.gpusPerPod
+    requests:
+      cpu: 2000m
+      memory: 8Gi
+      nvidia.com/gpu: 1
+
+  # GPU-specific environment variables
+  env:
+    # CUDA settings
+    CUDA_VISIBLE_DEVICES: "all"  # Or specific GPU IDs like "0,1"
+    NVIDIA_VISIBLE_DEVICES: "all"
+    NVIDIA_DRIVER_CAPABILITIES: "compute,utility"
+
+    # GPU memory management
+    GPU_MEMORY_FRACTION: "0.9"  # Fraction of GPU memory to use (0.0-1.0)
+    PYTORCH_CUDA_ALLOC_CONF: "max_split_size_mb:512"
+
+    # Model optimization settings
+    ENABLE_GPU_OPTIMIZATION: "true"
+    ENABLE_TORCH_COMPILE: "false"  # PyTorch 2.0+ compilation (experimental)
+    ENABLE_TENSORRT: "false"  # TensorRT optimization (requires TensorRT)
+
+    # Batch processing for GPU
+    GPU_BATCH_SIZE: "64"  # Larger batches for GPU efficiency
+    GPU_MAX_BATCH_SIZE: "128"
+    GPU_DYNAMIC_BATCHING: "true"
+
+    # Multi-GPU settings
+    MULTI_GPU_ENABLED: "false"
+    GPU_COUNT: "1"
+    DISTRIBUTED_BACKEND: "nccl"  # NCCL for NVIDIA, gloo for CPU fallback
+
+  # Node selection for GPU nodes
+  nodeSelector:
+    accelerator: nvidia-tesla-t4  # Will be set based on gpu.type
+    # Optional: specify cloud provider GPU node pools
+    # cloud.google.com/gke-accelerator: nvidia-tesla-t4
+    # eks.amazonaws.com/accelerator: nvidia-tesla-t4
+    # kubernetes.azure.com/accelerator: nvidia-tesla-t4
+
+  # Tolerations for GPU nodes
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: gpu
+      operator: Equal
+      value: "true"
+      effect: NoSchedule
+
+  # GPU affinity rules
+  affinity:
+    # Node affinity for GPU placement
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: accelerator
+            operator: In
+            values:
+            - nvidia-tesla-t4
+            - nvidia-tesla-v100
+            - nvidia-a100
+
+      # Prefer nodes with higher GPU count for multi-GPU
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: gpu-count
+            operator: Gt
+            values:
+            - "1"
+
+    # Pod anti-affinity to spread GPU pods across nodes
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+              - mlops-sentiment
+            - key: gpu-enabled
+              operator: In
+              values:
+              - "true"
+          topologyKey: kubernetes.io/hostname
+
+  # GPU-specific volumes
+  volumes:
+    # Shared memory for GPU operations (important for multi-GPU)
+    sharedMemory:
+      enabled: true
+      sizeLimit: 4Gi  # Larger for multi-GPU workloads
+
+    # GPU cache directory
+    gpuCache:
+      enabled: true
+      sizeLimit: 8Gi
+
+  # GPU health checks (longer timeouts for GPU initialization)
+  healthChecks:
+    livenessProbe:
+      initialDelaySeconds: 90
+      periodSeconds: 20
+      timeoutSeconds: 10
+      failureThreshold: 5
+
+    readinessProbe:
+      initialDelaySeconds: 60
+      periodSeconds: 15
+      timeoutSeconds: 8
+      failureThreshold: 3
+
+    startupProbe:
+      initialDelaySeconds: 30
+      periodSeconds: 15
+      timeoutSeconds: 10
+      failureThreshold: 40  # Up to 10 minutes for GPU initialization
+
+  # HPA settings for GPU deployments (more conservative)
+  hpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 4  # Limited due to GPU cost
+
+    # Custom metrics for GPU-based scaling
+    metrics:
+      - type: Resource
+        resource:
+          name: cpu
+          target:
+            type: Utilization
+            averageUtilization: 80
+      - type: Resource
+        resource:
+          name: memory
+          target:
+            type: Utilization
+            averageUtilization: 85
+      # GPU utilization metric (requires DCGM/GPU metrics exporter)
+      # - type: Pods
+      #   pods:
+      #     metric:
+      #       name: gpu_utilization
+      #     target:
+      #       type: AverageValue
+      #       averageValue: "80"
+
+    # Slower scaling for GPU pods (avoid rapid scaling)
+    behavior:
+      scaleUp:
+        stabilizationWindowSeconds: 180
+        policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+      scaleDown:
+        stabilizationWindowSeconds: 600
+        policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 180
+
 # Network Policy
 networkPolicy:
   enabled: true

@@ -1,0 +1,145 @@
+# GPU Configuration Example: Spot/Preemptible Instances for Cost Savings
+# Use this to save 60-90% on GPU costs with proper redundancy
+#
+# Deploy with:
+#   helm upgrade --install mlops-sentiment ./helm/mlops-sentiment \
+#     -f values.yaml \
+#     -f values-gpu-spot.yaml \
+#     --namespace mlops-prod
+
+# Enable GPU support
+gpu:
+  enabled: true
+  count: 1
+  vendor: nvidia
+  type: nvidia-tesla-t4
+
+  # GPU resources
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 8Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 4000m
+      memory: 16Gi
+      nvidia.com/gpu: 1
+
+  # Environment variables
+  env:
+    GPU_BATCH_SIZE: "64"
+    GPU_MAX_BATCH_SIZE: "128"
+    GPU_MEMORY_FRACTION: "0.9"
+    ENABLE_GPU_OPTIMIZATION: "true"
+    GPU_DYNAMIC_BATCHING: "true"
+
+  # Node selector for spot GPU instances
+  nodeSelector:
+    accelerator: nvidia-tesla-t4
+    # Uncomment for specific cloud providers:
+    # cloud.google.com/gke-preemptible: "true"
+    # eks.amazonaws.com/capacityType: "SPOT"
+    # kubernetes.azure.com/scalesetpriority: "spot"
+
+  # Tolerations for spot instances
+  tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+  # GCP preemptible
+  - key: cloud.google.com/gke-preemptible
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+  # AWS spot
+  - key: eks.amazonaws.com/capacityType
+    operator: Equal
+    value: "SPOT"
+    effect: NoSchedule
+  # Azure spot
+  - key: kubernetes.azure.com/scalesetpriority
+    operator: Equal
+    value: "spot"
+    effect: NoSchedule
+
+  # Affinity to prefer spot instances
+  affinity:
+    nodeAffinity:
+      # Require GPU
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: accelerator
+            operator: In
+            values:
+            - nvidia-tesla-t4
+
+      # Prefer spot instances
+      preferredDuringSchedulingIgnoredDuringExecution:
+      # GCP preemptible
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: cloud.google.com/gke-preemptible
+            operator: In
+            values:
+            - "true"
+      # AWS spot
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: eks.amazonaws.com/capacityType
+            operator: In
+            values:
+            - "SPOT"
+      # Azure spot
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: kubernetes.azure.com/scalesetpriority
+            operator: In
+            values:
+            - "spot"
+
+    # Spread across availability zones for resilience
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+              - mlops-sentiment
+          topologyKey: topology.kubernetes.io/zone
+
+  # Standard GPU HPA
+  hpa:
+    enabled: true
+    minReplicas: 2  # Higher minimum for spot resilience
+    maxReplicas: 6  # Can scale more aggressively with spot savings
+
+# Higher replica count for spot instance redundancy
+deployment:
+  replicaCount: 2
+
+  # Graceful shutdown for spot interruption
+  terminationGracePeriodSeconds: 120
+
+# Pod Disruption Budget critical for spot instances
+pdb:
+  enabled: true
+  minAvailable: 1  # Always keep 1 pod running during interruptions
+
+# Model persistence
+modelPersistence:
+  enabled: true
+  size: 10Gi
+
+# Monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 15s
