@@ -108,3 +108,22 @@ def get_feature_engineer():
     from app.features.feature_engineering import get_feature_engineer as get_fe
 
     return get_fe()
+
+
+def get_data_writer(settings: Settings = Depends(get_settings)):
+    """Provides a singleton instance of the data lake writer service.
+
+    This dependency ensures that the `DataLakeWriter` class is created
+    only once and reused across the application for streaming predictions
+    to cloud storage.
+
+    Args:
+        settings: The application's configuration settings, injected as a
+            dependency.
+
+    Returns:
+        The singleton instance of the `DataLakeWriter`.
+    """
+    from app.services.data_writer import get_data_writer as get_dw
+
+    return get_dw(settings)

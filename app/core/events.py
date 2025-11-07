@@ -159,6 +159,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.error("Async batch service initialization failed", error=str(e), exc_info=True)
 
+    # Initialize and start the data lake writer
+    if settings.data_lake_enabled:
+        try:
+            from app.services.data_writer import get_data_writer
+
+            data_writer = get_data_writer(settings)
+            await data_writer.start()
+            app.state.data_writer = data_writer
+            logger.info(
+                "Data lake writer started successfully",
+                provider=settings.data_lake_provider,
+                bucket=settings.data_lake_bucket,
+            )
+
+        except Exception as e:
+            logger.error("Data lake writer initialization failed", error=str(e), exc_info=True)
+
     logger.info("Application startup complete")
 
     yield
@@ -179,5 +196,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.info("Async batch service stopped successfully")
         except Exception as e:
             logger.error("Error stopping async batch service", error=str(e), exc_info=True)
+
+    if hasattr(app.state, "data_writer") and app.state.data_writer:
+        try:
+            await app.state.data_writer.stop()
+            logger.info("Data lake writer stopped successfully")
+        except Exception as e:
+            logger.error("Error stopping data lake writer", error=str(e), exc_info=True)
 
     logger.info("Application shutdown complete")

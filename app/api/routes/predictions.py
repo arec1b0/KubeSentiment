@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Response
 from app.api.schemas.requests import TextInput
 from app.api.schemas.responses import PredictionResponse
 from app.core.config import Settings, get_settings
-from app.core.dependencies import get_model_backend, get_prediction_service
+from app.core.dependencies import get_data_writer, get_model_backend, get_prediction_service
 from app.core.logging import get_contextual_logger
 from app.utils.error_codes import ErrorCode, raise_validation_error
 from app.utils.exceptions import ModelNotLoadedError
@@ -31,6 +31,7 @@ async def predict_sentiment(
     prediction_service=Depends(get_prediction_service),
     backend: str = Depends(get_model_backend),
     settings: Settings = Depends(get_settings),
+    data_writer=Depends(get_data_writer),
 ) -> PredictionResponse:
     """Analyzes the sentiment of a given text.
 
@@ -89,6 +90,22 @@ async def predict_sentiment(
 
         # Add backend to response
         result["backend"] = backend
+
+        # Stream prediction to data lake asynchronously
+        if settings.data_lake_enabled:
+            prediction_data = {
+                "text": payload.text,
+                "label": result["label"],
+                "score": result["score"],
+                "inference_time_ms": result["inference_time_ms"],
+                "backend": backend,
+                "cached": result.get("cached", False),
+                "features": result.get("features"),
+            }
+            # Fire and forget - don't await to keep response fast
+            import asyncio
+
+            asyncio.create_task(data_writer.write_prediction(prediction_data))
 
         return PredictionResponse(**result)
 
