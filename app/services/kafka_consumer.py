@@ -42,39 +42,9 @@ except Exception:  # pragma: no cover - fallback when pydantic is unavailable
 try:  # pragma: no cover - optional dependency for lightweight tests
     from app.core.logging import get_contextual_logger
 except Exception:  # pragma: no cover - fallback to standard logging
-    import logging
-
-    class _StdLoggerAdapter:
-        def __init__(self, name: str):
-            self._logger = logging.getLogger(name)
-
-        def _render(self, message: str, **extra: Any) -> str:
-            payload = {k: v for k, v in extra.items() if k != "exc_info"}
-            if payload:
-                formatted = ", ".join(
-                    f"{key}={value!r}" for key, value in payload.items()
-                )
-                return f"{message} | {formatted}"
-            return message
-
-        def info(self, message: str, *args: Any, **kwargs: Any) -> None:
-            exc_info = kwargs.pop("exc_info", None)
-            self._logger.info(self._render(message, **kwargs), *args, exc_info=exc_info)
-
-        def warning(self, message: str, *args: Any, **kwargs: Any) -> None:
-            exc_info = kwargs.pop("exc_info", None)
-            self._logger.warning(
-                self._render(message, **kwargs), *args, exc_info=exc_info
-            )
-
-        def error(self, message: str, *args: Any, **kwargs: Any) -> None:
-            exc_info = kwargs.pop("exc_info", None)
-            self._logger.error(
-                self._render(message, **kwargs), *args, exc_info=exc_info
-            )
-
-    def get_contextual_logger(name: str) -> _StdLoggerAdapter:
-        return _StdLoggerAdapter(name)
+    from app.utils.logging_adapters import (
+        get_fallback_contextual_logger as get_contextual_logger,
+    )
 
 
 from app.services.stream_processor import StreamProcessor
