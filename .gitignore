@@ -137,7 +137,19 @@ Thumbs.db
 mlruns/
 artifacts/
 *.onnx
-models/
+# Downloaded model files (preserve app/models/ source code)
+*.bin
+*.pth
+*.pt
+*.safetensors
+*.msgpack
+*.h5
+*.pb
+*.tflite
+*.tar.gz
+/models/
+onnx_models/
+cached_models/
 data/raw/
 data/processed/
 
