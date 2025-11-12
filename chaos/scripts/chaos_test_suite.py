@@ -463,17 +463,17 @@ class ChaosTestSuite:
             # Validate HPA behavior
             validation_errors = []
 
-            if result.hpa_replicas_during and result.hpa_replicas_during < result.hpa_min_replicas:
+            if result.hpa_replicas_during is not None and result.hpa_replicas_during < result.hpa_min_replicas:
                 validation_errors.append(
                     f"HPA did not scale up (stayed at {result.hpa_replicas_during} replicas)"
                 )
 
-            if result.hpa_replicas_after and result.hpa_replicas_after > result.hpa_min_replicas:
+            if result.hpa_replicas_after is not None and result.hpa_replicas_after > result.hpa_min_replicas:
                 result.observations.append(
                     f"HPA has not fully scaled down (currently {result.hpa_replicas_after} replicas, min: {result.hpa_min_replicas})"
                 )
 
-            if result.hpa_replicas_during and result.hpa_replicas_during >= result.hpa_max_replicas:
+            if result.hpa_replicas_during is not None and result.hpa_replicas_during >= result.hpa_max_replicas:
                 result.observations.append(
                     f"HPA successfully scaled to max replicas ({result.hpa_max_replicas})"
                 )
