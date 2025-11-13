@@ -192,13 +192,25 @@ class TestAsyncBatchServiceInitialization:
         """Test service initialization."""
         assert async_batch_service.prediction_service is not None
         assert async_batch_service.stream_processor is not None
+
+        # Initialize service to create priority queues
+        await async_batch_service.start()
+
+        assert async_batch_service._priority_queues is not None
         assert len(async_batch_service._priority_queues) == 3  # High, medium, low
         assert async_batch_service._metrics is not None
+
+        # Clean up
+        await async_batch_service.stop()
 
     @pytest.mark.asyncio
     async def test_queue_initialization(self, async_batch_service):
         """Test priority queue initialization."""
+        # Initialize service to create priority queues
+        await async_batch_service.start()
+
         # Check queue sizes from settings
+        assert async_batch_service._priority_queues is not None
         high_queue = async_batch_service._priority_queues[Priority.HIGH]
         medium_queue = async_batch_service._priority_queues[Priority.MEDIUM]
         low_queue = async_batch_service._priority_queues[Priority.LOW]
@@ -206,6 +218,9 @@ class TestAsyncBatchServiceInitialization:
         assert high_queue.maxsize == 100
         assert medium_queue.maxsize == 500
         assert low_queue.maxsize == 1000
+
+        # Clean up
+        await async_batch_service.stop()
 
     @pytest.mark.asyncio
     async def test_optimal_batch_size_calculation(self, async_batch_service):
