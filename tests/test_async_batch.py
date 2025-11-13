@@ -11,7 +11,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.services.async_batch_service import AsyncBatchService, BatchJob, BatchJobStatus, Priority
+from app.services.async_batch_service import (
+    AsyncBatchService,
+    BatchJob,
+    BatchJobStatus,
+    Priority,
+)
 from app.services.prediction import PredictionService
 from app.services.stream_processor import StreamProcessor
 
@@ -48,10 +53,28 @@ class MockModel:
         return {"name": "test_model", "version": "1.0.0"}
 
 
+class MockPerformanceConfig:
+    """Mock performance config for testing."""
+
+    def __init__(self):
+        self.async_batch_enabled = True
+        self.async_batch_max_jobs = 1000
+        self.async_batch_max_batch_size = 1000
+        self.async_batch_default_timeout_seconds = 300
+        self.async_batch_priority_high_limit = 100
+        self.async_batch_priority_medium_limit = 500
+        self.async_batch_priority_low_limit = 1000
+        self.async_batch_cleanup_interval_seconds = 60
+        self.async_batch_cache_ttl_seconds = 3600
+        self.async_batch_result_cache_max_size = 1000
+
+
 class MockSettings:
     """Mock settings for testing."""
 
     def __init__(self):
+        self.performance = MockPerformanceConfig()
+        # Backward compatibility
         self.async_batch_enabled = True
         self.async_batch_max_jobs = 1000
         self.async_batch_max_batch_size = 1000
@@ -184,7 +207,8 @@ class TestAsyncBatchServiceInitialization:
         assert medium_queue.maxsize == 500
         assert low_queue.maxsize == 1000
 
-    def test_optimal_batch_size_calculation(self, async_batch_service):
+    @pytest.mark.asyncio
+    async def test_optimal_batch_size_calculation(self, async_batch_service):
         """Test optimal batch size calculation."""
         # Small batch
         assert async_batch_service._get_optimal_batch_size(5) == 5
@@ -193,7 +217,7 @@ class TestAsyncBatchServiceInitialization:
         assert async_batch_service._get_optimal_batch_size(50) == 50
 
         # Large batch
-        assert async_batch_service._get_optimal_batch_size(2000) == 500  # Capped at 500
+        assert async_batch_service._get_optimal_batch_size(2000) == 1000  # Capped at max_batch_size
 
 
 class TestBatchJobSubmission:
@@ -444,7 +468,8 @@ class TestCaching:
         # Results should match original
         assert len(cached_results.results) == len(job.results)
 
-    def test_cache_cleanup(self, async_batch_service):
+    @pytest.mark.asyncio
+    async def test_cache_cleanup(self, async_batch_service):
         """Test cache cleanup."""
         # Fill cache beyond limit
         for i in range(async_batch_service.settings.async_batch_result_cache_max_size + 10):
@@ -457,7 +482,7 @@ class TestCaching:
         # Trigger cleanup by calling _cache_result which includes cleanup logic
         job_info = {"job_id": "test_cleanup_job"}
         results = [{"label": "POSITIVE"}]
-        async_batch_service._cache_result("test_cleanup_job", job_info, results)
+        await async_batch_service._cache_result("test_cleanup_job", job_info, results)
 
         # Cache should be within limits after cleanup
         assert (
