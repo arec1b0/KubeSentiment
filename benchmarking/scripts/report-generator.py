@@ -63,7 +63,7 @@ class BenchmarkReportGenerator:
         This method reads consolidated performance results, cost analysis
         data, and resource metrics from their respective JSON files.
         """
-        logger.info("Loading benchmark data...")
+        logger.info("Loading benchmark data")
 
         # Load benchmark results
         consolidated_file = self.results_dir / "consolidated_results.json"
@@ -86,9 +86,12 @@ class BenchmarkReportGenerator:
                 self.resource_data.append({"instance": instance_name, "metrics": resource_data})
 
         logger.info(
-            f"Loaded: {len(self.benchmark_data)} benchmarks, "
-            f"{len(self.cost_data)} cost analyses, "
-            f"{len(self.resource_data)} resource metric sets"
+            "Data loaded",
+            extra={
+                "benchmark_count": len(self.benchmark_data),
+                "cost_analyses_count": len(self.cost_data),
+                "resource_metric_sets_count": len(self.resource_data)
+            }
         )
 
     def create_performance_comparison_chart(self) -> str:
@@ -452,7 +455,7 @@ class BenchmarkReportGenerator:
         Args:
             output_path: The path to save the final HTML report.
         """
-        logger.info("Generating HTML report...")
+        logger.info("Generating HTML report")
 
         # Create charts
         performance_chart = self.create_performance_comparison_chart()
@@ -698,7 +701,7 @@ class BenchmarkReportGenerator:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(html_content)
 
-        logger.info(f"HTML report saved to: {output_path}")
+        logger.info("HTML report saved", extra={"output_path": output_path})
 
 
 def main():
@@ -723,13 +726,12 @@ def main():
         # Generate the HTML report
         generator.generate_html_report(args.output)
 
-        logger.info(f"✅ Comprehensive report created: {args.output}")
+        logger.info("Comprehensive report created", extra={"output": args.output})
 
     except Exception as e:
-        logger.error(f"Error generating report: {e}")
+        logger.error("Error generating report", extra={"error": str(e)}, exc_info=True)
         raise
 
 
 if __name__ == "__main__":
-    main()
     main()

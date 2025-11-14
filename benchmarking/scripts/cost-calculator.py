@@ -193,7 +193,10 @@ class CostCalculator:
             instance_type = result["instance_type"]
 
             if instance_type not in self.instance_costs:
-                logger.warning(f"Instance type {instance_type} not found in cost configuration")
+                logger.warning(
+                    "Instance type not found in cost configuration",
+                    extra={"instance_type": instance_type}
+                )
                 continue
 
             instance_cost = self.instance_costs[instance_type]
@@ -370,7 +373,7 @@ class CostCalculator:
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(asdict(report), f, indent=2, ensure_ascii=False)
 
-        logger.info(f"Cost report saved to {output_path}")
+        logger.info("Cost report saved", extra={"output_path": output_path})
 
     def generate_cost_visualization(self, analyses: List[BenchmarkCostAnalysis], output_dir: str):
         """Generates and saves visualizations of the cost analysis.
@@ -506,7 +509,7 @@ class CostCalculator:
         plt.savefig(output_dir / "cost_performance_bubble.png", dpi=300, bbox_inches="tight")
         plt.close()
 
-        logger.info(f"Cost visualization saved to {output_dir}")
+        logger.info("Cost visualization saved", extra={"output_dir": str(output_dir)})
 
     def print_cost_summary(self, report: CostComparisonReport):
         """Prints a formatted summary of the cost analysis to the console.
@@ -591,10 +594,9 @@ def main():
         calculator.print_cost_summary(report)
 
     except Exception as e:
-        logger.error(f"Cost calculation failed: {e}")
+        logger.error("Cost calculation failed", extra={"error": str(e)}, exc_info=True)
         raise
 
 
 if __name__ == "__main__":
-    main()
     main()

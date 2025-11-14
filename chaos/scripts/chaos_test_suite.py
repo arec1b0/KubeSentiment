@@ -225,23 +225,23 @@ class ChaosTestSuite:
     def apply_chaos(self, manifest_path: str) -> bool:
         """Apply a chaos experiment"""
         if self.dry_run:
-            logger.info(f"[DRY RUN] Would apply: {manifest_path}")
+            logger.info("[DRY RUN] Would apply chaos", extra={"manifest_path": manifest_path})
             return True
 
         cmd = ["kubectl", "apply", "-f", manifest_path, "-n", self.namespace]
         returncode, stdout, stderr = self.run_kubectl_command(cmd)
 
         if returncode == 0:
-            logger.info(f"Applied chaos: {manifest_path}")
+            logger.info("Applied chaos", extra={"manifest_path": manifest_path})
             return True
         else:
-            logger.error(f"Failed to apply chaos: {stderr}")
+            logger.error("Failed to apply chaos", extra={"stderr": stderr})
             return False
 
     def cleanup_chaos(self, resource_type: str) -> bool:
         """Clean up chaos experiments"""
         if self.dry_run:
-            logger.info(f"[DRY RUN] Would cleanup: {resource_type}")
+            logger.info("[DRY RUN] Would cleanup chaos", extra={"resource_type": resource_type})
             return True
 
         cmd = ["kubectl", "delete", resource_type, "--all", "-n", self.namespace]
@@ -256,12 +256,12 @@ class ChaosTestSuite:
         while time.time() - start < timeout:
             if self.check_pod_health():
                 recovery_time = time.time() - start
-                logger.info(f"System recovered in {recovery_time:.2f}s")
+                logger.info("System recovered", extra={"recovery_time_seconds": round(recovery_time, 2)})
                 return recovery_time
 
             time.sleep(check_interval)
 
-        logger.warning(f"Recovery timeout after {timeout}s")
+        logger.warning("Recovery timeout", extra={"timeout_seconds": timeout})
         return timeout
 
     def find_hpa_name(self) -> Optional[str]:
@@ -307,7 +307,7 @@ class ChaosTestSuite:
         cmd = ["kubectl", "get", "hpa", hpa_name, "-n", self.namespace, "-o", "json"]
         returncode, stdout, stderr = self.run_kubectl_command(cmd)
         if returncode != 0:
-            logger.warning(f"Failed to get HPA status: {stderr}")
+            logger.warning("Failed to get HPA status", extra={"stderr": stderr})
             return None
 
         try:
@@ -329,7 +329,7 @@ class ChaosTestSuite:
                 ),
             }
         except (json.JSONDecodeError, KeyError) as e:
-            logger.warning(f"Failed to parse HPA status: {e}")
+            logger.warning("Failed to parse HPA status", extra={"error": str(e)})
             return None
 
     def get_hpa_replicas(self) -> Optional[int]:
@@ -343,12 +343,17 @@ class ChaosTestSuite:
             name=experiment.name, status=ExperimentStatus.PENDING, severity=experiment.severity
         )
 
-        logger.info(f"\n{'='*60}")
-        logger.info(f"Starting HPA experiment: {experiment.name}")
-        logger.info(f"Description: {experiment.description}")
-        logger.info(f"Severity: {experiment.severity.value}")
-        logger.info(f"Duration: {experiment.duration_seconds}s")
-        logger.info(f"{'='*60}\n")
+        logger.info("\n" + "="*60)
+        logger.info(
+            "Starting HPA experiment",
+            extra={
+                "experiment_name": experiment.name,
+                "description": experiment.description,
+                "severity": experiment.severity.value,
+                "duration_seconds": experiment.duration_seconds
+            }
+        )
+        logger.info("="*60 + "\n")
 
         try:
             # Get HPA status before experiment
@@ -363,11 +368,15 @@ class ChaosTestSuite:
             result.hpa_replicas_before = hpa_status_before.get("current_replicas")
             result.pods_before = self.get_pod_count()
 
-            logger.info(f"HPA Status Before:")
-            logger.info(f"  Min Replicas: {result.hpa_min_replicas}")
-            logger.info(f"  Max Replicas: {result.hpa_max_replicas}")
-            logger.info(f"  Current Replicas: {result.hpa_replicas_before}")
-            logger.info(f"  Pods: {result.pods_before}")
+            logger.info(
+                "HPA Status Before",
+                extra={
+                    "min_replicas": result.hpa_min_replicas,
+                    "max_replicas": result.hpa_max_replicas,
+                    "current_replicas": result.hpa_replicas_before,
+                    "pods": result.pods_before
+                }
+            )
 
             # Check if manifest exists
             if not Path(experiment.manifest_path).exists():
@@ -385,7 +394,10 @@ class ChaosTestSuite:
                 return result
 
             # Monitor HPA during experiment (poll every 15 seconds)
-            logger.info(f"Monitoring HPA scaling behavior for {experiment.duration_seconds}s...")
+            logger.info(
+                "Monitoring HPA scaling behavior",
+                extra={"duration_seconds": experiment.duration_seconds}
+            )
             poll_interval = 15
             poll_count = experiment.duration_seconds // poll_interval
             peak_replicas = result.hpa_replicas_before
@@ -400,10 +412,13 @@ class ChaosTestSuite:
                     current_replicas = hpa_status.get("current_replicas", 0)
                     cpu_util = hpa_status.get("current_cpu_utilization")
 
-                    logger.info(
-                        f"  [{i+1}/{poll_count}] HPA: {current_replicas} replicas"
-                        + (f", CPU: {cpu_util}%" if cpu_util else "")
-                    )
+                    log_extra = {
+                        "poll_iteration": f"{i+1}/{poll_count}",
+                        "current_replicas": current_replicas
+                    }
+                    if cpu_util:
+                        log_extra["cpu_utilization"] = cpu_util
+                    logger.info("HPA status check", extra=log_extra)
 
                     # Track peak replicas
                     if current_replicas > peak_replicas:
@@ -414,7 +429,7 @@ class ChaosTestSuite:
                     # Check if we've reached max replicas
                     if current_replicas >= result.hpa_max_replicas and scale_up_complete is None:
                         scale_up_complete = time.time()
-                        logger.info(f"  HPA reached max replicas ({result.hpa_max_replicas})")
+                        logger.info("HPA reached max replicas", extra={"max_replicas": result.hpa_max_replicas})
 
             result.hpa_replicas_during = peak_replicas
 
@@ -425,11 +440,11 @@ class ChaosTestSuite:
                 )
 
             # Cleanup chaos
-            logger.info("Cleaning up chaos experiment...")
+            logger.info("Cleaning up chaos experiment")
             self.cleanup_chaos("stresschaos")
 
             # Monitor scale-down after chaos ends
-            logger.info("Monitoring HPA scale-down behavior...")
+            logger.info("Monitoring HPA scale-down behavior")
             scale_down_start = time.time()
             scale_down_complete = None
             scale_down_timeout = 600  # 10 minutes max for scale-down
@@ -440,14 +455,18 @@ class ChaosTestSuite:
                 hpa_status = self.get_hpa_status()
                 if hpa_status:
                     current_replicas = hpa_status.get("current_replicas", 0)
-                    logger.info(f"  HPA scale-down: {current_replicas} replicas")
+                    logger.info("HPA scale-down status", extra={"current_replicas": current_replicas})
 
                     # Check if we've reached min replicas
                     if current_replicas <= result.hpa_min_replicas:
                         scale_down_complete = time.time()
                         result.hpa_scale_down_time = scale_down_complete - scale_down_start
                         logger.info(
-                            f"  HPA scaled down to min replicas ({result.hpa_min_replicas}) in {result.hpa_scale_down_time:.1f}s"
+                            "HPA scaled down to min replicas",
+                            extra={
+                                "min_replicas": result.hpa_min_replicas,
+                                "scale_down_time_seconds": round(result.hpa_scale_down_time, 1)
+                            }
                         )
                         break
 
@@ -500,12 +519,15 @@ class ChaosTestSuite:
                 result.errors.extend(validation_errors)
 
         except Exception as e:
-            logger.error(f"Experiment failed with exception: {e}", exc_info=True)
+            logger.error("Experiment failed with exception", extra={"error": str(e)}, exc_info=True)
             result.status = ExperimentStatus.FAILED
             result.errors.append(str(e))
             result.end_time = datetime.now()
 
-        logger.info(f"\nExperiment {experiment.name} status: {result.status.value}\n")
+        logger.info(
+            "HPA experiment completed",
+            extra={"experiment_name": experiment.name, "status": result.status.value}
+        )
         self.results.append(result)
         return result
 
@@ -515,17 +537,22 @@ class ChaosTestSuite:
             name=experiment.name, status=ExperimentStatus.PENDING, severity=experiment.severity
         )
 
-        logger.info(f"\n{'='*60}")
-        logger.info(f"Starting experiment: {experiment.name}")
-        logger.info(f"Description: {experiment.description}")
-        logger.info(f"Severity: {experiment.severity.value}")
-        logger.info(f"Duration: {experiment.duration_seconds}s")
-        logger.info(f"{'='*60}\n")
+        logger.info("\n" + "="*60)
+        logger.info(
+            "Starting experiment",
+            extra={
+                "experiment_name": experiment.name,
+                "description": experiment.description,
+                "severity": experiment.severity.value,
+                "duration_seconds": experiment.duration_seconds
+            }
+        )
+        logger.info("="*60 + "\n")
 
         try:
             # Get baseline metrics
             result.pods_before = self.get_pod_count()
-            logger.info(f"Pods before experiment: {result.pods_before}")
+            logger.info("Pods before experiment", extra={"pods_before": result.pods_before})
 
             # Check if manifest exists
             if not Path(experiment.manifest_path).exists():
@@ -543,13 +570,13 @@ class ChaosTestSuite:
                 return result
 
             # Monitor experiment
-            logger.info(f"Monitoring for {experiment.duration_seconds}s...")
+            logger.info("Monitoring experiment", extra={"duration_seconds": experiment.duration_seconds})
 
             if not self.dry_run:
                 await asyncio.sleep(experiment.duration_seconds)
 
             # Cleanup chaos
-            logger.info("Cleaning up chaos experiment...")
+            logger.info("Cleaning up chaos experiment")
             # Cleanup multiple resource types for network chaos
             if experiment.resource_type == "networkchaos":
                 self.cleanup_chaos("networkchaos")
@@ -559,7 +586,7 @@ class ChaosTestSuite:
                 self.cleanup_chaos(experiment.resource_type)
 
             # Wait for recovery
-            logger.info("Waiting for system recovery...")
+            logger.info("Waiting for system recovery")
             result.recovery_time_seconds = self.wait_for_recovery()
 
             # Get post-experiment metrics
@@ -589,12 +616,15 @@ class ChaosTestSuite:
                 result.observations.append("Slow recovery (>2m)")
 
         except Exception as e:
-            logger.error(f"Experiment failed with exception: {e}", exc_info=True)
+            logger.error("Experiment failed with exception", extra={"error": str(e)}, exc_info=True)
             result.status = ExperimentStatus.FAILED
             result.errors.append(str(e))
             result.end_time = datetime.now()
 
-        logger.info(f"\nExperiment {experiment.name} status: {result.status.value}\n")
+        logger.info(
+            "Experiment completed",
+            extra={"experiment_name": experiment.name, "status": result.status.value}
+        )
         self.results.append(result)
         return result
 
@@ -615,6 +645,8 @@ class ChaosTestSuite:
         # Write JSON report
         with open(output_path, "w") as f:
             json.dump(report, f, indent=2, default=str)
+
+        logger.info("Report generated", extra={"output_path": output_path})
 
         # Write text report
         text_report = output_path.replace(".json", ".txt")
@@ -668,8 +700,7 @@ class ChaosTestSuite:
 
                 f.write("\n" + "-" * 80 + "\n\n")
 
-        logger.info(f"Report generated: {output_path}")
-        logger.info(f"Text report: {text_report}")
+        logger.info("Text report generated", extra={"text_report": text_report})
 
         return report
 
@@ -791,33 +822,38 @@ async def main():
     # Run test suite
     suite = ChaosTestSuite(namespace=args.namespace, dry_run=args.dry_run)
 
-    logger.info(f"\n{'='*80}")
+    logger.info("\n" + "="*80)
     logger.info("CHAOS ENGINEERING TEST SUITE")
-    logger.info(f"{'='*80}\n")
-    logger.info(f"Namespace: {args.namespace}")
-    logger.info(f"Experiments: {len(experiments)}")
-    logger.info(f"Dry Run: {args.dry_run}\n")
+    logger.info("="*80 + "\n")
+    logger.info(
+        "Test suite configuration",
+        extra={
+            "namespace": args.namespace,
+            "experiment_count": len(experiments),
+            "dry_run": args.dry_run
+        }
+    )
 
     # Check prerequisites
     if not args.skip_prereq_check:
-        logger.info("Checking prerequisites...")
+        logger.info("Checking prerequisites")
         prereq_ok, errors = suite.check_prerequisites()
         if not prereq_ok:
-            logger.error("Prerequisites check failed:")
+            logger.error("Prerequisites check failed", extra={"error_count": len(errors)})
             for error in errors:
-                logger.error(f"  - {error}")
+                logger.error("Prerequisite error", extra={"error": error})
             logger.error("\nPlease fix the issues above before running chaos experiments.")
             logger.error("You can skip this check with --skip-prereq-check (not recommended)")
             return 1
 
         # Check HPA prerequisites if running HPA test
         if any(e.name == "hpa-stress-test" for e in experiments):
-            logger.info("Checking HPA prerequisites...")
+            logger.info("Checking HPA prerequisites")
             hpa_prereq_ok, hpa_errors = suite.check_hpa_prerequisites()
             if not hpa_prereq_ok:
-                logger.error("HPA prerequisites check failed:")
+                logger.error("HPA prerequisites check failed", extra={"error_count": len(hpa_errors)})
                 for error in hpa_errors:
-                    logger.error(f"  - {error}")
+                    logger.error("HPA prerequisite error", extra={"error": error})
                 logger.error("\nPlease fix the issues above before running HPA chaos experiments.")
                 return 1
 
@@ -831,25 +867,24 @@ async def main():
             await suite.run_experiment(experiment)
         # Wait between experiments
         if not args.dry_run:
-            logger.info("Waiting 30s before next experiment...\n")
+            logger.info("Waiting before next experiment\n", extra={"wait_seconds": 30})
             await asyncio.sleep(30)
 
     # Generate report
     suite.generate_report(args.output)
 
     # Print summary
-    logger.info(f"\n{'='*80}")
+    logger.info("\n" + "="*80)
     logger.info("TEST SUITE COMPLETED")
-    logger.info(f"{'='*80}\n")
+    logger.info("="*80 + "\n")
 
     summary = {
-        "Total": len(suite.results),
-        "Completed": sum(1 for r in suite.results if r.status == ExperimentStatus.COMPLETED),
-        "Failed": sum(1 for r in suite.results if r.status == ExperimentStatus.FAILED),
+        "total": len(suite.results),
+        "completed": sum(1 for r in suite.results if r.status == ExperimentStatus.COMPLETED),
+        "failed": sum(1 for r in suite.results if r.status == ExperimentStatus.FAILED),
     }
 
-    for key, value in summary.items():
-        logger.info(f"{key}: {value}")
+    logger.info("Test suite summary", extra=summary)
 
 
 if __name__ == "__main__":

@@ -24,8 +24,11 @@ except ImportError:
     print("ERROR: Required libraries not found. Install with: pip install hvac pyYAML")
     sys.exit(1)
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+# Configure logging for standalone script
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s - %(name)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -206,15 +209,22 @@ class ProgressTracker:
 
         if item_name:
             logger.info(
-                f"Progress: [{self.current:2d}/{self.total}] {percentage:5.1f}% - {item_name}"
+                "Migration progress",
+                extra={"current": self.current, "total": self.total, "percentage": percentage, "item": item_name}
             )
         else:
-            logger.info(f"Progress: [{self.current}/{self.total}] {percentage:5.1f}%")
+            logger.info(
+                "Migration progress",
+                extra={"current": self.current, "total": self.total, "percentage": percentage}
+            )
 
     def finish(self):
         """Marks the process as complete and prints a final summary."""
         elapsed = time.time() - self.start_time
-        logger.info(f"Migration completed in {elapsed:.1f}s ({self.current}/{self.total} items)")
+        logger.info(
+            "Migration completed",
+            extra={"elapsed_seconds": elapsed, "items_processed": self.current, "total_items": self.total}
+        )
 
 
 def get_secret_interactive(secret_name: str) -> Optional[str]:
@@ -233,7 +243,7 @@ def get_secret_interactive(secret_name: str) -> Optional[str]:
     try:
         value = getpass.getpass(f"Enter value for {secret_name} (hidden): ")
         if not value:
-            logger.warning(f"No value provided for {secret_name}")
+            logger.warning("No value provided for secret", extra={"secret_name": secret_name})
             return None
         return value
     except KeyboardInterrupt:
@@ -282,7 +292,7 @@ class SecretMigrator:
         if not self.client.is_authenticated():
             raise RuntimeError("Failed to authenticate with Vault")
 
-        logger.info(f"Connected to Vault at {vault_addr}")
+        logger.info("Connected to Vault", extra={"vault_addr": vault_addr})
 
     def validate_secret_before_migration(self, key: str, value: str) -> Tuple[bool, str]:
         """Validates a secret before it is migrated.
@@ -303,7 +313,7 @@ class SecretMigrator:
             environment: The name of the environment (e.g., 'dev', 'prod').
             backup_file: The path where the backup file will be saved.
         """
-        logger.info(f"Backing up secrets for environment: {environment}")
+        logger.info("Backing up secrets", extra={"environment": environment})
 
         try:
             secrets_path = f"mlops-sentiment/{environment}"
@@ -326,10 +336,10 @@ class SecretMigrator:
             with open(backup_file, "w") as f:
                 json.dump(backup_data, f, indent=2)
 
-            logger.info(f"Backup saved to {backup_file}")
+            logger.info("Backup saved", extra={"backup_file": backup_file})
 
         except Exception as e:
-            logger.warning(f"Could not create backup: {e}")
+            logger.warning("Could not create backup", extra={"error": str(e)}, exc_info=True)
 
     def migrate_secret(
         self,
@@ -358,10 +368,16 @@ class SecretMigrator:
         is_valid, validation_msg = self.validate_secret_before_migration(secret_key, secret_value)
 
         if not is_valid:
-            logger.error(f"✗ Validation failed for {secret_key}: {validation_msg}")
+            logger.error(
+                "Validation failed for secret",
+                extra={"secret_key": secret_key, "validation_msg": validation_msg}
+            )
             return False
 
-        logger.info(f"✓ Validation passed for {secret_key}: {validation_msg}")
+        logger.info(
+            "Validation passed for secret",
+            extra={"secret_key": secret_key, "validation_msg": validation_msg}
+        )
 
         try:
             secret_path = f"mlops-sentiment/{environment}/{secret_key}"
@@ -374,7 +390,7 @@ class SecretMigrator:
                 path=secret_path, secret=secret_data, mount_point=self.mount_point
             )
 
-            logger.info(f"✓ Migrated secret: {secret_key} ({environment})")
+            logger.info("Secret migrated", extra={"secret_key": secret_key, "environment": environment})
 
             if progress_tracker:
                 progress_tracker.update(secret_key)
@@ -382,7 +398,11 @@ class SecretMigrator:
             return True
 
         except Exception as e:
-            logger.error(f"✗ Failed to migrate {secret_key}: {e}")
+            logger.error(
+                "Failed to migrate secret",
+                extra={"secret_key": secret_key, "error": str(e)},
+                exc_info=True
+            )
             return False
 
     def verify_secret(self, environment: str, secret_key: str) -> bool:
@@ -407,7 +427,11 @@ class SecretMigrator:
             return "value" in response["data"]["data"]
 
         except Exception as e:
-            logger.error(f"Verification failed for {secret_key}: {e}")
+            logger.error(
+                "Verification failed for secret",
+                extra={"secret_key": secret_key, "error": str(e)},
+                exc_info=True
+            )
             return False
 
 
@@ -464,7 +488,7 @@ def main():
             vault_addr=args.vault_addr, vault_token=vault_token, namespace=args.namespace
         )
     except Exception as e:
-        logger.error(f"Failed to initialize migrator: {e}")
+        logger.error("Failed to initialize migrator", extra={"error": str(e)}, exc_info=True)
         return 1
 
     # Create backup
@@ -480,7 +504,7 @@ def main():
             secrets_to_migrate = json.load(f)
     else:
         # Interactive mode
-        logger.info(f"\n=== Interactive Secret Migration for {args.environment} ===\n")
+        logger.info("Starting interactive secret migration", extra={"environment": args.environment})
 
         default_secrets = [
             ("api_key", "API key for authentication"),
@@ -499,7 +523,10 @@ def main():
     progress_tracker = ProgressTracker(len(secrets_to_migrate)) if not args.dry_run else None
 
     # Perform migration
-    logger.info(f"\n=== Migrating {len(secrets_to_migrate)} secrets to {args.environment} ===\n")
+    logger.info(
+        "Starting secret migration",
+        extra={"secret_count": len(secrets_to_migrate), "environment": args.environment}
+    )
 
     success_count = 0
     failed_secrets = []
@@ -507,7 +534,7 @@ def main():
 
     for key, value in secrets_to_migrate.items():
         if args.dry_run:
-            logger.info(f"[DRY RUN] Would migrate: {key}")
+            logger.info("Dry run - would migrate secret", extra={"secret_key": key})
             success_count += 1
             if progress_tracker:
                 progress_tracker.update(key)
@@ -516,7 +543,10 @@ def main():
             is_valid, validation_msg = migrator.validate_secret_before_migration(key, value)
 
             if not is_valid:
-                logger.error(f"✗ Skipping {key} due to validation failure: {validation_msg}")
+                logger.error(
+                    "Skipping secret due to validation failure",
+                    extra={"secret_key": key, "validation_msg": validation_msg}
+                )
                 skipped_secrets.append(key)
                 continue
 
@@ -526,10 +556,10 @@ def main():
                 # Verify migration
                 if migrator.verify_secret(args.environment, key):
                     success_count += 1
-                    logger.info(f"✓ Successfully migrated and verified: {key}")
+                    logger.info("Successfully migrated and verified secret", extra={"secret_key": key})
                 else:
                     failed_secrets.append(key)
-                    logger.error(f"✗ Verification failed for {key}")
+                    logger.error("Verification failed for secret", extra={"secret_key": key})
             else:
                 failed_secrets.append(key)
 
@@ -538,21 +568,25 @@ def main():
         progress_tracker.finish()
 
     # Summary
-    logger.info(f"\n=== Migration Summary ===")
-    logger.info(f"Total secrets: {len(secrets_to_migrate)}")
-    logger.info(f"Successfully migrated: {success_count}")
-    logger.info(f"Failed: {len(failed_secrets)}")
-    logger.info(f"Skipped (validation failed): {len(skipped_secrets)}")
+    logger.info(
+        "Migration summary",
+        extra={
+            "total_secrets": len(secrets_to_migrate),
+            "successful": success_count,
+            "failed": len(failed_secrets),
+            "skipped": len(skipped_secrets)
+        }
+    )
 
     if failed_secrets:
-        logger.error(f"Failed secrets: {', '.join(failed_secrets)}")
+        logger.error("Failed secrets", extra={"failed_secrets": failed_secrets})
 
     if skipped_secrets:
-        logger.warning(f"Skipped secrets: {', '.join(skipped_secrets)}")
+        logger.warning("Skipped secrets", extra={"skipped_secrets": skipped_secrets})
 
     if not args.dry_run:
-        logger.info(f"\n✓ Migration complete!")
-        logger.info(f"Backup saved to: {backup_file}")
+        logger.info("Migration complete")
+        logger.info("Backup saved", extra={"backup_file": backup_file})
 
     # Return appropriate exit code
     if failed_secrets or skipped_secrets:

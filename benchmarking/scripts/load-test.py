@@ -244,7 +244,7 @@ class LoadTester:
                 # A small pause between requests (to simulate a real user)
                 await asyncio.sleep(0.1)
 
-        logger.info(f"User {user_id} completed {len(results)} requests")
+        logger.info("User completed requests", extra={"user_id": user_id, "request_count": len(results)})
         return results
 
     async def run_load_test(
@@ -263,7 +263,10 @@ class LoadTester:
         Returns:
             A list containing all `TestResult` objects from the test.
         """
-        logger.info(f"Starting load test: {concurrent_users} users, {duration}s duration")
+        logger.info(
+            "Starting load test",
+            extra={"concurrent_users": concurrent_users, "duration_seconds": duration}
+        )
 
         test_data = self._generate_test_data()
         self.start_time = time.time()
@@ -285,7 +288,7 @@ class LoadTester:
         self.end_time = time.time()
         self.results = all_results
 
-        logger.info(f"Load test completed: {len(all_results)} total requests")
+        logger.info("Load test completed", extra={"total_requests": len(all_results)})
         return all_results
 
     def calculate_metrics(self, instance_type: str, concurrent_users: int) -> BenchmarkMetrics:
@@ -362,7 +365,7 @@ class LoadTester:
         with open(detailed_path, "w", encoding="utf-8") as f:
             json.dump(detailed_results, f, indent=2, ensure_ascii=False)
 
-        logger.info(f"Results saved to {output_path}")
+        logger.info("Results saved", extra={"output_path": output_path})
 
     def generate_report(self, metrics: BenchmarkMetrics, output_dir: str):
         """Generates and saves a graphical report of the benchmark results.
@@ -441,7 +444,7 @@ class LoadTester:
         )
         plt.close()
 
-        logger.info(f"Report generated in {output_dir}")
+        logger.info("Report generated", extra={"output_dir": str(output_dir)})
 
 
 async def main():
@@ -506,10 +509,9 @@ async def main():
         tester.generate_report(metrics, args.report_dir)
 
     except Exception as e:
-        logger.error(f"Benchmark failed: {e}")
+        logger.error("Benchmark failed", extra={"error": str(e)}, exc_info=True)
         raise
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
     asyncio.run(main())

@@ -23,14 +23,14 @@ try:
     NVIDIA_GPU_AVAILABLE = True
 except ImportError:
     NVIDIA_GPU_AVAILABLE = False
-    logging.warning("pynvml not available. GPU monitoring will be disabled.")
+    logging.warning("pynvml not available - GPU monitoring will be disabled")
 
 try:
     from kubernetes import client, config
     KUBERNETES_AVAILABLE = True
 except ImportError:
     KUBERNETES_AVAILABLE = False
-    logging.warning("kubernetes library not available. K8s monitoring will be disabled.")
+    logging.warning("kubernetes library not available - K8s monitoring will be disabled")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -84,9 +84,9 @@ class ResourceMonitor:
             try:
                 pynvml.nvmlInit()
                 self.gpu_count = pynvml.nvmlDeviceGetCount()
-                logger.info(f"Initialized NVIDIA GPU monitoring. Found {self.gpu_count} GPU(s)")
+                logger.info("Initialized NVIDIA GPU monitoring", extra={"gpu_count": self.gpu_count})
             except Exception as e:
-                logger.warning(f"Failed to initialize GPU monitoring: {e}")
+                logger.warning("Failed to initialize GPU monitoring", extra={"error": str(e)})
                 self.gpu_count = 0
         else:
             self.gpu_count = 0
@@ -102,7 +102,7 @@ class ResourceMonitor:
                     self.k8s_metrics_client = client.CustomObjectsApi()
                     logger.info("Initialized Kubernetes monitoring")
                 except Exception as e:
-                    logger.warning(f"Failed to initialize Kubernetes monitoring: {e}")
+                    logger.warning("Failed to initialize Kubernetes monitoring", extra={"error": str(e)})
                     KUBERNETES_AVAILABLE = False
     
     def _get_gpu_metrics(self) -> Dict[str, Any]:
@@ -136,9 +136,9 @@ class ResourceMonitor:
                 'gpu_temperature': temperature,
                 'gpu_power_draw': power_draw
             }
-            
+
         except Exception as e:
-            logger.warning(f"Failed to get GPU metrics: {e}")
+            logger.warning("Failed to get GPU metrics", extra={"error": str(e)})
             return {}
     
     def _get_kubernetes_metrics(self, namespace: str = "mlops-benchmark") -> List[KubernetesMetrics]:
@@ -197,14 +197,17 @@ class ResourceMonitor:
                             )
                             
                             k8s_metrics.append(k8s_metric)
-                            
+
                     except Exception as e:
-                        logger.warning(f"Failed to get metrics for pod {pod.metadata.name}: {e}")
-            
+                        logger.warning(
+                            "Failed to get metrics for pod",
+                            extra={"pod_name": pod.metadata.name, "error": str(e)}
+                        )
+
             return k8s_metrics
-            
+
         except Exception as e:
-            logger.warning(f"Failed to get Kubernetes metrics: {e}")
+            logger.warning("Failed to get Kubernetes metrics", extra={"error": str(e)})
             return []
     
     def _parse_cpu_usage(self, cpu_string: str) -> float:
@@ -272,7 +275,7 @@ class ResourceMonitor:
     async def start_monitoring(self, interval: int = 5, namespace: str = "mlops-benchmark"):
         """Запуск мониторинга ресурсов"""
         self.monitoring = True
-        logger.info(f"Starting resource monitoring (interval: {interval}s)")
+        logger.info("Starting resource monitoring", extra={"interval_seconds": interval})
         
         while self.monitoring:
             try:
@@ -286,16 +289,19 @@ class ResourceMonitor:
                 
                 # Логирование текущих метрик
                 logger.info(
-                    f"CPU: {system_metrics.cpu_percent:.1f}%, "
-                    f"Memory: {system_metrics.memory_percent:.1f}% "
-                    f"({system_metrics.memory_used_gb:.2f}GB), "
-                    f"GPU: {system_metrics.gpu_utilization or 'N/A'}%"
+                    "Resource metrics",
+                    extra={
+                        "cpu_percent": round(system_metrics.cpu_percent, 1),
+                        "memory_percent": round(system_metrics.memory_percent, 1),
+                        "memory_used_gb": round(system_metrics.memory_used_gb, 2),
+                        "gpu_utilization": system_metrics.gpu_utilization or "N/A"
+                    }
                 )
-                
+
                 await asyncio.sleep(interval)
-                
+
             except Exception as e:
-                logger.error(f"Error during monitoring: {e}")
+                logger.error("Error during monitoring", extra={"error": str(e)}, exc_info=True)
                 await asyncio.sleep(interval)
     
     def stop_monitoring(self):
@@ -355,8 +361,8 @@ class ResourceMonitor:
         avg_output_path = output_path.replace('.json', '_summary.json')
         with open(avg_output_path, 'w', encoding='utf-8') as f:
             json.dump(avg_metrics, f, indent=2, ensure_ascii=False)
-        
-        logger.info(f"Metrics saved to {output_path}")
+
+        logger.info("Metrics saved", extra={"output_path": output_path})
 
 async def main():
     parser = argparse.ArgumentParser(description='Resource Monitoring for MLOps Benchmarking')
@@ -405,12 +411,12 @@ async def main():
         if 'avg_gpu_utilization' in avg_metrics:
             print(f"Average GPU: {avg_metrics['avg_gpu_utilization']:.1f}%")
             print(f"Max GPU: {avg_metrics['max_gpu_utilization']:.1f}%")
-        
+
     except KeyboardInterrupt:
         logger.info("Monitoring interrupted by user")
         monitor.stop_monitoring()
     except Exception as e:
-        logger.error(f"Monitoring failed: {e}")
+        logger.error("Monitoring failed", extra={"error": str(e)}, exc_info=True)
         raise
 
 if __name__ == "__main__":

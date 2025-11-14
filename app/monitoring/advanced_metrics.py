@@ -9,7 +9,6 @@ This module provides comprehensive metrics beyond basic observability:
 - Custom SLO/SLA tracking
 """
 
-import logging
 import time
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
@@ -19,7 +18,9 @@ import threading
 
 from prometheus_client import Counter, Histogram, Gauge, Summary
 
-logger = logging.getLogger(__name__)
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass

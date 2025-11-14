@@ -68,7 +68,7 @@ class SecretRotator:
         if not self.client.is_authenticated():
             raise RuntimeError("Failed to authenticate with Vault")
 
-        logger.info(f"Connected to Vault at {vault_addr}")
+        logger.info("Connected to Vault", extra={"vault_addr": vault_addr})
 
     def generate_api_key(self, length: int = 32) -> str:
         """Generates a cryptographically secure, random API key.
@@ -139,9 +139,9 @@ class SecretRotator:
                 self.client.secrets.kv.v2.read_secret_version(
                     path=secret_path, mount_point=self.mount_point
                 )
-                logger.info(f"Backing up current version of {secret_key}")
+                logger.info("Backing up current version of secret", extra={"secret_key": secret_key})
             except Exception:
-                logger.warning(f"No existing secret found for {secret_key}")
+                logger.warning("No existing secret found", extra={"secret_key": secret_key})
 
             # Generate new value if not provided
             if new_value is None:
@@ -163,11 +163,11 @@ class SecretRotator:
                 path=secret_path, secret=secret_data, mount_point=self.mount_point
             )
 
-            logger.info(f"✓ Rotated secret: {secret_key} ({environment})")
+            logger.info("Rotated secret", extra={"secret_key": secret_key, "environment": environment})
             return True
 
         except Exception as e:
-            logger.error(f"✗ Failed to rotate {secret_key}: {e}")
+            logger.error("Failed to rotate secret", extra={"secret_key": secret_key, "error": str(e)}, exc_info=True)
             return False
 
     def verify_secret_rotation(self, environment: str, secret_key: str) -> bool:
@@ -194,13 +194,18 @@ class SecretRotator:
             recently_rotated = "rotated_at" in data
 
             logger.info(
-                f"Verification: {secret_key} - Value exists: {has_value}, Recently rotated: {recently_rotated}"
+                "Secret verification completed",
+                extra={
+                    "secret_key": secret_key,
+                    "value_exists": has_value,
+                    "recently_rotated": recently_rotated
+                }
             )
 
             return has_value
 
         except Exception as e:
-            logger.error(f"Verification failed for {secret_key}: {e}")
+            logger.error("Verification failed", extra={"secret_key": secret_key, "error": str(e)}, exc_info=True)
             return False
 
     def trigger_kubernetes_rollout(self, namespace: str, deployment_name: str) -> bool:
@@ -224,7 +229,7 @@ class SecretRotator:
             try:
                 config.load_kube_config()
             except Exception as e:
-                logger.error(f"Failed to load Kubernetes config: {e}")
+                logger.error("Failed to load Kubernetes config", extra={"error": str(e)}, exc_info=True)
                 return False
 
         try:
@@ -244,13 +249,16 @@ class SecretRotator:
                 name=deployment_name, namespace=namespace, body=body
             )
 
-            logger.info(f"✓ Triggered rollout for {deployment_name} in {namespace}")
+            logger.info(
+                "Triggered rollout",
+                extra={"deployment_name": deployment_name, "namespace": namespace}
+            )
 
             # Wait for rollout to complete
             return self._wait_for_rollout(namespace, deployment_name)
 
         except Exception as e:
-            logger.error(f"Failed to trigger Kubernetes rollout: {e}")
+            logger.error("Failed to trigger Kubernetes rollout", extra={"error": str(e)}, exc_info=True)
             return False
 
     def _wait_for_rollout(self, namespace: str, deployment_name: str, timeout: int = 300) -> bool:
@@ -283,16 +291,16 @@ class SecretRotator:
                     and status.replicas == status.available_replicas
                     and status.observed_generation >= deployment.metadata.generation
                 ):
-                    logger.info(f"✓ Rollout complete for {deployment_name}")
+                    logger.info("Rollout complete", extra={"deployment_name": deployment_name})
                     return True
 
                 time.sleep(5)
 
             except Exception as e:
-                logger.error(f"Error checking rollout status: {e}")
+                logger.error("Error checking rollout status", extra={"error": str(e)}, exc_info=True)
                 return False
 
-        logger.error(f"Rollout timeout for {deployment_name}")
+        logger.error("Rollout timeout", extra={"deployment_name": deployment_name})
         return False
 
 
@@ -346,15 +354,18 @@ def main():
     try:
         rotator = SecretRotator(vault_addr=args.vault_addr, vault_token=vault_token)
     except Exception as e:
-        logger.error(f"Failed to initialize rotator: {e}")
+        logger.error("Failed to initialize rotator", extra={"error": str(e)}, exc_info=True)
         return 1
 
-    logger.info(f"\n=== Secret Rotation for {args.environment}/{args.secret} ===\n")
+    logger.info(
+        "\n=== Secret Rotation ===\n",
+        extra={"environment": args.environment, "secret": args.secret}
+    )
 
     if args.dry_run:
-        logger.info(f"[DRY RUN] Would rotate: {args.secret}")
-        logger.info(f"[DRY RUN] Environment: {args.environment}")
-        logger.info(f"[DRY RUN] Type: {args.secret_type}")
+        logger.info("[DRY RUN] Would rotate secret", extra={"secret": args.secret})
+        logger.info("[DRY RUN] Environment", extra={"environment": args.environment})
+        logger.info("[DRY RUN] Type", extra={"secret_type": args.secret_type})
         return 0
 
     # Perform rotation
@@ -375,7 +386,7 @@ def main():
         else:
             logger.info("Skipping Kubernetes rollout (no namespace/deployment specified)")
 
-    logger.info(f"\n✓ Secret rotation complete for {args.secret}!")
+    logger.info("\nSecret rotation complete", extra={"secret": args.secret})
     return 0
 
 
