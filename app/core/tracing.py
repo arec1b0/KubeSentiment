@@ -5,7 +5,6 @@ This module provides comprehensive distributed tracing using OpenTelemetry,
 supporting both Jaeger and Zipkin backends for trace collection and visualization.
 """
 
-import logging
 from typing import Optional
 
 from opentelemetry import trace
@@ -23,8 +22,9 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExport
 from opentelemetry.trace import Status, StatusCode
 
 from app.core.config import get_settings
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class TracingConfig:
@@ -69,14 +69,12 @@ class TracingConfig:
 
             logger.info(
                 "Distributed tracing initialized successfully",
-                extra={
-                    "service_name": self.settings.service_name,
-                    "tracing_backend": self.settings.tracing_backend,
-                },
+                service_name=self.settings.service_name,
+                tracing_backend=self.settings.tracing_backend
             )
 
         except Exception as e:
-            logger.error(f"Failed to initialize distributed tracing: {e}", exc_info=True)
+            logger.error("Failed to initialize distributed tracing", error=str(e), exc_info=True)
 
     def _configure_exporters(self) -> None:
         """Configure trace exporters based on settings."""
@@ -91,7 +89,7 @@ class TracingConfig:
         elif backend == "console":
             self._setup_console_exporter()
         else:
-            logger.warning(f"Unknown tracing backend: {backend}, using console exporter")
+            logger.warning("Unknown tracing backend, using console exporter", backend=backend)
             self._setup_console_exporter()
 
     def _setup_jaeger_exporter(self) -> None:
@@ -106,7 +104,9 @@ class TracingConfig:
         self.tracer_provider.add_span_processor(span_processor)
 
         logger.info(
-            f"Jaeger exporter configured: {self.settings.jaeger_agent_host}:{self.settings.jaeger_agent_port}"
+            "Jaeger exporter configured",
+            host=self.settings.jaeger_agent_host,
+            port=self.settings.jaeger_agent_port
         )
 
     def _setup_zipkin_exporter(self) -> None:
@@ -118,7 +118,7 @@ class TracingConfig:
         span_processor = BatchSpanProcessor(zipkin_exporter)
         self.tracer_provider.add_span_processor(span_processor)
 
-        logger.info(f"Zipkin exporter configured: {self.settings.zipkin_endpoint}")
+        logger.info("Zipkin exporter configured", endpoint=self.settings.zipkin_endpoint)
 
     def _setup_otlp_exporter(self) -> None:
         """Configure OTLP (OpenTelemetry Protocol) exporter."""
@@ -130,7 +130,7 @@ class TracingConfig:
         span_processor = BatchSpanProcessor(otlp_exporter)
         self.tracer_provider.add_span_processor(span_processor)
 
-        logger.info(f"OTLP exporter configured: {self.settings.otlp_endpoint}")
+        logger.info("OTLP exporter configured", endpoint=self.settings.otlp_endpoint)
 
     def _setup_console_exporter(self) -> None:
         """Configure console exporter for debugging."""
@@ -154,7 +154,7 @@ class TracingConfig:
             RedisInstrumentor().instrument()
             logger.info("Redis instrumentation enabled")
         except Exception as e:
-            logger.debug(f"Redis instrumentation not available: {e}")
+            logger.debug("Redis instrumentation not available", error=str(e))
 
     def instrument_fastapi(self, app) -> None:
         """
@@ -174,7 +174,7 @@ class TracingConfig:
             )
             logger.info("FastAPI instrumentation enabled")
         except Exception as e:
-            logger.error(f"Failed to instrument FastAPI: {e}", exc_info=True)
+            logger.error("Failed to instrument FastAPI", error=str(e), exc_info=True)
 
     def get_tracer(self) -> trace.Tracer:
         """

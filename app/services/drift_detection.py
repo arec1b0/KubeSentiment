@@ -9,13 +9,14 @@ This module provides comprehensive drift detection capabilities:
 - Integration with Prometheus metrics
 """
 
-import logging
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 from collections import deque
 from dataclasses import dataclass, field
 import threading
+
+from app.core.logging import get_logger
 
 try:
     from scipy import stats
@@ -29,7 +30,7 @@ except ImportError:
     DRIFT_DETECTION_AVAILABLE = False
     pd = None
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -85,7 +86,7 @@ class DriftDetector:
 
         if not self.enabled:
             if not DRIFT_DETECTION_AVAILABLE:
-                logger.warning("Drift detection dependencies not available.")
+                logger.warning("Drift detection dependencies not available")
             return
 
         self.window_size = window_size
@@ -113,7 +114,7 @@ class DriftDetector:
         # Baseline established flag
         self.baseline_established = False
 
-        logger.info(f"Drift detector initialized: window_size={window_size}, psi_threshold={psi_threshold}")
+        logger.info("Drift detector initialized", window_size=window_size, psi_threshold=psi_threshold)
 
     def add_prediction(
         self,
@@ -253,7 +254,7 @@ class DriftDetector:
             statistic, p_value = stats.chisquare(cur_counts, ref_counts)
             return float(statistic), float(p_value)
         except Exception as e:
-            logger.error(f"Chi-squared test failed: {e}")
+            logger.error("Chi-squared test failed", error=str(e), exc_info=True)
             return 0.0, 1.0
 
     def check_drift(self) -> Optional[DriftMetrics]:
@@ -346,12 +347,13 @@ class DriftDetector:
             # Log drift detection
             if drift_metrics.data_drift_detected or drift_metrics.prediction_drift_detected:
                 logger.warning(
-                    f"Drift detected! Data drift: {drift_metrics.data_drift_detected}, "
-                    f"Prediction drift: {drift_metrics.prediction_drift_detected}, "
-                    f"Score: {drift_metrics.drift_score:.4f}"
+                    "Drift detected",
+                    data_drift_detected=drift_metrics.data_drift_detected,
+                    prediction_drift_detected=drift_metrics.prediction_drift_detected,
+                    drift_score=drift_metrics.drift_score
                 )
             else:
-                logger.debug(f"No drift detected. Score: {drift_metrics.drift_score:.4f}")
+                logger.debug("No drift detected", drift_score=drift_metrics.drift_score)
 
             return drift_metrics
 
@@ -451,7 +453,7 @@ class DriftDetector:
             # Return HTML
             return report.get_html()
         except Exception as e:
-            logger.error(f"Failed to generate drift report: {e}")
+            logger.error("Failed to generate drift report", error=str(e), exc_info=True)
             return None
 
 

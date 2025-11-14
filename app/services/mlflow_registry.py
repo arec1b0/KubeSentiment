@@ -9,10 +9,11 @@ This module provides integration with MLflow Model Registry for:
 - Model performance tracking
 """
 
-import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from enum import Enum
+
+from app.core.logging import get_logger
 
 try:
     import mlflow
@@ -22,7 +23,7 @@ try:
 except ImportError:
     MLFLOW_AVAILABLE = False
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ModelStage(str, Enum):
@@ -70,9 +71,9 @@ class ModelRegistry:
 
         if not self.enabled:
             if not MLFLOW_AVAILABLE:
-                logger.warning("MLflow not available. Model registry features disabled.")
+                logger.warning("MLflow not available, model registry features disabled")
             else:
-                logger.info("MLflow integration disabled by configuration.")
+                logger.info("MLflow integration disabled by configuration")
             return
 
         self.tracking_uri = tracking_uri or "http://localhost:5000"
@@ -93,9 +94,9 @@ class ModelRegistry:
                 self.experiment_id = mlflow.create_experiment(experiment_name)
             else:
                 self.experiment_id = self.experiment.experiment_id
-            logger.info(f"MLflow initialized: tracking_uri={self.tracking_uri}, experiment={experiment_name}")
+            logger.info("MLflow initialized", tracking_uri=self.tracking_uri, experiment=experiment_name)
         except Exception as e:
-            logger.error(f"Failed to initialize MLflow: {e}")
+            logger.error("Failed to initialize MLflow", error=str(e), exc_info=True)
             self.enabled = False
 
     def register_model(
@@ -137,7 +138,7 @@ class ModelRegistry:
                     model_name, model_version.version, description=description
                 )
 
-            logger.info(f"Registered model {model_name} version {model_version.version}")
+            logger.info("Model registered", model_name=model_name, version=model_version.version)
 
             return {
                 "name": model_version.name,
@@ -146,7 +147,7 @@ class ModelRegistry:
                 "creation_timestamp": model_version.creation_timestamp
             }
         except MlflowException as e:
-            logger.error(f"Failed to register model {model_name}: {e}")
+            logger.error("Failed to register model", model_name=model_name, error=str(e), exc_info=True)
             return None
 
     def get_model_version(
@@ -177,14 +178,14 @@ class ModelRegistry:
                 # Get latest version in stage
                 versions = self.client.get_latest_versions(model_name, stages=[stage.value])
                 if not versions:
-                    logger.warning(f"No model found in stage {stage} for {model_name}")
+                    logger.warning("No model found in stage", stage=stage.value, model_name=model_name)
                     return None
                 model_version = versions[0]
             else:
                 # Get latest version overall
                 versions = self.client.search_model_versions(f"name='{model_name}'")
                 if not versions:
-                    logger.warning(f"No versions found for model {model_name}")
+                    logger.warning("No versions found for model", model_name=model_name)
                     return None
                 model_version = max(versions, key=lambda v: v.version)
 
@@ -199,7 +200,7 @@ class ModelRegistry:
                 "tags": model_version.tags
             }
         except MlflowException as e:
-            logger.error(f"Failed to get model version for {model_name}: {e}")
+            logger.error("Failed to get model version", model_name=model_name, error=str(e), exc_info=True)
             return None
 
     def get_production_model(self, model_name: str) -> Optional[Dict[str, Any]]:
@@ -238,7 +239,7 @@ class ModelRegistry:
                 "tags": v.tags
             } for v in versions]
         except MlflowException as e:
-            logger.error(f"Failed to get production models for {model_name}: {e}")
+            logger.error("Failed to get production models", model_name=model_name, error=str(e), exc_info=True)
             return []
 
     def transition_model_stage(
@@ -270,10 +271,10 @@ class ModelRegistry:
                 stage=stage.value,
                 archive_existing_versions=archive_existing
             )
-            logger.info(f"Transitioned {model_name} v{version} to {stage.value}")
+            logger.info("Model stage transitioned", model_name=model_name, version=version, stage=stage.value)
             return True
         except MlflowException as e:
-            logger.error(f"Failed to transition model stage: {e}")
+            logger.error("Failed to transition model stage", error=str(e), exc_info=True)
             return False
 
     def promote_to_production(
@@ -332,10 +333,10 @@ class ModelRegistry:
                 if tags:
                     mlflow.set_tags(tags)
 
-            logger.debug(f"Logged metrics for {model_name} v{version}: {metrics}")
+            logger.debug("Metrics logged for model", model_name=model_name, version=version, metrics=metrics)
             return True
         except MlflowException as e:
-            logger.error(f"Failed to log metrics: {e}")
+            logger.error("Failed to log metrics", error=str(e), exc_info=True)
             return False
 
     def delete_model_version(self, model_name: str, version: int) -> bool:
@@ -354,10 +355,10 @@ class ModelRegistry:
 
         try:
             self.client.delete_model_version(model_name, version)
-            logger.info(f"Deleted {model_name} version {version}")
+            logger.info("Model version deleted", model_name=model_name, version=version)
             return True
         except MlflowException as e:
-            logger.error(f"Failed to delete model version: {e}")
+            logger.error("Failed to delete model version", error=str(e), exc_info=True)
             return False
 
     def search_models(
@@ -394,7 +395,7 @@ class ModelRegistry:
                 } for v in m.latest_versions]
             } for m in models]
         except MlflowException as e:
-            logger.error(f"Failed to search models: {e}")
+            logger.error("Failed to search models", error=str(e), exc_info=True)
             return []
 
 

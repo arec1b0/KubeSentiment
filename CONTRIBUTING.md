@@ -116,6 +116,150 @@ If you use Visual Studio Code, we have a recommended setup for an optimal develo
 
 2.  **Automatic Formatting**: The workspace settings in `.vscode/settings.json` are already configured to format your code with Black and sort imports with isort every time you save a file.
 
+## Logging Guidelines
+
+KubeSentiment uses structured logging throughout the codebase to enable better observability, debugging, and log aggregation. Please follow these guidelines when adding logging to your code.
+
+### Using Structured Logging
+
+#### For Application Code
+
+Application code (files in `app/` directory) must use the structured logging system:
+
+```python
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
+# Good - Structured logging with keyword arguments
+logger.info("User authentication successful", user_id=user.id, method="oauth")
+logger.warning("API rate limit approaching", current_requests=95, limit=100)
+logger.error("Database connection failed", error=str(e), database="postgres", exc_info=True)
+
+# Bad - F-strings and string formatting (DO NOT USE)
+logger.info(f"User {user.id} authenticated")  # DON'T DO THIS
+logger.error("Failed: {}".format(str(e)))  # DON'T DO THIS
+```
+
+#### For Standalone Scripts
+
+Scripts in `scripts/`, `benchmarking/scripts/`, and `chaos/scripts/` should use standard logging with structured data:
+
+```python
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s - %(name)s"
+)
+logger = logging.getLogger(__name__)
+
+# Use the 'extra' parameter for structured data
+logger.info("Migration started", extra={"environment": "prod", "secret_count": 10})
+logger.error("Validation failed", extra={"key": key, "error": str(e)}, exc_info=True)
+```
+
+### Log Levels
+
+Use appropriate log levels for different situations:
+
+- **DEBUG**: Detailed information for debugging (e.g., variable values, function entry/exit)
+- **INFO**: General information about application flow (e.g., startup, requests completed, operations succeeded)
+- **WARNING**: Something unexpected but recoverable happened (e.g., deprecated API used, fallback behavior triggered)
+- **ERROR**: An error occurred but the application continues (e.g., request failed, database timeout)
+- **CRITICAL**: A critical error that may cause application failure (rarely used)
+
+### Best Practices
+
+1. **Always use keyword arguments** instead of f-strings or string formatting
+2. **Include context**: Add relevant metadata like IDs, names, counts, durations
+3. **Use `exc_info=True`** when logging exceptions in exception handlers
+4. **Be consistent**: Use snake_case for all metadata keys
+5. **Avoid sensitive data**: Never log passwords, API keys, or PII
+6. **Use descriptive messages**: Message should explain "what", metadata should provide "details"
+
+### Examples
+
+#### Good Examples
+
+```python
+# API request logging
+logger.info(
+    "API request completed",
+    http_method="POST",
+    http_path="/predict",
+    http_status=200,
+    duration_ms=45.2,
+    user_id=user_id
+)
+
+# Model operation
+logger.info(
+    "Model prediction completed",
+    model_name="distilbert",
+    confidence=0.95,
+    prediction="POSITIVE",
+    latency_ms=23.1
+)
+
+# Error with context
+try:
+    result = expensive_operation()
+except Exception as e:
+    logger.error(
+        "Operation failed",
+        operation="expensive_operation",
+        error=str(e),
+        retry_count=3,
+        exc_info=True
+    )
+```
+
+#### Bad Examples
+
+```python
+# DON'T: Using f-strings
+logger.info(f"User {user_id} completed request in {duration}ms")
+
+# DON'T: String concatenation
+logger.error("Failed to connect to " + database + ": " + str(error))
+
+# DON'T: Missing context
+logger.info("Operation completed")  # What operation? How long? Any errors?
+
+# DON'T: Logging sensitive data
+logger.debug("User credentials", username=username, password=password)  # NEVER DO THIS
+```
+
+### Helper Functions
+
+The logging system provides helper functions for common patterns:
+
+```python
+from app.core.logging import log_api_request, log_model_operation, log_security_event
+
+# Log API requests
+log_api_request(request, response, duration_ms)
+
+# Log model operations
+log_model_operation("prediction", model_name, duration_ms, success=True)
+
+# Log security events
+log_security_event("authentication_failed", severity="high", user_id=user_id)
+```
+
+### Configuration
+
+The structured logging system is configured in `app/core/logging.py`. It provides:
+
+- JSON-formatted output for production
+- Automatic correlation ID injection
+- Service metadata enrichment
+- Integration with OpenTelemetry
+- Contextual loggers with request-specific data
+
+For more details on configuration, see `app/core/logging.py`.
+
 ## Submitting Contributions
 
 ### Git Commit Guidelines

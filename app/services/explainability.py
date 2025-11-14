@@ -9,11 +9,12 @@ This module provides various explanation methods for sentiment predictions:
 - Example-based explanations
 """
 
-import logging
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
 import torch
 from transformers import AutoTokenizer
+
+from app.core.logging import get_logger
 
 try:
     import shap
@@ -27,7 +28,7 @@ try:
 except ImportError:
     CAPTUM_AVAILABLE = False
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ExplainabilityEngine:
@@ -72,7 +73,7 @@ class ExplainabilityEngine:
             try:
                 self.tokenizer = AutoTokenizer.from_pretrained(model_name)
             except Exception as e:
-                logger.error(f"Failed to load tokenizer: {e}")
+                logger.error("Failed to load tokenizer", error=str(e), exc_info=True)
                 self.enabled = False
                 return
         else:
@@ -82,9 +83,9 @@ class ExplainabilityEngine:
         self.is_pytorch = hasattr(model, 'eval') and hasattr(model, 'forward')
 
         if not self.is_pytorch:
-            logger.warning("Model is not PyTorch-based. Some explainability features disabled.")
+            logger.warning("Model is not PyTorch-based, some explainability features disabled")
 
-        logger.info(f"Explainability engine initialized for {model_name}")
+        logger.info("Explainability engine initialized", model_name=model_name)
 
     def extract_attention_weights(
         self,
@@ -156,7 +157,7 @@ class ExplainabilityEngine:
                 'word_importance': word_importance
             }
         except Exception as e:
-            logger.error(f"Failed to extract attention weights: {e}")
+            logger.error("Failed to extract attention weights", error=str(e), exc_info=True)
             return None
 
     def compute_integrated_gradients(
@@ -234,7 +235,7 @@ class ExplainabilityEngine:
                 'word_attributions': word_attributions
             }
         except Exception as e:
-            logger.error(f"Failed to compute integrated gradients: {e}")
+            logger.error("Failed to compute integrated gradients", error=str(e), exc_info=True)
             return None
 
     def _forward_func(self, input_ids):
