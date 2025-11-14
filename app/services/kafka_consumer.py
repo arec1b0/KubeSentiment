@@ -25,6 +25,7 @@ from kafka import KafkaProducer
 
 try:  # pragma: no cover - optional dependency for lightweight tests
     from app.core.config import get_settings
+    from app.interfaces.kafka_interface import IKafkaConsumer
 except Exception:  # pragma: no cover - fallback when pydantic is unavailable
 
     def get_settings() -> Any:  # type: ignore[misc]
@@ -37,6 +38,10 @@ except Exception:  # pragma: no cover - fallback when pydantic is unavailable
             kafka_consumer_group = "unknown"
 
         return _FallbackSettings()
+
+    class IKafkaConsumer:  # type: ignore[no-redef]
+        """Fallback interface for lightweight tests"""
+        pass
 
 
 try:  # pragma: no cover - optional dependency for lightweight tests
@@ -305,7 +310,7 @@ class AsyncBatchHandle:
         return self._resolve_sync()[index]
 
 
-class HighThroughputKafkaConsumer:
+class HighThroughputKafkaConsumer(IKafkaConsumer):
     """A high-performance Kafka consumer with multi-threading and batching.
 
     This class manages a pool of Kafka consumer threads that poll for messages

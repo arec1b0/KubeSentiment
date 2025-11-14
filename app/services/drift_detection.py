@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 import threading
 
 from app.core.logging import get_logger
+from app.interfaces.drift_interface import IDriftDetector
 
 try:
     from scipy import stats
@@ -44,7 +45,7 @@ class DriftMetrics:
     feature_drifts: Dict[str, float] = field(default_factory=dict)
 
 
-class DriftDetector:
+class DriftDetector(IDriftDetector):
     """
     Comprehensive drift detection for sentiment analysis models.
 

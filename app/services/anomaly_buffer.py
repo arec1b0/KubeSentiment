@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from app.core.logging import get_logger
+from app.interfaces.buffer_interface import IAnomalyBuffer
 from app.monitoring.prometheus import (
     record_anomaly_buffer_eviction,
     record_anomaly_buffer_size,
@@ -71,7 +72,7 @@ class AnomalyEntry:
         }
 
 
-class BoundedAnomalyBuffer:
+class BoundedAnomalyBuffer(IAnomalyBuffer):
     """A thread-safe, bounded buffer for storing anomalies with TTL.
 
     This buffer is implemented using an `OrderedDict` to efficiently manage a

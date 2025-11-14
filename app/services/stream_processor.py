@@ -18,6 +18,7 @@ import pandas as pd
 
 try:  # pragma: no cover - allow running without full settings stack
     from app.core.config import get_settings
+    from app.interfaces.stream_interface import IStreamProcessor
 except Exception:  # pragma: no cover - fallback stub for lightweight tests
 
     def get_settings():  # type: ignore[misc]
@@ -26,6 +27,10 @@ except Exception:  # pragma: no cover - fallback stub for lightweight tests
             data_dir = "./data"
 
         return _Fallback()
+
+    class IStreamProcessor:  # type: ignore[no-redef]
+        """Fallback interface for lightweight tests"""
+        pass
 
 
 try:  # pragma: no cover - optional dependency in tests
@@ -124,7 +129,7 @@ class PendingRequest:
     request_id: str
 
 
-class StreamProcessor:
+class StreamProcessor(IStreamProcessor):
     """Processes prediction requests with intelligent, dynamic batching.
 
     This processor collects incoming prediction requests and groups them into

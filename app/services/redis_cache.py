@@ -18,6 +18,7 @@ from redis.exceptions import RedisError
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.interfaces.cache_interface import ICacheClient
 from app.monitoring.prometheus import (
     record_redis_cache_error,
     record_redis_cache_hit,
@@ -28,7 +29,7 @@ from app.monitoring.prometheus import (
 logger = get_logger(__name__)
 
 
-class RedisCacheClient:
+class RedisCacheClient(ICacheClient):
     """A high-performance Redis cache client with connection pooling and retries.
 
     This client provides a robust interface for interacting with a Redis

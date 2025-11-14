@@ -12,13 +12,14 @@ from typing import Any, Dict, List
 from app.core.config import Settings
 from app.core.logging import get_logger
 from app.features.feature_engineering import FeatureEngineer
+from app.interfaces.prediction_interface import IPredictionService
 from app.models.base import ModelStrategy
 from app.utils.exceptions import ModelNotLoadedError, TextEmptyError, TextTooLongError
 
 logger = get_logger(__name__)
 
 
-class PredictionService:
+class PredictionService(IPredictionService):
     """Orchestrates the sentiment analysis prediction workflow.
 
     This service class handles the core logic for making predictions. It

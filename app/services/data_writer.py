@@ -16,11 +16,12 @@ import pyarrow.parquet as pq
 
 from app.core.config import Settings
 from app.core.logging import get_logger
+from app.interfaces.storage_interface import IDataWriter
 
 logger = get_logger(__name__)
 
 
-class DataLakeWriter:
+class DataLakeWriter(IDataWriter):
     """Async writer for streaming predictions to data lake storage.
 
     This service batches predictions and writes them to cloud storage in Parquet

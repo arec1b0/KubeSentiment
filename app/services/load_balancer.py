@@ -19,6 +19,7 @@ except ImportError:
     PSUTIL_AVAILABLE = False
 
 from app.core.logging import get_logger
+from app.interfaces.resilience_interface import ICircuitBreaker, ILoadMetrics
 
 logger = get_logger(__name__)
 
@@ -114,7 +115,7 @@ class InstanceLoad:
         }
 
 
-class CircuitBreaker:
+class CircuitBreaker(ICircuitBreaker):
     """An implementation of the circuit breaker pattern for overload protection.
 
     This class provides a simple and effective way to prevent a service from
@@ -212,7 +213,7 @@ class CircuitBreaker:
             )
 
 
-class LoadBalancingMetrics:
+class LoadBalancingMetrics(ILoadMetrics):
     """Collects and provides metrics for load balancing and autoscaling.
 
     This class tracks instance-level metrics that can be used by a Kubernetes
