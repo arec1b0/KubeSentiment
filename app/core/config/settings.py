@@ -5,6 +5,7 @@ This module provides the main Settings class that brings together all
 domain-specific configuration classes into a single, cohesive settings object.
 """
 
+import os
 from functools import cached_property
 from typing import Any, List, Optional
 
@@ -17,6 +18,7 @@ from app.core.config.mlops import MLOpsConfig
 from app.core.config.model import ModelConfig
 from app.core.config.monitoring import MonitoringConfig
 from app.core.config.performance import PerformanceConfig
+from app.core.config.profiles import load_profile, get_profile_info
 from app.core.config.redis import RedisConfig
 from app.core.config.security import SecurityConfig
 from app.core.config.server import ServerConfig
@@ -380,6 +382,71 @@ class Settings(BaseSettings):
         """
         return self.secret_manager.get_secret(key, default)
 
+    @classmethod
+    def load_from_profile(cls, profile_name: Optional[str] = None) -> "Settings":
+        """Load settings with profile-based defaults.
+
+        This method creates a Settings instance with environment-specific defaults
+        from the specified profile. Environment variables can still override these
+        defaults.
+
+        Args:
+            profile_name: Name of the profile to load (local, development, staging,
+                         production). If None, uses MLOPS_PROFILE or defaults to
+                         'development'.
+
+        Returns:
+            Settings instance with profile defaults applied.
+
+        Example:
+            # Load development profile
+            settings = Settings.load_from_profile('development')
+
+            # Load from environment variable MLOPS_PROFILE
+            settings = Settings.load_from_profile()
+        """
+        # Determine profile name
+        if profile_name is None:
+            profile_name = os.getenv("MLOPS_PROFILE", "development")
+
+        # Load profile overrides
+        profile_overrides = load_profile(profile_name)
+
+        # Apply overrides to environment (only if not already set)
+        for key, value in profile_overrides.items():
+            if key not in os.environ:
+                os.environ[key] = str(value)
+
+        # Create settings instance (will read from environment)
+        return cls()
+
+    @staticmethod
+    def get_available_profiles() -> dict:
+        """Get information about available configuration profiles.
+
+        Returns:
+            Dictionary with profile information.
+        """
+        return get_profile_info()
+
+    def get_active_profile(self) -> str:
+        """Get the name of the currently active profile.
+
+        Returns:
+            Profile name based on the environment setting.
+        """
+        env = self.server.environment.lower()
+        # Map environment names to profile names
+        profile_map = {
+            "local": "local",
+            "development": "development",
+            "dev": "development",
+            "staging": "staging",
+            "production": "production",
+            "prod": "production",
+        }
+        return profile_map.get(env, env)
+
     class Config:
         """Pydantic configuration options for the Settings class.
 
@@ -396,8 +463,14 @@ class Settings(BaseSettings):
         extra = "ignore"  # Ignore extra environment variables
 
 
-# Global settings instance
-settings = Settings()
+# Load settings with profile support
+# Use MLOPS_PROFILE environment variable or default to 'development'
+_profile_name = os.getenv("MLOPS_PROFILE")
+if _profile_name:
+    settings = Settings.load_from_profile(_profile_name)
+else:
+    # Fallback to standard loading for backward compatibility
+    settings = Settings()
 
 
 def get_settings() -> Settings:

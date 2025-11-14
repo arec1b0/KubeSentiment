@@ -8,6 +8,12 @@ metadata:
     app: kubesentiment
     component: config
 data:
+  # ===== Configuration Profile =====
+  # Set to 'production', 'staging', 'development', or 'local'
+  # The profile provides sensible defaults for the environment
+  # Many settings below can be removed if using profile defaults
+  MLOPS_PROFILE: "production"
+
   # Redis Configuration
   MLOPS_REDIS_ENABLED: "true"
   MLOPS_REDIS_HOST: "redis"

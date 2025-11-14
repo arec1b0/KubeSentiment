@@ -1,0 +1,148 @@
+---
+# Staging Environment Configuration
+# Using profile-based defaults to minimize configuration
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubesentiment-staging-config
+  namespace: default
+  labels:
+    app: kubesentiment
+    environment: staging
+    component: config
+data:
+  # ===== Configuration Profile =====
+  # Staging profile provides these defaults automatically:
+  # - MLOPS_DEBUG=false
+  # - MLOPS_LOG_LEVEL=INFO
+  # - MLOPS_WORKERS=2
+  # - Redis, Vault, MLOps features enabled
+  # - Moderate cache sizes
+  # - Distributed tracing enabled
+  MLOPS_PROFILE: "staging"
+
+  # ===== Application Configuration =====
+  MLOPS_APP_NAME: "ML Model Serving API - Staging"
+  MLOPS_APP_VERSION: "1.0.0-staging"
+
+  # ===== Service Endpoints =====
+  # External services (enabled by default via profile)
+  MLOPS_REDIS_HOST: "redis-staging"
+  MLOPS_REDIS_PORT: "6379"
+
+  MLOPS_VAULT_ADDR: "https://vault-staging.example.com"
+  MLOPS_VAULT_ROLE: "kubesentiment-staging"
+  MLOPS_VAULT_NAMESPACE: "staging"
+
+  # MLflow (enabled by default via profile)
+  MLOPS_MLFLOW_TRACKING_URI: "https://mlflow-staging.example.com"
+  MLOPS_MLFLOW_EXPERIMENT_NAME: "sentiment_analysis_staging"
+
+  # Tracing (enabled by default via profile)
+  MLOPS_JAEGER_AGENT_HOST: "jaeger-agent-staging"
+  MLOPS_SERVICE_NAME: "kubesentiment-staging"
+
+  # ===== Security =====
+  # API key should be set via Secret, not ConfigMap
+  # MLOPS_API_KEY is set via kubesentiment-staging-secrets
+
+  MLOPS_ALLOWED_ORIGINS: "https://staging.example.com,https://staging-app.example.com"
+  MLOPS_CORS_ORIGINS: "https://staging.example.com"
+
+---
+# Staging Secrets (example - use kubectl or CI/CD to create)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubesentiment-staging-secrets
+  namespace: default
+  labels:
+    app: kubesentiment
+    environment: staging
+type: Opaque
+stringData:
+  MLOPS_API_KEY: "CHANGE_ME_staging_api_key"
+  MLOPS_REDIS_PASSWORD: "CHANGE_ME_redis_password"
+
+---
+# Staging Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubesentiment-staging
+  namespace: default
+  labels:
+    app: kubesentiment
+    environment: staging
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kubesentiment
+      environment: staging
+  template:
+    metadata:
+      labels:
+        app: kubesentiment
+        environment: staging
+    spec:
+      containers:
+        - name: kubesentiment
+          image: kubesentiment:staging
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: kubesentiment-staging-config
+            - secretRef:
+                name: kubesentiment-staging-secrets
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/details
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+---
+# Horizontal Pod Autoscaler for Staging
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kubesentiment-staging-hpa
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kubesentiment-staging
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

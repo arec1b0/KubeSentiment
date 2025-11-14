@@ -5,6 +5,7 @@ FROM python:3.11-slim as base
 ARG BUILDTIME
 ARG VERSION
 ARG REVISION
+ARG MLOPS_PROFILE=production
 
 # Set build metadata as labels
 LABEL org.opencontainers.image.created="${BUILDTIME}"
@@ -23,7 +24,9 @@ ENV PYTHONUNBUFFERED=1 \
     # Build metadata as env vars
     BUILD_VERSION="${VERSION}" \
     BUILD_REVISION="${REVISION}" \
-    BUILD_TIME="${BUILDTIME}"
+    BUILD_TIME="${BUILDTIME}" \
+    # Configuration profile (production, staging, development, local)
+    MLOPS_PROFILE="${MLOPS_PROFILE}"
 
 # Create non-root user for security
 RUN groupadd --gid 1000 appuser && \

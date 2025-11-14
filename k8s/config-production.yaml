@@ -1,0 +1,312 @@
+---
+# Production Environment Configuration
+# Using profile-based defaults for maximum reliability and performance
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubesentiment-prod-config
+  namespace: production
+  labels:
+    app: kubesentiment
+    environment: production
+    component: config
+data:
+  # ===== Configuration Profile =====
+  # Production profile provides these defaults automatically:
+  # - MLOPS_DEBUG=false
+  # - MLOPS_LOG_LEVEL=WARNING
+  # - MLOPS_WORKERS=4
+  # - All external services enabled (Redis, Kafka, Vault, Data Lake)
+  # - All MLOps features enabled
+  # - Large cache sizes for optimal performance
+  # - Production-grade monitoring and tracing
+  MLOPS_PROFILE: "production"
+
+  # ===== Application Configuration =====
+  MLOPS_APP_NAME: "ML Model Serving API"
+  MLOPS_APP_VERSION: "1.0.0"
+
+  # ===== Service Endpoints =====
+  # Redis (enabled by default via profile)
+  MLOPS_REDIS_HOST: "redis-prod.production.svc.cluster.local"
+  MLOPS_REDIS_PORT: "6379"
+
+  # Kafka (enabled by default via profile)
+  MLOPS_KAFKA_BOOTSTRAP_SERVERS: "kafka-prod.production.svc.cluster.local:9092"
+  MLOPS_KAFKA_CONSUMER_GROUP: "kubesentiment_prod"
+  MLOPS_KAFKA_TOPIC: "sentiment_requests"
+
+  # Vault (enabled by default via profile)
+  MLOPS_VAULT_ADDR: "https://vault.production.example.com"
+  MLOPS_VAULT_ROLE: "kubesentiment-production"
+  MLOPS_VAULT_NAMESPACE: "production"
+  MLOPS_VAULT_SECRETS_PATH: "kubesentiment/production"
+
+  # Data Lake (enabled by default via profile)
+  MLOPS_DATA_LAKE_S3_PREFIX: "predictions/"
+
+  # ===== MLOps Services =====
+  # MLflow (enabled by default via profile)
+  MLOPS_MLFLOW_EXPERIMENT_NAME: "sentiment_analysis_production"
+
+  # ===== Monitoring & Observability =====
+  MLOPS_SERVICE_NAME: "kubesentiment-production"
+
+  # Tracing (OTLP in production)
+  MLOPS_TRACING_EXCLUDED_URLS: "/health,/metrics,/health/details"
+
+  # ===== Security =====
+  # Secrets are managed via Kubernetes Secrets and Vault
+  # Only non-sensitive configuration here
+
+  # NOTE: Sensitive values (API keys, passwords, cloud credentials)
+  # are set via kubesentiment-prod-secrets Secret below
+
+---
+# Production Secrets (managed via CI/CD or external secret manager)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubesentiment-prod-secrets
+  namespace: production
+  labels:
+    app: kubesentiment
+    environment: production
+type: Opaque
+stringData:
+  # IMPORTANT: In real production, use:
+  # - External Secrets Operator
+  # - Sealed Secrets
+  # - Vault Agent Injector
+  # - Cloud provider secret managers (AWS Secrets Manager, GCP Secret Manager, etc.)
+
+  # Security
+  MLOPS_API_KEY: "REPLACE_WITH_VAULT_SECRET"
+  MLOPS_ALLOWED_ORIGINS: "https://api.example.com,https://app.example.com"
+  MLOPS_CORS_ORIGINS: "https://app.example.com"
+
+  # Redis
+  MLOPS_REDIS_PASSWORD: "REPLACE_WITH_VAULT_SECRET"
+
+  # Cloud Provider Credentials
+  # AWS_ACCESS_KEY_ID: "REPLACE_WITH_VAULT_SECRET"
+  # AWS_SECRET_ACCESS_KEY: "REPLACE_WITH_VAULT_SECRET"
+
+  # MLflow
+  MLOPS_MLFLOW_TRACKING_URI: "https://mlflow.production.example.com"
+  MLOPS_MLFLOW_S3_BUCKET: "prod-mlflow-artifacts"
+  MLOPS_MLFLOW_REGISTRY_URI: "https://mlflow-registry.production.example.com"
+
+  # Data Lake
+  MLOPS_DATA_LAKE_S3_BUCKET: "prod-data-lake-kubesentiment"
+
+  # OTLP Endpoint
+  MLOPS_OTLP_ENDPOINT: "https://otlp-collector.production.example.com:4317"
+
+---
+# Production Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubesentiment-prod
+  namespace: production
+  labels:
+    app: kubesentiment
+    environment: production
+    version: "1.0.0"
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kubesentiment
+      environment: production
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: kubesentiment
+        environment: production
+        version: "1.0.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      terminationGracePeriodSeconds: 60
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - kubesentiment
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: kubesentiment
+          image: gcr.io/my-project/kubesentiment:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: kubesentiment-prod-config
+            - secretRef:
+                name: kubesentiment-prod-secrets
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 2Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/details
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - sleep 15
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /app/.cache
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir:
+            sizeLimit: 2Gi
+      securityContext:
+        fsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+---
+# Production Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kubesentiment-prod-hpa
+  namespace: production
+  labels:
+    app: kubesentiment
+    environment: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kubesentiment-prod
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+      selectPolicy: Max
+
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kubesentiment-prod-pdb
+  namespace: production
+  labels:
+    app: kubesentiment
+    environment: production
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: kubesentiment
+      environment: production
+
+---
+# Production Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubesentiment-prod
+  namespace: production
+  labels:
+    app: kubesentiment
+    environment: production
+spec:
+  type: ClusterIP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app: kubesentiment
+    environment: production
