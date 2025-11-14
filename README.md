@@ -102,6 +102,21 @@ This is the quickest way to get the service running on your local machine.
 
 2.  **Install dependencies:**
     ```bash
+    # Core dependencies
+    pip install -r requirements.txt
+
+    # Development tools (linting, formatting, type checking)
+    pip install -r requirements-dev.txt
+
+    # Testing dependencies
+    pip install -r requirements-test.txt
+
+    # Cloud-specific dependencies (install as needed):
+    # AWS: pip install -r requirements-aws.txt
+    # GCP: pip install -r requirements-gcp.txt
+    # Azure: pip install -r requirements-azure.txt
+
+    # Or use the Makefile shortcut:
     make install-dev
     ```
 

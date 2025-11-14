@@ -1,20 +1,42 @@
-# Линтеры и форматтеры
+# ==============================================================================
+# Development Dependencies
+# ==============================================================================
+# Install with: pip install -r requirements.txt -r requirements-dev.txt
+# ==============================================================================
+
+# Code Formatting
 black==23.12.1
+isort==5.13.2
+
+# Linting
+ruff==0.1.6
 flake8==7.0.0
 flake8-bugbear==23.12.2
 flake8-comprehensions==3.14.0
 flake8-simplify==0.21.0
-isort==5.13.2
 
-# Анализ типов
+# Type Checking
 mypy==1.7.1
 types-requests==2.31.0.10
 
-# Инструменты для разработки
-pre-commit==3.6.0
+# Security Analysis
 bandit==1.7.6
 
-# Документация
+# Pre-commit Hooks
+pre-commit==3.6.0
+
+# Documentation Coverage
 interrogate==1.5.0
 
-
+# ==============================================================================
+# Notes:
+# ==============================================================================
+# - black: Code formatter
+# - isort: Import sorter
+# - ruff: Fast Python linter (replaces many flake8 plugins)
+# - flake8: Comprehensive linting with plugins
+# - mypy: Static type checker
+# - bandit: Security vulnerability scanner
+# - pre-commit: Git hook scripts for code quality
+# - interrogate: Checks docstring coverage
+# ==============================================================================

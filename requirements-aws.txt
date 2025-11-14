@@ -1,0 +1,22 @@
+# ==============================================================================
+# AWS-Specific Dependencies
+# ==============================================================================
+# Install with: pip install -r requirements.txt -r requirements-aws.txt
+# ==============================================================================
+
+# AWS SDK & Services
+boto3==1.34.8
+
+# S3 Filesystem Interface
+s3fs==2023.12.2
+
+# AWS Lambda Adapter (for serverless deployments)
+mangum>=0.17.0
+
+# ==============================================================================
+# Notes:
+# ==============================================================================
+# - boto3: AWS SDK for Python (S3, Lambda, etc.)
+# - s3fs: S3 filesystem interface for easier file operations
+# - mangum: ASGI adapter for running FastAPI on AWS Lambda
+# ==============================================================================

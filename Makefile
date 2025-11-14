@@ -1,6 +1,6 @@
 # MLOps Sentiment Analysis - Development Commands
 
-.PHONY: help install test lint format clean build deploy dev docs chaos-install chaos-test-pod-kill chaos-test-network-partition chaos-test-suite chaos-test-hpa chaos-cleanup chaos-status
+.PHONY: help install install-dev install-test install-aws install-gcp install-azure test lint format clean build deploy dev docs chaos-install chaos-test-pod-kill chaos-test-network-partition chaos-test-suite chaos-test-hpa chaos-cleanup chaos-status
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -13,7 +13,24 @@ install: ## Install Python dependencies
 
 install-dev: ## Install development dependencies
 	pip install -r requirements.txt
+	pip install -r requirements-test.txt
 	pip install -r requirements-dev.txt
+
+install-test: ## Install testing dependencies
+	pip install -r requirements.txt
+	pip install -r requirements-test.txt
+
+install-aws: ## Install AWS-specific dependencies
+	pip install -r requirements.txt
+	pip install -r requirements-aws.txt
+
+install-gcp: ## Install GCP-specific dependencies
+	pip install -r requirements.txt
+	pip install -r requirements-gcp.txt
+
+install-azure: ## Install Azure-specific dependencies
+	pip install -r requirements.txt
+	pip install -r requirements-azure.txt
 
 test: ## Run tests with coverage
 	pytest tests/ -v --cov=app --cov-report=term-missing

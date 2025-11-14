@@ -1,0 +1,18 @@
+# ==============================================================================
+# Azure-Specific Dependencies
+# ==============================================================================
+# Install with: pip install -r requirements.txt -r requirements-azure.txt
+# ==============================================================================
+
+# Azure Blob Storage SDK
+azure-storage-blob==12.19.0
+
+# Azure Data Lake Filesystem Interface
+adlfs==2023.12.0
+
+# ==============================================================================
+# Notes:
+# ==============================================================================
+# - azure-storage-blob: Azure Blob Storage SDK for interacting with blob containers
+# - adlfs: Azure Data Lake filesystem interface for easier file operations
+# ==============================================================================

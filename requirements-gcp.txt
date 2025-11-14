@@ -1,0 +1,18 @@
+# ==============================================================================
+# GCP-Specific Dependencies
+# ==============================================================================
+# Install with: pip install -r requirements.txt -r requirements-gcp.txt
+# ==============================================================================
+
+# Google Cloud Storage SDK
+google-cloud-storage==2.14.0
+
+# GCS Filesystem Interface
+gcsfs==2023.12.2
+
+# ==============================================================================
+# Notes:
+# ==============================================================================
+# - google-cloud-storage: GCP Storage SDK for interacting with GCS buckets
+# - gcsfs: GCS filesystem interface for easier file operations
+# ==============================================================================

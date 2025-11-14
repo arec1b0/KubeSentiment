@@ -1,57 +1,55 @@
+# ==============================================================================
+# Core Dependencies - Essential for basic application functionality
+# ==============================================================================
+
+# Web Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
-transformers==4.33.0
-torch==2.6.0
+
+# Data Validation & Configuration
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
 python-dotenv==1.0.0
+
+# HTTP Clients
 requests==2.31.0
-prometheus-client==0.19.0
-pytest==7.4.3
-pytest-asyncio==0.21.1
-pytest-cov==4.1.0
-structlog==23.2.0
 httpx==0.25.1
+
+# Logging & Monitoring
+structlog==23.2.0
+prometheus-client==0.19.0
+
+# Machine Learning & Model Inference
+torch==2.6.0
+transformers==4.33.0
+onnxruntime==1.17.0
+
+# Secrets Management
 hvac>=1.2.0
+
+# Kubernetes Integration
 kubernetes>=27.0.0
 
-# Kafka dependencies for high-throughput streaming
+# Kafka Streaming
 kafka-python==2.0.2
 confluent-kafka==2.3.0
 
-# Redis for distributed caching
+# Redis Caching
 redis==5.0.1
-hiredis==2.2.3  # C parser for better performance
+hiredis==2.2.3
 
-# Performance optimization
+# System Monitoring
 psutil==5.9.6
-asyncio-throttle==1.0.2
 
-# Data validation and processing
-great-expectations==0.17.23
-pandera==0.17.2
-pandas==2.1.4
-
-# Feature Engineering
+# Feature Engineering & NLP
 nltk==3.8.1
-vaderSentiment==3.3.2
 textstat==0.7.3
 
-# Configuration management
-hydra-core==1.3.2
-dynaconf==3.2.4
+# ==============================================================================
+# Optional MLOps Features
+# ==============================================================================
 
-# Model optimization
-onnx==1.15.0
-onnxruntime==1.17.0
-
-# Development and testing
-black==23.11.0
-ruff==0.1.6
-isort==5.12.0
-pre-commit==3.5.0
-
-# OpenTelemetry for distributed tracing
+# Distributed Tracing (OpenTelemetry)
 opentelemetry-api==1.21.0
 opentelemetry-sdk==1.21.0
 opentelemetry-instrumentation-fastapi==0.42b0
@@ -63,26 +61,29 @@ opentelemetry-exporter-jaeger==1.21.0
 opentelemetry-exporter-zipkin==1.21.0
 opentelemetry-exporter-otlp==1.21.0
 
-# MLflow for model registry and experiment tracking
+# MLflow Model Registry & Experiment Tracking
 mlflow==2.9.2
-mlflow-skinny==2.9.2
 
-# Model explainability and interpretability
+# Model Explainability
 shap==0.44.0
-captum==0.7.0  # For transformer attention visualization
+captum==0.7.0
 
-# Drift detection and data quality monitoring
+# Drift Detection & Data Quality
 evidently==0.4.11
-scipy==1.11.4  # For statistical tests
+scipy==1.11.4
+pandas==2.1.4
 
-# Advanced analytics
-scikit-learn==1.3.2  # For additional metrics and preprocessing
+# Data Format Support
+pyarrow==14.0.1
 
-# Data Lake Integration
-pyarrow==14.0.1  # For Parquet file format support
-boto3==1.34.8  # AWS S3 SDK
-google-cloud-storage==2.14.0  # Google Cloud Storage SDK
-azure-storage-blob==12.19.0  # Azure Blob Storage SDK
-s3fs==2023.12.2  # S3 filesystem interface
-gcsfs==2023.12.2  # GCS filesystem interface
-adlfs==2023.12.0  # Azure Data Lake filesystem interface
+# ==============================================================================
+# Notes:
+# ==============================================================================
+# - For cloud-specific dependencies, install:
+#   * AWS: pip install -r requirements-aws.txt
+#   * GCP: pip install -r requirements-gcp.txt
+#   * Azure: pip install -r requirements-azure.txt
+# - For development tools: pip install -r requirements-dev.txt
+# - For testing: pip install -r requirements-test.txt
+# - For ONNX-optimized deployment: pip install -r requirements-onnx.txt
+# ==============================================================================
