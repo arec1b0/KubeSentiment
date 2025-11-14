@@ -21,6 +21,7 @@ from app.api.schemas.responses import (
 )
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.interfaces.batch_interface import IAsyncBatchService
 from app.services.prediction import PredictionService
 from app.services.stream_processor import StreamProcessor
 
@@ -154,7 +155,7 @@ class ProcessingMetrics:
             self.processing_efficiency = 0.0
 
 
-class AsyncBatchService:
+class AsyncBatchService(IAsyncBatchService):
     """A service for asynchronous, high-throughput batch processing.
 
     This service manages a system of priority queues and background workers to

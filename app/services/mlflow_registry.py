@@ -14,6 +14,7 @@ from datetime import datetime
 from enum import Enum
 
 from app.core.logging import get_logger
+from app.interfaces.registry_interface import IModelRegistry
 
 try:
     import mlflow
@@ -34,7 +35,7 @@ class ModelStage(str, Enum):
     ARCHIVED = "Archived"
 
 
-class ModelRegistry:
+class ModelRegistry(IModelRegistry):
     """
     MLflow Model Registry client for managing sentiment analysis models.
 

@@ -14,6 +14,7 @@ from enum import Enum
 
 from app.core.config import Settings
 from app.core.logging import get_logger
+from app.interfaces.optimization_interface import IGPUBatchOptimizer
 
 logger = get_logger(__name__)
 
@@ -38,7 +39,7 @@ class GPUConfig:
     load_balancing_strategy: LoadBalancingStrategy
 
 
-class GPUBatchOptimizer:
+class GPUBatchOptimizer(IGPUBatchOptimizer):
     """
     Optimizes batch inference for GPU workloads.
 

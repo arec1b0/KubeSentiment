@@ -6,6 +6,9 @@ following the dependency inversion principle. It allows for a clean separation
 of concerns and makes the application more modular, testable, and maintainable
 by decoupling the API layer from the concrete implementations of services and
 models.
+
+All dependency injection functions now return interface types rather than
+concrete implementations, enabling loose coupling and easier testing.
 """
 
 from typing import Optional
@@ -13,6 +16,7 @@ from typing import Optional
 from fastapi import Depends, Query
 
 from app.core.config import Settings, get_settings
+from app.interfaces import IPredictionService, IDataWriter
 
 
 def get_model_backend(
@@ -72,7 +76,7 @@ def get_prediction_service(
     model=Depends(get_model_service),
     settings: Settings = Depends(get_settings),
     feature_engineer=Depends(get_feature_engineer),
-):
+) -> IPredictionService:
     """Provides an instance of the prediction service.
 
     This dependency injects the appropriate model service, the application
@@ -88,7 +92,7 @@ def get_prediction_service(
             `get_feature_engineer`.
 
     Returns:
-        An instance of the `PredictionService`.
+        An instance implementing the `IPredictionService` interface.
     """
     from app.services.prediction import PredictionService
 
@@ -110,7 +114,7 @@ def get_feature_engineer():
     return get_fe()
 
 
-def get_data_writer(settings: Settings = Depends(get_settings)):
+def get_data_writer(settings: Settings = Depends(get_settings)) -> IDataWriter:
     """Provides a singleton instance of the data lake writer service.
 
     This dependency ensures that the `DataLakeWriter` class is created
@@ -122,7 +126,7 @@ def get_data_writer(settings: Settings = Depends(get_settings)):
             dependency.
 
     Returns:
-        The singleton instance of the `DataLakeWriter`.
+        The singleton instance implementing the `IDataWriter` interface.
     """
     from app.services.data_writer import get_data_writer as get_dw
 

@@ -15,6 +15,7 @@ import torch
 from transformers import AutoTokenizer
 
 from app.core.logging import get_logger
+from app.interfaces.explainability_interface import IExplainabilityEngine
 
 try:
     import shap
@@ -31,7 +32,7 @@ except ImportError:
 logger = get_logger(__name__)
 
 
-class ExplainabilityEngine:
+class ExplainabilityEngine(IExplainabilityEngine):
     """
     Comprehensive explainability engine for sentiment analysis.
 
