@@ -1,0 +1,23 @@
+# ==============================================================================
+# Testing Dependencies
+# ==============================================================================
+# Install with: pip install -r requirements.txt -r requirements-test.txt
+# ==============================================================================
+
+# Testing Framework
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+
+# Test Utilities
+httpx==0.25.1  # For async HTTP testing
+
+# ==============================================================================
+# Notes:
+# ==============================================================================
+# - pytest: Testing framework
+# - pytest-asyncio: Async test support
+# - pytest-cov: Code coverage plugin
+# - httpx: Already in core requirements.txt, but listed here for clarity
+#   (used for async testing in benchmarking)
+# ==============================================================================
