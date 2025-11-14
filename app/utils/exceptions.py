@@ -220,3 +220,425 @@ class TextEmptyError(TextValidationError):
         message = "The text field is required and cannot be empty or contain only whitespace."
         super().__init__(message, context=context)
         self.code = "TEXT_EMPTY"
+
+
+class BatchSizeExceededError(ValidationError):
+    """Raised when batch size exceeds maximum allowed limit."""
+
+    def __init__(self, batch_size: int, max_batch_size: int, context: Optional[Any] = None):
+        """Initializes the BatchSizeExceededError.
+
+        Args:
+            batch_size: The size of the provided batch.
+            max_batch_size: The maximum allowed batch size.
+            context: Optional additional context about the error.
+        """
+        message = f"Batch size of {batch_size} exceeds the maximum of {max_batch_size}."
+        super().__init__(message, code="BATCH_SIZE_EXCEEDED", context=context)
+
+
+class EmptyBatchError(ValidationError):
+    """Raised when a batch processing request contains no items."""
+
+    def __init__(self, context: Optional[Any] = None):
+        """Initializes the EmptyBatchError.
+
+        Args:
+            context: Optional additional context about the error.
+        """
+        message = "Batch processing request cannot be empty."
+        super().__init__(message, code="EMPTY_BATCH", context=context)
+
+
+# --- Configuration exceptions ---
+
+
+class ConfigurationError(ValidationError):
+    """Base class for all configuration-related errors.
+
+    This exception should be used when there are issues with application
+    configuration, whether from environment variables, config files, or
+    runtime validation of settings.
+    """
+
+    status_code = 500
+
+
+class SecurityConfigError(ConfigurationError):
+    """Raised when security configuration is invalid or missing."""
+
+    def __init__(self, message: str, context: Optional[Any] = None):
+        """Initializes the SecurityConfigError.
+
+        Args:
+            message: Description of the security configuration issue.
+            context: Optional additional context about the error.
+        """
+        super().__init__(message, code="SECURITY_CONFIG_ERROR", context=context)
+
+
+class ModelConfigError(ConfigurationError):
+    """Raised when model configuration is invalid."""
+
+    def __init__(self, message: str, context: Optional[Any] = None):
+        """Initializes the ModelConfigError.
+
+        Args:
+            message: Description of the model configuration issue.
+            context: Optional additional context about the error.
+        """
+        super().__init__(message, code="MODEL_CONFIG_ERROR", context=context)
+
+
+class SettingsValidationError(ConfigurationError):
+    """Raised when application settings validation fails."""
+
+    def __init__(self, message: str, context: Optional[Any] = None):
+        """Initializes the SettingsValidationError.
+
+        Args:
+            message: Description of the settings validation issue.
+            context: Optional additional context about the error.
+        """
+        super().__init__(message, code="SETTINGS_VALIDATION_ERROR", context=context)
+
+
+# --- Secrets management exceptions ---
+
+
+class SecretsError(ServiceError):
+    """Base class for secrets management errors.
+
+    This exception covers issues related to secrets storage and retrieval,
+    including Vault, Kubernetes secrets, and environment variables.
+    """
+
+    status_code = 500
+
+
+class VaultAuthenticationError(AuthenticationError):
+    """Raised when authentication with HashiCorp Vault fails."""
+
+    def __init__(self, message: str = "Failed to authenticate with Vault", context: Optional[Any] = None):
+        """Initializes the VaultAuthenticationError.
+
+        Args:
+            message: Description of the Vault authentication failure.
+            context: Optional additional context about the error.
+        """
+        super().__init__(message, code="VAULT_AUTH_FAILED", context=context)
+
+
+class KubernetesAuthenticationError(AuthenticationError):
+    """Raised when Kubernetes authentication fails."""
+
+    def __init__(self, message: str = "Kubernetes authentication failed", context: Optional[Any] = None):
+        """Initializes the KubernetesAuthenticationError.
+
+        Args:
+            message: Description of the Kubernetes authentication failure.
+            context: Optional additional context about the error.
+        """
+        super().__init__(message, code="K8S_AUTH_FAILED", context=context)
+
+
+class InvalidSecretsConfigError(ValidationError):
+    """Raised when secrets configuration is invalid."""
+
+    def __init__(self, message: str, context: Optional[Any] = None):
+        """Initializes the InvalidSecretsConfigError.
+
+        Args:
+            message: Description of the invalid secrets configuration.
+            context: Optional additional context about the error.
+        """
+        super().__init__(message, code="INVALID_SECRETS_CONFIG", context=context)
+
+
+# --- Extended model exceptions ---
+
+
+class ModelLoadingError(ModelError):
+    """Raised when a model fails to load from storage.
+
+    This can occur due to missing files, corrupted model artifacts,
+    or incompatible model formats.
+    """
+
+    status_code = 500
+
+    def __init__(self, message: str, model_name: Optional[str] = None, context: Optional[Any] = None):
+        """Initializes the ModelLoadingError.
+
+        Args:
+            message: Description of the model loading failure.
+            model_name: The name of the model that failed to load.
+            context: Optional additional context about the error.
+        """
+        super().__init__(message, code="MODEL_LOADING_FAILED", context=context)
+
+
+class ModelInitializationError(InternalError):
+    """Raised when model initialization fails.
+
+    This occurs when the model backend cannot be properly initialized,
+    which might be due to missing dependencies, incompatible configurations,
+    or resource constraints.
+    """
+
+    def __init__(self, message: str, backend: Optional[str] = None, context: Optional[Any] = None):
+        """Initializes the ModelInitializationError.
+
+        Args:
+            message: Description of the initialization failure.
+            backend: The model backend that failed to initialize (e.g., 'pytorch', 'onnx').
+            context: Optional additional context about the error.
+        """
+        super().__init__(message, code="MODEL_INIT_FAILED", context=context)
+
+
+class ModelCachingError(InternalError):
+    """Raised when model caching operations fail.
+
+    This covers failures in saving, loading, or managing cached model artifacts.
+    """
+
+    def __init__(self, message: str, context: Optional[Any] = None):
+        """Initializes the ModelCachingError.
+
+        Args:
+            message: Description of the caching failure.
+            context: Optional additional context about the error.
+        """
+        super().__init__(message, code="MODEL_CACHING_FAILED", context=context)
+
+
+class ModelMetadataNotFoundError(NotFoundError):
+    """Raised when model metadata is not found in cache."""
+
+    def __init__(self, model_identifier: str, context: Optional[Any] = None):
+        """Initializes the ModelMetadataNotFoundError.
+
+        Args:
+            model_identifier: The identifier of the model whose metadata was not found.
+            context: Optional additional context about the error.
+        """
+        message = f"Model metadata not found for: {model_identifier}"
+        super().__init__(message, code="MODEL_METADATA_NOT_FOUND", context=context)
+
+
+class InvalidModelPathError(ValidationError):
+    """Raised when a model path is invalid or does not exist."""
+
+    def __init__(self, path: str, context: Optional[Any] = None):
+        """Initializes the InvalidModelPathError.
+
+        Args:
+            path: The invalid model path.
+            context: Optional additional context about the error.
+        """
+        message = f"Model path is invalid or does not exist: {path}"
+        super().__init__(message, code="INVALID_MODEL_PATH", context=context)
+
+
+class ModelExportError(InternalError):
+    """Raised when model export operations fail.
+
+    This typically occurs when converting models to different formats
+    (e.g., PyTorch to ONNX).
+    """
+
+    def __init__(self, message: str, source_format: Optional[str] = None, target_format: Optional[str] = None, context: Optional[Any] = None):
+        """Initializes the ModelExportError.
+
+        Args:
+            message: Description of the export failure.
+            source_format: The source model format.
+            target_format: The target model format.
+            context: Optional additional context about the error.
+        """
+        super().__init__(message, code="MODEL_EXPORT_FAILED", context=context)
+
+
+class UnsupportedBackendError(ValidationError):
+    """Raised when a requested ML backend is not supported."""
+
+    def __init__(self, backend: str, supported_backends: list[str], context: Optional[Any] = None):
+        """Initializes the UnsupportedBackendError.
+
+        Args:
+            backend: The requested backend that is not supported.
+            supported_backends: List of supported backends.
+            context: Optional additional context about the error.
+        """
+        message = f"Backend '{backend}' is not supported. Supported backends: {', '.join(supported_backends)}"
+        super().__init__(message, code="UNSUPPORTED_BACKEND", context=context)
+
+
+# --- Feature engineering exceptions ---
+
+
+class FeatureMismatchError(ValidationError):
+    """Raised when input features don't match expected configuration.
+
+    This typically occurs when the number or type of features provided
+    doesn't match what the model or scaler expects.
+    """
+
+    def __init__(self, message: str, expected: Optional[int] = None, received: Optional[int] = None, context: Optional[Any] = None):
+        """Initializes the FeatureMismatchError.
+
+        Args:
+            message: Description of the feature mismatch.
+            expected: Expected number of features.
+            received: Received number of features.
+            context: Optional additional context about the error.
+        """
+        super().__init__(message, code="FEATURE_MISMATCH", context=context)
+
+
+class UnfittedScalerError(ValidationError):
+    """Raised when attempting to use an unfitted scaler.
+
+    This occurs when trying to transform data with a scaler that
+    hasn't been fitted on training data yet.
+    """
+
+    def __init__(self, context: Optional[Any] = None):
+        """Initializes the UnfittedScalerError.
+
+        Args:
+            context: Optional additional context about the error.
+        """
+        message = "Cannot transform data with an unfitted scaler. Call fit() first."
+        super().__init__(message, code="UNFITTED_SCALER", context=context)
+
+
+class ScalerStatePersistenceError(InternalError):
+    """Raised when scaler state persistence operations fail."""
+
+    def __init__(self, message: str, context: Optional[Any] = None):
+        """Initializes the ScalerStatePersistenceError.
+
+        Args:
+            message: Description of the persistence failure.
+            context: Optional additional context about the error.
+        """
+        super().__init__(message, code="SCALER_PERSISTENCE_FAILED", context=context)
+
+
+class InvalidScalerStateError(ValidationError):
+    """Raised when a scaler state file is corrupted or invalid."""
+
+    def __init__(self, message: str, context: Optional[Any] = None):
+        """Initializes the InvalidScalerStateError.
+
+        Args:
+            message: Description of the invalid state.
+            context: Optional additional context about the error.
+        """
+        super().__init__(message, code="INVALID_SCALER_STATE", context=context)
+
+
+# --- Service and async processing exceptions ---
+
+
+class AsyncContextError(InternalError):
+    """Raised when there are issues with async context or event loop."""
+
+    def __init__(self, message: str, context: Optional[Any] = None):
+        """Initializes the AsyncContextError.
+
+        Args:
+            message: Description of the async context issue.
+            context: Optional additional context about the error.
+        """
+        super().__init__(message, code="ASYNC_CONTEXT_ERROR", context=context)
+
+
+class QueueCapacityExceededError(ServiceUnavailableError):
+    """Raised when a service queue is at capacity.
+
+    This indicates that the service is under heavy load and cannot
+    accept additional requests at this time.
+    """
+
+    def __init__(self, queue_name: str = "processing", current_size: Optional[int] = None, max_size: Optional[int] = None, context: Optional[Any] = None):
+        """Initializes the QueueCapacityExceededError.
+
+        Args:
+            queue_name: Name of the queue that is full.
+            current_size: Current size of the queue.
+            max_size: Maximum capacity of the queue.
+            context: Optional additional context about the error.
+        """
+        message = f"Queue '{queue_name}' is at capacity"
+        if current_size is not None and max_size is not None:
+            message += f" ({current_size}/{max_size})"
+        super().__init__(message, code="QUEUE_CAPACITY_EXCEEDED", context=context)
+
+
+class ServiceNotStartedError(InternalError):
+    """Raised when attempting to use a service that hasn't been started."""
+
+    def __init__(self, service_name: str, context: Optional[Any] = None):
+        """Initializes the ServiceNotStartedError.
+
+        Args:
+            service_name: Name of the service that hasn't been started.
+            context: Optional additional context about the error.
+        """
+        message = f"Service '{service_name}' has not been started. Call start() first."
+        super().__init__(message, code="SERVICE_NOT_STARTED", context=context)
+
+
+class CircuitBreakerOpenError(ServiceUnavailableError):
+    """Raised when circuit breaker is open and blocking requests.
+
+    The circuit breaker pattern is used to prevent cascading failures
+    by temporarily blocking requests to a failing service.
+    """
+
+    def __init__(self, service_name: str, retry_after: Optional[int] = None, context: Optional[Any] = None):
+        """Initializes the CircuitBreakerOpenError.
+
+        Args:
+            service_name: Name of the service with open circuit breaker.
+            retry_after: Suggested time in seconds to wait before retrying.
+            context: Optional additional context about the error.
+        """
+        message = f"Circuit breaker is open for service '{service_name}'"
+        if retry_after:
+            message += f". Retry after {retry_after} seconds."
+        super().__init__(message, code="CIRCUIT_BREAKER_OPEN", context=context)
+
+
+# --- Health check and monitoring exceptions ---
+
+
+class HealthCheckError(InternalError):
+    """Raised when health check operations fail."""
+
+    def __init__(self, component: str, message: str, context: Optional[Any] = None):
+        """Initializes the HealthCheckError.
+
+        Args:
+            component: The component that failed the health check.
+            message: Description of the health check failure.
+            context: Optional additional context about the error.
+        """
+        full_message = f"Health check failed for {component}: {message}"
+        super().__init__(full_message, code="HEALTH_CHECK_FAILED", context=context)
+
+
+class TracingError(InternalError):
+    """Raised when distributed tracing operations fail."""
+
+    def __init__(self, message: str, context: Optional[Any] = None):
+        """Initializes the TracingError.
+
+        Args:
+            message: Description of the tracing failure.
+            context: Optional additional context about the error.
+        """
+        super().__init__(message, code="TRACING_ERROR", context=context)

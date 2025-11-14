@@ -11,6 +11,7 @@ from typing import Dict, List, Optional
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.models.base import ModelStrategy
+from app.utils.exceptions import UnsupportedBackendError, ModelInitializationError
 
 logger = get_logger(__name__)
 
@@ -44,8 +45,8 @@ class ModelFactory:
             A model instance that implements the ModelStrategy protocol.
 
         Raises:
-            ValueError: If the backend is not supported.
-            RuntimeError: If model initialization fails.
+            UnsupportedBackendError: If the backend is not supported.
+            ModelInitializationError: If model initialization fails.
 
         Example:
             >>> model = ModelFactory.create_model("pytorch")
@@ -80,19 +81,27 @@ class ModelFactory:
 
             else:
                 available = ModelFactory.get_available_backends()
-                raise ValueError(
-                    f"Unsupported backend: {backend}. Available backends: {available}"
+                raise UnsupportedBackendError(
+                    backend=backend,
+                    supported_backends=available
                 )
 
         except ImportError as e:
             logger.error(f"Failed to import backend {backend}: {e}")
-            raise RuntimeError(
-                f"Backend '{backend}' is not available. "
-                f"Please ensure required dependencies are installed."
+            raise ModelInitializationError(
+                message=f"Backend '{backend}' is not available. "
+                f"Please ensure required dependencies are installed.",
+                backend=backend
             ) from e
+        except (UnsupportedBackendError, ModelInitializationError):
+            # Re-raise our custom exceptions
+            raise
         except Exception as e:
             logger.error(f"Failed to create model for backend {backend}: {e}")
-            raise RuntimeError(f"Failed to initialize model for backend '{backend}': {e}") from e
+            raise ModelInitializationError(
+                message=f"Failed to initialize model for backend '{backend}': {e}",
+                backend=backend
+            ) from e
 
     @staticmethod
     def get_available_backends() -> List[str]:

@@ -9,10 +9,13 @@ and includes the API routers.
 """
 
 import time
+from datetime import datetime
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from app.api import router
 from app.api.middleware import (
@@ -26,7 +29,7 @@ from app.core.events import lifespan
 from app.core.logging import get_logger, setup_structured_logging
 from app.core.tracing import setup_tracing, instrument_fastapi_app
 from app.monitoring.routes import router as monitoring_router
-from app.utils.exceptions import ServiceError
+from app.utils.exceptions import ServiceError, ValidationError as CustomValidationError
 
 # Setup structured logging
 setup_structured_logging()
@@ -93,9 +96,55 @@ def create_app() -> FastAPI:
     except Exception as e:
         logger.warning(f"Distributed tracing not available: {e}")
 
+    # Handler for Pydantic validation errors
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        """Handles FastAPI/Pydantic request validation errors.
+
+        This handler provides detailed error information about validation failures,
+        making it easier for API clients to understand what went wrong with their request.
+
+        Args:
+            request: The incoming request that failed validation.
+            exc: The validation error instance.
+
+        Returns:
+            A JSONResponse with detailed validation error information.
+        """
+        correlation_id = getattr(request.state, "correlation_id", None)
+
+        error_details = []
+        for error in exc.errors():
+            error_details.append({
+                "loc": error["loc"],
+                "msg": error["msg"],
+                "type": error["type"],
+            })
+
+        logger.warning(
+            "Request validation failed",
+            correlation_id=correlation_id,
+            errors=error_details,
+            path=request.url.path,
+        )
+
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error_code": "E1001",
+                "error_message": "Request validation failed",
+                "detail": "The request data failed validation. Please check the errors below.",
+                "validation_errors": error_details,
+                "correlation_id": correlation_id,
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )
+
     # Global exception handler for unhandled errors
     @app.exception_handler(Exception)
-    async def global_exception_handler(request, exc: Exception) -> JSONResponse:
+    async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         """Handles unexpected exceptions across the application.
 
         This global handler catches any unhandled exceptions, logs them, and
@@ -111,24 +160,60 @@ def create_app() -> FastAPI:
         Returns:
             A JSONResponse containing the error details.
         """
+        # Extract correlation ID if available
+        correlation_id = getattr(request.state, "correlation_id", None)
+
         # Map known service errors to their status codes
         if isinstance(exc, ServiceError):
-            logger.warning(f"Service error occurred: {exc}", exc_info=False)
-            return JSONResponse(
-                status_code=getattr(exc, "status_code", 400),
-                content={
-                    "detail": str(exc),
-                    "error_code": getattr(exc, "code", "E0000"),
-                    "context": getattr(exc, "context", None),
-                },
+            status_code = getattr(exc, "status_code", 500)
+            error_code = getattr(exc, "code", "E0000")
+            context = getattr(exc, "context", None)
+
+            logger.warning(
+                f"Service error occurred: {exc}",
+                error_code=error_code,
+                status_code=status_code,
+                correlation_id=correlation_id,
+                path=request.url.path,
+                exc_info=False,
             )
 
-        logger.error(f"Unhandled exception: {exc}", exc_info=True)
+            response_content = {
+                "error_code": error_code,
+                "error_message": str(exc),
+                "status_code": status_code,
+                "correlation_id": correlation_id,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
+            # Only include context if it exists and is not None
+            if context:
+                response_content["context"] = context
+
+            return JSONResponse(
+                status_code=status_code,
+                content=response_content,
+            )
+
+        # Handle unexpected errors
+        error_id = f"error_{int(time.time())}_{id(exc)}"
+        logger.error(
+            f"Unhandled exception: {exc}",
+            error_id=error_id,
+            correlation_id=correlation_id,
+            path=request.url.path,
+            exc_info=True,
+        )
+
         return JSONResponse(
             status_code=500,
             content={
-                "detail": "Internal server error",
-                "error_id": f"error_{int(time.time())}",
+                "error_code": "E4001",
+                "error_message": "An unexpected internal server error occurred",
+                "status_code": 500,
+                "error_id": error_id,
+                "correlation_id": correlation_id,
+                "timestamp": datetime.utcnow().isoformat(),
             },
         )
 

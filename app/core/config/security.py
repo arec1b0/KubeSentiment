@@ -7,6 +7,8 @@ from typing import List, Optional
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
+from app.utils.exceptions import SecurityConfigError
+
 
 class SecurityConfig(BaseSettings):
     """Security and authentication configuration.
@@ -57,17 +59,17 @@ class SecurityConfig(BaseSettings):
             The validated list of CORS origins.
 
         Raises:
-            ValueError: If a wildcard origin is used or a URL is invalid.
+            SecurityConfigError: If a wildcard origin is used or a URL is invalid.
         """
         for origin in v:
             if origin == "*":
-                raise ValueError(
+                raise SecurityConfigError(
                     "Wildcard CORS origin '*' is not allowed. "
                     "Specify explicit origins for security."
                 )
             url_pattern = re.compile(r"^https?://[a-zA-Z0-9.-]+(?:\:[0-9]+)?(?:/.*)?$")
             if not url_pattern.match(origin):
-                raise ValueError(f"Invalid CORS origin URL: {origin}")
+                raise SecurityConfigError(f"Invalid CORS origin URL: {origin}")
         return v
 
     @field_validator("api_key")
@@ -82,13 +84,13 @@ class SecurityConfig(BaseSettings):
             The validated API key.
 
         Raises:
-            ValueError: If the API key is not strong enough.
+            SecurityConfigError: If the API key is not strong enough.
         """
         if v is not None:
             if len(v) < 8:
-                raise ValueError("API key must be at least 8 characters")
+                raise SecurityConfigError("API key must be at least 8 characters")
             if not re.search(r"[A-Za-z]", v) or not re.search(r"[0-9]", v):
-                raise ValueError("API key must contain both letters and numbers")
+                raise SecurityConfigError("API key must contain both letters and numbers")
         return v
 
     class Config:

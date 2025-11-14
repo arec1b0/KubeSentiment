@@ -14,6 +14,11 @@ from functools import lru_cache
 from typing import Any, Dict, Optional
 
 from app.core.logging import get_logger
+from app.utils.exceptions import (
+    InvalidSecretsConfigError,
+    VaultAuthenticationError,
+    KubernetesAuthenticationError,
+)
 
 logger = get_logger(__name__)
 
@@ -210,9 +215,9 @@ class VaultSecretManager(SecretManager):
 
         Raises:
             ImportError: If the `hvac` library is not installed.
-            ValueError: If neither a token nor a role is provided for
+            InvalidSecretsConfigError: If neither a token nor a role is provided for
                 authentication.
-            RuntimeError: If authentication with Vault fails.
+            VaultAuthenticationError: If authentication with Vault fails.
         """
         try:
             import hvac
@@ -240,10 +245,12 @@ class VaultSecretManager(SecretManager):
         elif role:
             self._authenticate_kubernetes(role)
         else:
-            raise ValueError("Either token or role must be provided for Vault authentication")
+            raise InvalidSecretsConfigError(
+                "Either token or role must be provided for Vault authentication"
+            )
 
         if not self.client.is_authenticated():
-            raise RuntimeError("Failed to authenticate to Vault")
+            raise VaultAuthenticationError("Failed to authenticate to Vault")
 
         logger.info("Initialized Vault secret manager", vault_addr=vault_addr, role=role)
 
@@ -259,7 +266,7 @@ class VaultSecretManager(SecretManager):
             role: The Vault role to authenticate against.
 
         Raises:
-            RuntimeError: If the service account token is not found or if
+            KubernetesAuthenticationError: If the service account token is not found or if
                 authentication fails.
         """
         try:
@@ -268,9 +275,9 @@ class VaultSecretManager(SecretManager):
             self.client.auth.kubernetes.login(role=role, jwt=jwt)
             logger.info("Authenticated to Vault using Kubernetes auth", role=role)
         except FileNotFoundError:
-            raise RuntimeError("Kubernetes service account token not found.")
+            raise KubernetesAuthenticationError("Kubernetes service account token not found.")
         except Exception as e:
-            raise RuntimeError(f"Kubernetes authentication failed: {e}")
+            raise KubernetesAuthenticationError(f"Kubernetes authentication failed: {e}")
 
     def get_secret(self, key: str, default: Optional[str] = None) -> Optional[str]:
         """Retrieves a secret from Vault, using an in-memory cache.

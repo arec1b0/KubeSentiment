@@ -20,6 +20,15 @@ class ErrorCode(str, Enum):
     manage, reference, and maintain. The codes are categorized by their nature,
     such as input validation, model-related issues, security, and general
     system errors, which helps in diagnosing problems more efficiently.
+
+    Error Code Ranges:
+    - 1000-1099: Input validation errors
+    - 2000-2099: Model errors
+    - 3000-3099: Security and authentication errors
+    - 4000-4099: System and service errors
+    - 5000-5099: Configuration errors
+    - 6000-6099: Feature processing errors
+    - 7000-7099: Batch and async processing errors
     """
 
     # Input validation errors (1000-1099)
@@ -27,20 +36,49 @@ class ErrorCode(str, Enum):
     TEXT_TOO_LONG = "E1002"
     TEXT_EMPTY = "E1003"
     TEXT_INVALID_CHARACTERS = "E1004"
+    BATCH_SIZE_EXCEEDED = "E1005"
+    EMPTY_BATCH = "E1006"
 
     # Model errors (2000-2099)
     MODEL_NOT_LOADED = "E2001"
     MODEL_INFERENCE_FAILED = "E2002"
     MODEL_TIMEOUT = "E2003"
+    MODEL_LOADING_FAILED = "E2004"
+    MODEL_INIT_FAILED = "E2005"
+    MODEL_CACHING_FAILED = "E2006"
+    MODEL_METADATA_NOT_FOUND = "E2007"
+    INVALID_MODEL_PATH = "E2008"
+    MODEL_EXPORT_FAILED = "E2009"
+    UNSUPPORTED_BACKEND = "E2010"
 
-    # Security errors (3000-3099)
+    # Security and authentication errors (3000-3099)
     INVALID_MODEL_NAME = "E3001"
     UNAUTHORIZED_ACCESS = "E3002"
+    VAULT_AUTH_FAILED = "E3003"
+    K8S_AUTH_FAILED = "E3004"
+    INVALID_SECRETS_CONFIG = "E3005"
 
-    # System errors (4000-4099)
+    # System and service errors (4000-4099)
     INTERNAL_SERVER_ERROR = "E4001"
     SERVICE_UNAVAILABLE = "E4002"
     RATE_LIMIT_EXCEEDED = "E4003"
+    ASYNC_CONTEXT_ERROR = "E4004"
+    QUEUE_CAPACITY_EXCEEDED = "E4005"
+    SERVICE_NOT_STARTED = "E4006"
+    CIRCUIT_BREAKER_OPEN = "E4007"
+    HEALTH_CHECK_FAILED = "E4008"
+    TRACING_ERROR = "E4009"
+
+    # Configuration errors (5000-5099)
+    SECURITY_CONFIG_ERROR = "E5001"
+    MODEL_CONFIG_ERROR = "E5002"
+    SETTINGS_VALIDATION_ERROR = "E5003"
+
+    # Feature processing errors (6000-6099)
+    FEATURE_MISMATCH = "E6001"
+    UNFITTED_SCALER = "E6002"
+    SCALER_PERSISTENCE_FAILED = "E6003"
+    INVALID_SCALER_STATE = "E6004"
 
 
 class ErrorMessages:
@@ -52,18 +90,54 @@ class ErrorMessages:
     """
 
     MESSAGES = {
+        # Input validation errors
         ErrorCode.INVALID_INPUT_TEXT: "Invalid input text provided. The text may be malformed or of an unsupported type.",
         ErrorCode.TEXT_TOO_LONG: "The provided input text exceeds the maximum allowed length limit.",
         ErrorCode.TEXT_EMPTY: "Input text cannot be empty or consist only of whitespace.",
         ErrorCode.TEXT_INVALID_CHARACTERS: "The input text contains invalid or unsupported characters.",
+        ErrorCode.BATCH_SIZE_EXCEEDED: "The batch size exceeds the maximum allowed limit.",
+        ErrorCode.EMPTY_BATCH: "Batch processing request cannot be empty.",
+
+        # Model errors
         ErrorCode.MODEL_NOT_LOADED: "The sentiment analysis model is currently not loaded or unavailable.",
         ErrorCode.MODEL_INFERENCE_FAILED: "An unexpected error occurred during the model inference process.",
         ErrorCode.MODEL_TIMEOUT: "The model inference process timed out before a result could be returned.",
+        ErrorCode.MODEL_LOADING_FAILED: "Failed to load the model from storage. The model file may be corrupted or missing.",
+        ErrorCode.MODEL_INIT_FAILED: "Model initialization failed. Check model configuration and dependencies.",
+        ErrorCode.MODEL_CACHING_FAILED: "Failed to cache the model. There may be insufficient storage or permissions issues.",
+        ErrorCode.MODEL_METADATA_NOT_FOUND: "Model metadata not found in cache. The model may need to be reloaded.",
+        ErrorCode.INVALID_MODEL_PATH: "The specified model path is invalid or does not exist.",
+        ErrorCode.MODEL_EXPORT_FAILED: "Failed to export the model to the requested format.",
+        ErrorCode.UNSUPPORTED_BACKEND: "The requested ML backend is not supported by this service.",
+
+        # Security and authentication errors
         ErrorCode.INVALID_MODEL_NAME: "The requested model name is invalid, not found, or not permitted.",
         ErrorCode.UNAUTHORIZED_ACCESS: "Unauthorized access. A valid authentication token is required.",
+        ErrorCode.VAULT_AUTH_FAILED: "Failed to authenticate with HashiCorp Vault. Check credentials and configuration.",
+        ErrorCode.K8S_AUTH_FAILED: "Kubernetes authentication failed. Check service account and RBAC permissions.",
+        ErrorCode.INVALID_SECRETS_CONFIG: "Secrets configuration is invalid or missing required parameters.",
+
+        # System and service errors
         ErrorCode.INTERNAL_SERVER_ERROR: "An unexpected internal server error occurred.",
         ErrorCode.SERVICE_UNAVAILABLE: "The service is temporarily unavailable. Please try again later.",
         ErrorCode.RATE_LIMIT_EXCEEDED: "You have exceeded the API rate limit. Please wait before making new requests.",
+        ErrorCode.ASYNC_CONTEXT_ERROR: "Invalid async context or event loop error. This is an internal service issue.",
+        ErrorCode.QUEUE_CAPACITY_EXCEEDED: "The processing queue is at capacity. The service is under heavy load.",
+        ErrorCode.SERVICE_NOT_STARTED: "The requested service has not been started or initialized.",
+        ErrorCode.CIRCUIT_BREAKER_OPEN: "Circuit breaker is open. The service is temporarily unavailable due to detected failures.",
+        ErrorCode.HEALTH_CHECK_FAILED: "Health check failed for one or more service components.",
+        ErrorCode.TRACING_ERROR: "Distributed tracing operation failed. This should not affect service functionality.",
+
+        # Configuration errors
+        ErrorCode.SECURITY_CONFIG_ERROR: "Security configuration is invalid or missing required settings.",
+        ErrorCode.MODEL_CONFIG_ERROR: "Model configuration is invalid or contains unsupported parameters.",
+        ErrorCode.SETTINGS_VALIDATION_ERROR: "Application settings validation failed. Check environment variables and config files.",
+
+        # Feature processing errors
+        ErrorCode.FEATURE_MISMATCH: "Input features don't match the expected configuration or dimensions.",
+        ErrorCode.UNFITTED_SCALER: "Cannot use an unfitted scaler. The scaler must be fitted on training data first.",
+        ErrorCode.SCALER_PERSISTENCE_FAILED: "Failed to persist scaler state to storage.",
+        ErrorCode.INVALID_SCALER_STATE: "Scaler state file is corrupted or invalid. Cannot restore scaler.",
     }
 
     @classmethod

@@ -7,6 +7,8 @@ from typing import List, Optional
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
+from app.utils.exceptions import ModelConfigError
+
 
 class ModelConfig(BaseSettings):
     """Machine learning model configuration.
@@ -79,13 +81,13 @@ class ModelConfig(BaseSettings):
             The validated list of model names.
 
         Raises:
-            ValueError: If a model name has an invalid format or is too long.
+            ModelConfigError: If a model name has an invalid format or is too long.
         """
         for model_name in v:
             if not re.match(r"^[a-zA-Z0-9/_-]+$", model_name):
-                raise ValueError(f"Invalid model name format: {model_name}")
+                raise ModelConfigError(f"Invalid model name format: {model_name}")
             if len(model_name) > 200:
-                raise ValueError(f"Model name too long: {model_name}")
+                raise ModelConfigError(f"Model name too long: {model_name}")
         return v
 
     @field_validator("model_cache_dir")
@@ -100,14 +102,14 @@ class ModelConfig(BaseSettings):
             The validated cache directory path.
 
         Raises:
-            ValueError: If the path is not absolute or the parent directory does not exist.
+            ModelConfigError: If the path is not absolute or the parent directory does not exist.
         """
         if v is not None:
             if not os.path.isabs(v):
-                raise ValueError("Cache directory must be an absolute path")
+                raise ModelConfigError("Cache directory must be an absolute path")
             parent_dir = os.path.dirname(v)
             if not os.path.exists(parent_dir):
-                raise ValueError(f"Parent directory does not exist: {parent_dir}")
+                raise ModelConfigError(f"Parent directory does not exist: {parent_dir}")
         return v
 
     class Config:

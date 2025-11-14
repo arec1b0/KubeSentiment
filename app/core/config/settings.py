@@ -21,6 +21,7 @@ from app.core.config.redis import RedisConfig
 from app.core.config.security import SecurityConfig
 from app.core.config.server import ServerConfig
 from app.core.config.vault import VaultConfig
+from app.utils.exceptions import SettingsValidationError
 
 
 class Settings(BaseSettings):
@@ -301,11 +302,11 @@ class Settings(BaseSettings):
         """Ensures the selected model_name is in the allowed_models list.
 
         Raises:
-            ValueError: If model_name is not in allowed_models.
+            SettingsValidationError: If model_name is not in allowed_models.
         """
         if self.model.model_name and self.model.allowed_models:
             if self.model.model_name not in self.model.allowed_models:
-                raise ValueError(
+                raise SettingsValidationError(
                     f"Model '{self.model.model_name}' must be in allowed_models list: "
                     f"{self.model.allowed_models}"
                 )
@@ -314,22 +315,22 @@ class Settings(BaseSettings):
         """Validates that multiple workers are not used in debug mode.
 
         Raises:
-            ValueError: If debug is True and workers is greater than 1.
+            SettingsValidationError: If debug is True and workers is greater than 1.
         """
         if self.server.debug and self.server.workers > 1:
-            raise ValueError("Cannot use multiple workers in debug mode")
+            raise SettingsValidationError("Cannot use multiple workers in debug mode")
 
     def _validate_cache_memory_usage(self) -> None:
         """Estimates cache memory usage to prevent excessive allocation.
 
         Raises:
-            ValueError: If the estimated memory usage exceeds a predefined limit.
+            SettingsValidationError: If the estimated memory usage exceeds a predefined limit.
         """
         estimated_memory_mb = (
             self.model.prediction_cache_max_size * self.model.max_text_length
         ) / 100000
         if estimated_memory_mb > 1000:  # 1GB limit
-            raise ValueError(
+            raise SettingsValidationError(
                 f"Cache configuration may use too much memory (~{estimated_memory_mb:.0f}MB). "
                 "Reduce cache_size or max_text_length."
             )
