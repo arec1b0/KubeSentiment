@@ -1,0 +1,87 @@
+---
+# Development Environment Configuration
+# Using profile-based defaults to minimize configuration
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubesentiment-dev-config
+  namespace: default
+  labels:
+    app: kubesentiment
+    environment: development
+    component: config
+data:
+  # ===== Configuration Profile =====
+  # Development profile provides these defaults automatically:
+  # - MLOPS_DEBUG=true
+  # - MLOPS_LOG_LEVEL=DEBUG
+  # - MLOPS_WORKERS=1
+  # - All external services disabled
+  # - Small cache sizes for faster iteration
+  MLOPS_PROFILE: "development"
+
+  # ===== Minimal Required Overrides =====
+  # Only override what's specific to your dev environment
+
+  # Application Identity
+  MLOPS_APP_NAME: "ML Model Serving API - Dev"
+  MLOPS_APP_VERSION: "1.0.0-dev"
+
+  # Optional: Enable specific services for testing
+  # MLOPS_REDIS_ENABLED: "true"
+  # MLOPS_REDIS_HOST: "redis-dev"
+  # MLOPS_KAFKA_ENABLED: "true"
+  # MLOPS_KAFKA_BOOTSTRAP_SERVERS: "kafka-dev:9092"
+
+---
+# Development Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubesentiment-dev
+  namespace: default
+  labels:
+    app: kubesentiment
+    environment: development
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubesentiment
+      environment: development
+  template:
+    metadata:
+      labels:
+        app: kubesentiment
+        environment: development
+    spec:
+      containers:
+        - name: kubesentiment
+          image: kubesentiment:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: kubesentiment-dev-config
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
