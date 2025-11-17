@@ -10,11 +10,11 @@ efficiently grouped together for model inference.
 import asyncio
 import time
 from collections import deque
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import pandas as pd
+from app.models.stream_models import BatchConfig, PendingRequest
+from app.services.feature_processor import FeatureProcessor
 
 try:  # pragma: no cover - allow running without full settings stack
     from app.core.config import get_settings
@@ -80,53 +80,6 @@ else:
     ModelStrategy = Any  # type: ignore[misc, assignment]
 
 logger = get_logger(__name__)
-
-
-@dataclass
-class BatchConfig:
-    """Configuration for batch processing behavior.
-
-    This class defines the parameters that control how the StreamProcessor
-    groups requests into batches. These settings allow for fine-tuning the
-    trade-off between latency and throughput.
-
-    Attributes:
-        max_batch_size: The largest number of items to include in a single batch.
-        max_wait_time_ms: The maximum time in milliseconds to wait for a batch
-                          to fill up before processing it, even if it's not full.
-        min_batch_size: The minimum number of items required to process a batch,
-                        unless the max_wait_time_ms is exceeded.
-        dynamic_batching: A flag to enable or disable dynamic adjustment of
-                          batch sizes based on request load.
-    """
-
-    max_batch_size: int = 32
-    max_wait_time_ms: float = 50.0
-    min_batch_size: int = 1
-    dynamic_batching: bool = True
-
-
-@dataclass
-class PendingRequest:
-    """Represents a pending prediction request in the batch queue.
-
-    Each instance of this class holds the data for a single prediction request,
-    along with metadata needed for asynchronous processing and tracking.
-
-    Attributes:
-        text: The input text to be analyzed for sentiment.
-        future: An asyncio.Future object that will be resolved with the
-                prediction result when the batch is processed.
-        timestamp: The time when the request was added to the queue, used for
-                   calculating wait times.
-        request_id: A unique identifier for the request, used for logging and
-                    tracking.
-    """
-
-    text: str
-    future: asyncio.Future
-    timestamp: float
-    request_id: str
 
 
 class StreamProcessor(IStreamProcessor):
@@ -338,75 +291,14 @@ class StreamProcessor(IStreamProcessor):
             texts: A list of input texts for feature extraction.
             batch_logger: A contextual logger for logging batch-specific information.
         """
+        FeatureProcessor.process_features(
+            texts, self.feature_engineer, self.online_scaler, batch_logger
+        )
+        # Save scaler state after processing
         try:
-            feature_dicts = [
-                self.feature_engineer.extract_features(text) for text in texts
-            ]
-            feature_df = pd.DataFrame(feature_dicts).fillna(0)
-            numerical_features = [
-                "char_count",
-                "word_count",
-                "sentence_count",
-                "avg_word_length",
-                "avg_sentence_length",
-                "unique_word_count",
-                "lexical_richness",
-                "stopwords_count",
-                "stopwords_ratio",
-                "vader_sentiment_compound",
-                "vader_sentiment_pos",
-                "vader_sentiment_neg",
-                "vader_sentiment_neu",
-                "flesch_reading_ease",
-                "flesch_kincaid_grade",
-                "smog_index",
-                "coleman_liau_index",
-                "automated_readability_index",
-                "dale_chall_readability_score",
-                "gunning_fog",
-                "noun_count",
-                "verb_count",
-                "adjective_count",
-                "adverb_count",
-                "pronoun_count",
-                "noun_ratio",
-                "verb_ratio",
-                "adjective_ratio",
-                "punctuation_count",
-                "punctuation_ratio",
-                "uppercase_word_count",
-                "uppercase_word_ratio",
-                "exclamation_mark_count",
-                "question_mark_count",
-                "numeric_count",
-                "all_caps_word_count",
-                "all_caps_word_ratio",
-            ]
-            available_features = [
-                col for col in numerical_features if col in feature_df.columns
-            ]
-            feature_array = feature_df[available_features].values
-
-            if feature_array.shape[0] > 0:
-                self.online_scaler.partial_fit(feature_array)
-                normalized_features = self.online_scaler.transform(feature_array)
-                self.online_scaler.save_state(str(self.scaler_state_path))
-                batch_logger.info(
-                    "Normalized features generated",
-                    shape=normalized_features.shape,
-                    n_features=len(available_features),
-                    scaler_samples_seen=self.online_scaler.n_samples_seen_,
-                )
-            else:
-                batch_logger.warning(
-                    "No numerical features available for normalization"
-                )
-        except Exception as fe_e:
-            batch_logger.error(
-                "Feature engineering/normalization failed",
-                error=str(fe_e),
-                exc_info=True,
-            )
+            self.online_scaler.save_state(str(self.scaler_state_path))
+        except Exception:
+            pass  # Logging already handled in FeatureProcessor
 
     def _finalize_batch_processing(
         self,

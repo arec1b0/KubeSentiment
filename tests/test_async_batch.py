@@ -11,12 +11,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.services.async_batch_service import (
-    AsyncBatchService,
-    BatchJob,
-    BatchJobStatus,
-    Priority,
-)
+from app.models.batch_job import BatchJob, BatchJobStatus, Priority
+from app.services.async_batch_service import AsyncBatchService
 from app.services.prediction import PredictionService
 from app.services.stream_processor import StreamProcessor
 

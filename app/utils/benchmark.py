@@ -15,7 +15,8 @@ from typing import Dict, List, Optional
 
 from app.core.logging import get_logger
 from app.models.base import ModelStrategy
-from app.services.stream_processor import BatchConfig, StreamProcessor
+from app.models.stream_models import BatchConfig
+from app.services.stream_processor import StreamProcessor
 
 logger = get_logger(__name__)
 

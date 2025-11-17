@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
 from threading import Lock
 from typing import (
     Any,
@@ -14,7 +12,6 @@ from typing import (
     Callable,
     Deque,
     Dict,
-    Iterable,
     List,
     MutableMapping,
     Optional,
@@ -22,6 +19,11 @@ from typing import (
 )
 
 from kafka import KafkaProducer
+
+from app.models.kafka_models import ConsumerMetrics, MessageMetadata, ProcessingResult
+from app.services.dead_letter_queue import DeadLetterQueue
+from app.services.message_batch import MessageBatch
+from app.services.stream_processor import StreamProcessor
 
 try:  # pragma: no cover - optional dependency for lightweight tests
     from app.core.config import get_settings
@@ -51,211 +53,7 @@ except Exception:  # pragma: no cover - fallback to standard logging
         get_fallback_contextual_logger as get_contextual_logger,
     )
 
-
-from app.services.stream_processor import StreamProcessor
-
 logger = get_contextual_logger(__name__)
-
-
-@dataclass(slots=True)
-class MessageMetadata:
-    """Represents metadata for a Kafka message."""
-
-    topic: str
-    partition: int
-    offset: int
-    timestamp: float
-
-    def as_dict(self) -> Dict[str, Any]:
-        """Return a serialisable representation of the metadata."""
-
-        return {
-            "topic": self.topic,
-            "partition": self.partition,
-            "offset": self.offset,
-            "timestamp": self.timestamp,
-        }
-
-
-@dataclass(slots=True)
-class ProcessingResult:
-    """Represents the result of processing a single message."""
-
-    success: bool
-    message_id: str
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-
-    def as_dict(self) -> Dict[str, Any]:
-        """Convert the result to a JSON-serialisable dictionary."""
-
-        payload: Dict[str, Any] = {
-            "success": self.success,
-            "message_id": self.message_id,
-        }
-        if self.result is not None:
-            payload["result"] = self.result
-        if self.error is not None:
-            payload["error"] = self.error
-        return payload
-
-
-class MessageBatch:
-    """Container for messages that should be processed together."""
-
-    def __init__(self, max_size: int, created_at: Optional[float] = None) -> None:
-        self.max_size = max_size
-        self._messages: List[Any] = []
-        self._metadata: List[MessageMetadata] = []
-        self.created_at = created_at or time.time()
-
-    def add_message(self, message: Any, metadata: MessageMetadata) -> bool:
-        """Add a message to the batch if capacity is available."""
-
-        if self.is_full():
-            return False
-        self._messages.append(message)
-        self._metadata.append(metadata)
-        return True
-
-    def size(self) -> int:
-        """Return the number of messages currently buffered."""
-
-        return len(self._messages)
-
-    def is_full(self) -> bool:
-        """Return ``True`` when the batch reached its configured size."""
-
-        return self.size() >= self.max_size
-
-    def is_empty(self) -> bool:
-        """Return ``True`` when the batch has no buffered messages."""
-
-        return self.size() == 0
-
-    def clear(self) -> None:
-        """Remove all buffered messages from the batch."""
-
-        self._messages.clear()
-        self._metadata.clear()
-        self.created_at = time.time()
-
-    def iter_messages(self) -> Iterable[Tuple[Any, MessageMetadata]]:
-        """Yield pairs of message payloads and their metadata."""
-
-        return zip(self._messages, self._metadata, strict=True)
-
-    def get_texts_and_ids(self) -> Tuple[List[str], List[str]]:
-        """Extract message texts and identifiers for model inference."""
-
-        texts: List[str] = []
-        message_ids: List[str] = []
-        for message in self._messages:
-            text = (
-                message.get("text", "") if isinstance(message, dict) else str(message)
-            )
-            message_id = (
-                message.get("id")
-                if isinstance(message, dict) and message.get("id") is not None
-                else f"{time.time_ns()}"
-            )
-            texts.append(text)
-            message_ids.append(message_id)
-        return texts, message_ids
-
-
-class DeadLetterQueue:
-    """Handles messages that fail processing after multiple retries.
-
-    This class encapsulates the logic for sending failed messages to a
-    designated dead-letter queue (DLQ) topic in Kafka. This ensures that
-    failing messages do not block the consumer and can be investigated
-    separately.
-    """
-
-    def __init__(self, producer: KafkaProducer, dlq_topic: str, max_retries: int = 3):
-        self.producer = producer
-        self.dlq_topic = dlq_topic
-        self.max_retries = max_retries
-
-    def send_to_dlq(
-        self,
-        message: Any,
-        metadata: MessageMetadata,
-        error: str,
-        retry_count: int = 0,
-    ) -> bool:
-        """Sends a message to the dead-letter queue.
-
-        Args:
-            message: The original message that failed.
-            metadata: The metadata of the original message.
-            error: The error that caused the failure.
-            retry_count: Number of attempts already performed.
-
-        Returns:
-            `True` if the message was sent successfully, `False` otherwise.
-        """
-
-        payload = {
-            "message": message,
-            "metadata": metadata.as_dict(),
-            "error": error,
-            "retry_count": retry_count,
-            "timestamp": time.time(),
-        }
-
-        backoff_base = 0.002  # seconds; keeps retries fast in tests while honouring exponential backoff
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                future = self.producer.send(
-                    self.dlq_topic,
-                    value=json.dumps(payload).encode("utf-8"),
-                )
-                future.get(timeout=5.0)
-                logger.info(
-                    "Message forwarded to Kafka DLQ",
-                    topic=self.dlq_topic,
-                    attempt=attempt,
-                    trace_id=metadata.topic,
-                )
-                return True
-            except Exception as exc:  # pragma: no cover - defensive branch
-                logger.warning(
-                    "Retrying DLQ publish",
-                    error=str(exc),
-                    attempt=attempt,
-                    trace_id=metadata.topic,
-                )
-                time.sleep(min(backoff_base * (2**attempt), 0.1))
-        logger.error(
-            "Failed to forward message to Kafka DLQ",
-            topic=self.dlq_topic,
-            error=error,
-            trace_id=metadata.topic,
-        )
-        return False
-
-
-@dataclass(slots=True)
-class ConsumerMetrics:
-    """Aggregated metrics describing consumer activity."""
-
-    messages_consumed: int = 0
-    messages_processed: int = 0
-    messages_failed: int = 0
-    total_processing_time_ms: float = 0.0
-    throughput_tps: float = 0.0
-    last_commit_time: float = field(default_factory=time.time)
-    consumer_threads: int = 0
-    running: bool = False
-
-    def avg_processing_time_ms(self) -> float:
-        """Average processing time per consumed message."""
-
-        if self.messages_consumed == 0:
-            return 0.0
-        return self.total_processing_time_ms / self.messages_consumed
 
 
 class KafkaConsumerPrometheusMetrics:
