@@ -15,7 +15,7 @@ from pathlib import Path
 
 from app.core.config import get_settings
 from app.models.factory import ModelFactory
-from app.services.stream_processor import BatchConfig
+from app.models.stream_models import BatchConfig
 from app.utils.benchmark import PerformanceBenchmark
 
 # Add parent directory to path

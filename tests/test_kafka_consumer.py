@@ -12,14 +12,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.kafka_consumer import (
-    ConsumerMetrics,
-    DeadLetterQueue,
-    HighThroughputKafkaConsumer,
-    MessageBatch,
-    MessageMetadata,
-    ProcessingResult,
-)
+from app.models.kafka_models import ConsumerMetrics, MessageMetadata, ProcessingResult
+from app.services.dead_letter_queue import DeadLetterQueue
+from app.services.kafka_consumer import HighThroughputKafkaConsumer
+from app.services.message_batch import MessageBatch
 from app.services.stream_processor import StreamProcessor
 
 
