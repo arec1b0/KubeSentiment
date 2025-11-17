@@ -10,7 +10,6 @@ This module provides integration with MLflow Model Registry for:
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime
 from enum import Enum
 
 from app.core.logging import get_logger
@@ -20,6 +19,7 @@ try:
     import mlflow
     from mlflow.tracking import MlflowClient
     from mlflow.exceptions import MlflowException
+
     MLFLOW_AVAILABLE = True
 except ImportError:
     MLFLOW_AVAILABLE = False
@@ -29,6 +29,7 @@ logger = get_logger(__name__)
 
 class ModelStage(str, Enum):
     """MLflow model stages."""
+
     NONE = "None"
     STAGING = "Staging"
     PRODUCTION = "Production"
@@ -57,7 +58,7 @@ class ModelRegistry(IModelRegistry):
         tracking_uri: Optional[str] = None,
         registry_uri: Optional[str] = None,
         experiment_name: str = "sentiment-analysis",
-        enabled: bool = True
+        enabled: bool = True,
     ):
         """
         Initialize MLflow Model Registry client.
@@ -95,7 +96,9 @@ class ModelRegistry(IModelRegistry):
                 self.experiment_id = mlflow.create_experiment(experiment_name)
             else:
                 self.experiment_id = self.experiment.experiment_id
-            logger.info("MLflow initialized", tracking_uri=self.tracking_uri, experiment=experiment_name)
+            logger.info(
+                "MLflow initialized", tracking_uri=self.tracking_uri, experiment=experiment_name
+            )
         except Exception as e:
             logger.error("Failed to initialize MLflow", error=str(e), exc_info=True)
             self.enabled = False
@@ -105,7 +108,7 @@ class ModelRegistry(IModelRegistry):
         model_name: str,
         model_uri: str,
         tags: Optional[Dict[str, str]] = None,
-        description: Optional[str] = None
+        description: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Register a new model version in MLflow.
@@ -129,9 +132,7 @@ class ModelRegistry(IModelRegistry):
             # Add tags if provided
             if tags:
                 for key, value in tags.items():
-                    self.client.set_model_version_tag(
-                        model_name, model_version.version, key, value
-                    )
+                    self.client.set_model_version_tag(model_name, model_version.version, key, value)
 
             # Update description
             if description:
@@ -145,17 +146,16 @@ class ModelRegistry(IModelRegistry):
                 "name": model_version.name,
                 "version": model_version.version,
                 "stage": model_version.current_stage,
-                "creation_timestamp": model_version.creation_timestamp
+                "creation_timestamp": model_version.creation_timestamp,
             }
         except MlflowException as e:
-            logger.error("Failed to register model", model_name=model_name, error=str(e), exc_info=True)
+            logger.error(
+                "Failed to register model", model_name=model_name, error=str(e), exc_info=True
+            )
             return None
 
     def get_model_version(
-        self,
-        model_name: str,
-        version: Optional[int] = None,
-        stage: Optional[ModelStage] = None
+        self, model_name: str, version: Optional[int] = None, stage: Optional[ModelStage] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Get a specific model version or the latest in a stage.
@@ -179,7 +179,9 @@ class ModelRegistry(IModelRegistry):
                 # Get latest version in stage
                 versions = self.client.get_latest_versions(model_name, stages=[stage.value])
                 if not versions:
-                    logger.warning("No model found in stage", stage=stage.value, model_name=model_name)
+                    logger.warning(
+                        "No model found in stage", stage=stage.value, model_name=model_name
+                    )
                     return None
                 model_version = versions[0]
             else:
@@ -198,10 +200,12 @@ class ModelRegistry(IModelRegistry):
                 "run_id": model_version.run_id,
                 "status": model_version.status,
                 "creation_timestamp": model_version.creation_timestamp,
-                "tags": model_version.tags
+                "tags": model_version.tags,
             }
         except MlflowException as e:
-            logger.error("Failed to get model version", model_name=model_name, error=str(e), exc_info=True)
+            logger.error(
+                "Failed to get model version", model_name=model_name, error=str(e), exc_info=True
+            )
             return None
 
     def get_production_model(self, model_name: str) -> Optional[Dict[str, Any]]:
@@ -230,25 +234,31 @@ class ModelRegistry(IModelRegistry):
             return []
 
         try:
-            versions = self.client.get_latest_versions(model_name, stages=[ModelStage.PRODUCTION.value])
-            return [{
-                "name": v.name,
-                "version": v.version,
-                "stage": v.current_stage,
-                "source": v.source,
-                "run_id": v.run_id,
-                "tags": v.tags
-            } for v in versions]
+            versions = self.client.get_latest_versions(
+                model_name, stages=[ModelStage.PRODUCTION.value]
+            )
+            return [
+                {
+                    "name": v.name,
+                    "version": v.version,
+                    "stage": v.current_stage,
+                    "source": v.source,
+                    "run_id": v.run_id,
+                    "tags": v.tags,
+                }
+                for v in versions
+            ]
         except MlflowException as e:
-            logger.error("Failed to get production models", model_name=model_name, error=str(e), exc_info=True)
+            logger.error(
+                "Failed to get production models",
+                model_name=model_name,
+                error=str(e),
+                exc_info=True,
+            )
             return []
 
     def transition_model_stage(
-        self,
-        model_name: str,
-        version: int,
-        stage: ModelStage,
-        archive_existing: bool = False
+        self, model_name: str, version: int, stage: ModelStage, archive_existing: bool = False
     ) -> bool:
         """
         Transition a model version to a new stage.
@@ -270,19 +280,21 @@ class ModelRegistry(IModelRegistry):
                 name=model_name,
                 version=version,
                 stage=stage.value,
-                archive_existing_versions=archive_existing
+                archive_existing_versions=archive_existing,
             )
-            logger.info("Model stage transitioned", model_name=model_name, version=version, stage=stage.value)
+            logger.info(
+                "Model stage transitioned",
+                model_name=model_name,
+                version=version,
+                stage=stage.value,
+            )
             return True
         except MlflowException as e:
             logger.error("Failed to transition model stage", error=str(e), exc_info=True)
             return False
 
     def promote_to_production(
-        self,
-        model_name: str,
-        version: int,
-        archive_existing: bool = True
+        self, model_name: str, version: int, archive_existing: bool = True
     ) -> bool:
         """
         Promote a model version to production.
@@ -304,7 +316,7 @@ class ModelRegistry(IModelRegistry):
         model_name: str,
         version: int,
         metrics: Dict[str, float],
-        tags: Optional[Dict[str, str]] = None
+        tags: Optional[Dict[str, str]] = None,
     ) -> bool:
         """
         Log prediction metrics for a model version.
@@ -334,7 +346,9 @@ class ModelRegistry(IModelRegistry):
                 if tags:
                     mlflow.set_tags(tags)
 
-            logger.debug("Metrics logged for model", model_name=model_name, version=version, metrics=metrics)
+            logger.debug(
+                "Metrics logged for model", model_name=model_name, version=version, metrics=metrics
+            )
             return True
         except MlflowException as e:
             logger.error("Failed to log metrics", error=str(e), exc_info=True)
@@ -363,9 +377,7 @@ class ModelRegistry(IModelRegistry):
             return False
 
     def search_models(
-        self,
-        filter_string: Optional[str] = None,
-        max_results: int = 10
+        self, filter_string: Optional[str] = None, max_results: int = 10
     ) -> List[Dict[str, Any]]:
         """
         Search for registered models.
@@ -382,19 +394,20 @@ class ModelRegistry(IModelRegistry):
 
         try:
             models = self.client.search_registered_models(
-                filter_string=filter_string,
-                max_results=max_results
+                filter_string=filter_string, max_results=max_results
             )
-            return [{
-                "name": m.name,
-                "creation_timestamp": m.creation_timestamp,
-                "last_updated_timestamp": m.last_updated_timestamp,
-                "description": m.description,
-                "latest_versions": [{
-                    "version": v.version,
-                    "stage": v.current_stage
-                } for v in m.latest_versions]
-            } for m in models]
+            return [
+                {
+                    "name": m.name,
+                    "creation_timestamp": m.creation_timestamp,
+                    "last_updated_timestamp": m.last_updated_timestamp,
+                    "description": m.description,
+                    "latest_versions": [
+                        {"version": v.version, "stage": v.current_stage} for v in m.latest_versions
+                    ],
+                }
+                for m in models
+            ]
         except MlflowException as e:
             logger.error("Failed to search models", error=str(e), exc_info=True)
             return []
@@ -410,8 +423,7 @@ def get_model_registry() -> Optional[ModelRegistry]:
 
 
 def initialize_model_registry(
-    tracking_uri: Optional[str] = None,
-    enabled: bool = True
+    tracking_uri: Optional[str] = None, enabled: bool = True
 ) -> ModelRegistry:
     """Initialize the global model registry instance."""
     global _registry_instance

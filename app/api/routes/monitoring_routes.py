@@ -26,6 +26,7 @@ router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 # Request/Response Models
 class ExplainRequest(BaseModel):
     """Request for prediction explanation."""
+
     text: str = Field(..., min_length=1, max_length=10000, description="Text to explain")
     prediction: str = Field(..., description="Predicted label")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Prediction confidence")
@@ -48,10 +49,7 @@ async def get_drift_summary() -> Dict[str, Any]:
     detector = get_drift_detector()
 
     if detector is None or not detector.enabled:
-        return {
-            "enabled": False,
-            "message": "Drift detection is not enabled"
-        }
+        return {"enabled": False, "message": "Drift detection is not enabled"}
 
     return detector.get_drift_summary()
 
@@ -74,7 +72,7 @@ async def check_drift() -> Dict[str, Any]:
         return {
             "message": "Not enough data for drift detection",
             "baseline_established": detector.baseline_established,
-            "min_samples_required": detector.min_samples
+            "min_samples_required": detector.min_samples,
         }
 
     return {
@@ -83,7 +81,7 @@ async def check_drift() -> Dict[str, Any]:
         "prediction_drift_detected": drift_metrics.prediction_drift_detected,
         "drift_score": drift_metrics.drift_score,
         "statistical_tests": drift_metrics.statistical_tests,
-        "feature_drifts": drift_metrics.feature_drifts
+        "feature_drifts": drift_metrics.feature_drifts,
     }
 
 
@@ -134,12 +132,10 @@ async def export_drift_report():
     report_html = detector.export_drift_report()
 
     if report_html is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Not enough data to generate drift report"
-        )
+        raise HTTPException(status_code=400, detail="Not enough data to generate drift report")
 
     from fastapi.responses import HTMLResponse
+
     return HTMLResponse(content=report_html)
 
 
@@ -224,7 +220,7 @@ async def get_performance_metrics() -> Dict[str, Any]:
 async def check_slo_compliance(
     availability_target: float = Query(default=99.9, ge=0, le=100),
     latency_p95_target_ms: float = Query(default=100, ge=0),
-    latency_p99_target_ms: float = Query(default=250, ge=0)
+    latency_p99_target_ms: float = Query(default=250, ge=0),
 ) -> Dict[str, Any]:
     """
     Check SLO (Service Level Objective) compliance.
@@ -245,7 +241,7 @@ async def check_slo_compliance(
     return collector.get_slo_compliance(
         availability_target=availability_target,
         latency_p95_target_ms=latency_p95_target_ms,
-        latency_p99_target_ms=latency_p99_target_ms
+        latency_p99_target_ms=latency_p99_target_ms,
     )
 
 
@@ -253,7 +249,7 @@ async def check_slo_compliance(
 @router.get("/models", summary="List registered models")
 async def list_models(
     filter_string: Optional[str] = Query(default=None, description="Filter expression"),
-    max_results: int = Query(default=10, ge=1, le=100)
+    max_results: int = Query(default=10, ge=1, le=100),
 ) -> Dict[str, Any]:
     """
     List registered models in MLflow registry.
@@ -268,19 +264,11 @@ async def list_models(
     registry = get_model_registry()
 
     if registry is None or not registry.enabled:
-        return {
-            "enabled": False,
-            "message": "Model registry is not enabled",
-            "models": []
-        }
+        return {"enabled": False, "message": "Model registry is not enabled", "models": []}
 
     models = registry.search_models(filter_string=filter_string, max_results=max_results)
 
-    return {
-        "enabled": True,
-        "count": len(models),
-        "models": models
-    }
+    return {"enabled": True, "count": len(models), "models": models}
 
 
 @router.get("/models/{model_name}/production", summary="Get production model")
@@ -302,10 +290,7 @@ async def get_production_model(model_name: str) -> Dict[str, Any]:
     model_info = registry.get_production_model(model_name)
 
     if model_info is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No production model found for {model_name}"
-        )
+        raise HTTPException(status_code=404, detail=f"No production model found for {model_name}")
 
     return model_info
 
@@ -328,11 +313,7 @@ async def get_all_production_models(model_name: str) -> Dict[str, Any]:
 
     versions = registry.get_all_production_models(model_name)
 
-    return {
-        "model_name": model_name,
-        "production_versions": versions,
-        "count": len(versions)
-    }
+    return {"model_name": model_name, "production_versions": versions, "count": len(versions)}
 
 
 # Explainability Endpoints
@@ -361,7 +342,7 @@ async def explain_prediction(request: ExplainRequest) -> Dict[str, Any]:
             "message": "Explainability engine is not enabled",
             "text": request.text,
             "prediction": request.prediction,
-            "confidence": request.confidence
+            "confidence": request.confidence,
         }
 
     explanation = explainer.explain_prediction(
@@ -369,7 +350,7 @@ async def explain_prediction(request: ExplainRequest) -> Dict[str, Any]:
         prediction=request.prediction,
         confidence=request.confidence,
         use_attention=request.use_attention,
-        use_gradients=request.use_gradients
+        use_gradients=request.use_gradients,
     )
 
     return explanation
@@ -396,12 +377,13 @@ async def get_html_explanation(request: ExplainRequest):
         prediction=request.prediction,
         confidence=request.confidence,
         use_attention=request.use_attention,
-        use_gradients=request.use_gradients
+        use_gradients=request.use_gradients,
     )
 
     html = explainer.generate_html_explanation(explanation)
 
     from fastapi.responses import HTMLResponse
+
     return HTMLResponse(content=html)
 
 
@@ -421,18 +403,15 @@ async def monitoring_health() -> Dict[str, Any]:
     return {
         "drift_detection": {
             "enabled": detector is not None and detector.enabled,
-            "healthy": detector is not None and detector.enabled and detector.baseline_established
+            "healthy": detector is not None and detector.enabled and detector.baseline_established,
         },
         "model_registry": {
             "enabled": registry is not None and registry.enabled,
-            "healthy": registry is not None and registry.enabled
+            "healthy": registry is not None and registry.enabled,
         },
         "explainability": {
             "enabled": explainer is not None and explainer.enabled,
-            "healthy": explainer is not None and explainer.enabled
+            "healthy": explainer is not None and explainer.enabled,
         },
-        "advanced_metrics": {
-            "enabled": collector is not None,
-            "healthy": collector is not None
-        }
+        "advanced_metrics": {"enabled": collector is not None, "healthy": collector is not None},
     }

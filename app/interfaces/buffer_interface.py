@@ -13,6 +13,7 @@ from datetime import datetime
 @dataclass
 class AnomalyEntry:
     """Anomaly detection entry"""
+
     id: str
     timestamp: datetime
     text: str
@@ -22,12 +23,32 @@ class AnomalyEntry:
     metadata: Dict[str, Any]
 
     def is_expired(self, ttl_seconds: int) -> bool:
-        """Check if entry has exceeded TTL"""
-        pass
+        """Check if entry has exceeded TTL
+
+        Args:
+            ttl_seconds: Time-to-live in seconds
+
+        Returns:
+            True if the entry is older than ttl_seconds
+        """
+        age_seconds = (datetime.now() - self.timestamp).total_seconds()
+        return age_seconds > ttl_seconds
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary"""
-        pass
+        """Convert to dictionary
+
+        Returns:
+            Dictionary representation of the anomaly entry
+        """
+        return {
+            "id": self.id,
+            "timestamp": self.timestamp.isoformat(),
+            "text": self.text,
+            "prediction": self.prediction,
+            "anomaly_score": self.anomaly_score,
+            "anomaly_type": self.anomaly_type,
+            "metadata": self.metadata,
+        }
 
 
 class IAnomalyBuffer(ABC):

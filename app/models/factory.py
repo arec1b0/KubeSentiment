@@ -74,24 +74,23 @@ class ModelFactory:
                 from app.models.onnx_sentiment import get_onnx_sentiment_analyzer
 
                 # Use provided path, or fall back to settings
-                onnx_path = model_path or settings.onnx_model_path or settings.onnx_model_path_default
+                onnx_path = (
+                    model_path or settings.onnx_model_path or settings.onnx_model_path_default
+                )
                 model = get_onnx_sentiment_analyzer(onnx_path)
                 _model_cache[cache_key] = model
                 return model
 
             else:
                 available = ModelFactory.get_available_backends()
-                raise UnsupportedBackendError(
-                    backend=backend,
-                    supported_backends=available
-                )
+                raise UnsupportedBackendError(backend=backend, supported_backends=available)
 
         except ImportError as e:
             logger.error(f"Failed to import backend {backend}: {e}")
             raise ModelInitializationError(
                 message=f"Backend '{backend}' is not available. "
                 f"Please ensure required dependencies are installed.",
-                backend=backend
+                backend=backend,
             ) from e
         except (UnsupportedBackendError, ModelInitializationError):
             # Re-raise our custom exceptions
@@ -99,8 +98,7 @@ class ModelFactory:
         except Exception as e:
             logger.error(f"Failed to create model for backend {backend}: {e}")
             raise ModelInitializationError(
-                message=f"Failed to initialize model for backend '{backend}': {e}",
-                backend=backend
+                message=f"Failed to initialize model for backend '{backend}': {e}", backend=backend
             ) from e
 
     @staticmethod

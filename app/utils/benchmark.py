@@ -156,9 +156,9 @@ class PerformanceBenchmark:
             avg_latency_ms=round(sum(latencies) / len(latencies), 2) if latencies else 0.0,
             min_latency_ms=round(min(latencies), 2) if latencies else 0.0,
             max_latency_ms=round(max(latencies), 2) if latencies else 0.0,
-            throughput_rps=round(len(texts) / (total_time / 1000), 2)
-            if total_time > 0
-            else float("inf"),
+            throughput_rps=(
+                round(len(texts) / (total_time / 1000), 2) if total_time > 0 else float("inf")
+            ),
             p50_latency_ms=round(percentiles["p50"], 2),
             p95_latency_ms=round(percentiles["p95"], 2),
             p99_latency_ms=round(percentiles["p99"], 2),
@@ -211,9 +211,9 @@ class PerformanceBenchmark:
             avg_latency_ms=round(sum(latencies) / len(latencies), 2) if latencies else 0.0,
             min_latency_ms=round(min(latencies), 2) if latencies else 0.0,
             max_latency_ms=round(max(latencies), 2) if latencies else 0.0,
-            throughput_rps=round(len(texts) / (total_time / 1000), 2)
-            if total_time > 0
-            else float("inf"),
+            throughput_rps=(
+                round(len(texts) / (total_time / 1000), 2) if total_time > 0 else float("inf")
+            ),
             p50_latency_ms=round(percentiles["p50"], 2),
             p95_latency_ms=round(percentiles["p95"], 2),
             p99_latency_ms=round(percentiles["p99"], 2),
@@ -268,9 +268,9 @@ class PerformanceBenchmark:
             avg_latency_ms=round(sum(latencies) / len(latencies), 2) if latencies else 0.0,
             min_latency_ms=round(min(latencies), 2) if latencies else 0.0,
             max_latency_ms=round(max(latencies), 2) if latencies else 0.0,
-            throughput_rps=round(len(texts) / (total_time / 1000), 2)
-            if total_time > 0
-            else float("inf"),
+            throughput_rps=(
+                round(len(texts) / (total_time / 1000), 2) if total_time > 0 else float("inf")
+            ),
             p50_latency_ms=round(percentiles["p50"], 2),
             p95_latency_ms=round(percentiles["p95"], 2),
             p99_latency_ms=round(percentiles["p99"], 2),

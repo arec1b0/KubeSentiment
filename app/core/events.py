@@ -76,8 +76,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             from app.services.mlflow_registry import initialize_model_registry
 
             registry = initialize_model_registry(
-                tracking_uri=settings.mlflow_tracking_uri,
-                enabled=settings.mlflow_enabled
+                tracking_uri=settings.mlflow_tracking_uri, enabled=settings.mlflow_enabled
             )
             logger.info("MLflow Model Registry initialized")
             app.state.model_registry = registry
@@ -92,7 +91,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             drift_detector = initialize_drift_detector(
                 window_size=settings.drift_window_size,
                 psi_threshold=settings.drift_psi_threshold,
-                enabled=settings.drift_detection_enabled
+                enabled=settings.drift_detection_enabled,
             )
             logger.info("Drift Detection initialized")
             app.state.drift_detector = drift_detector
@@ -105,9 +104,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             from app.services.explainability import initialize_explainability_engine
 
             explainer = initialize_explainability_engine(
-                model=model if 'model' in locals() else None,
+                model=model if "model" in locals() else None,
                 model_name=settings.model_name,
-                enabled=settings.explainability_enabled
+                enabled=settings.explainability_enabled,
             )
             logger.info("Explainability Engine initialized")
             app.state.explainability_engine = explainer
@@ -121,7 +120,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
             metrics_collector = initialize_advanced_metrics_collector(
                 enable_detailed_tracking=settings.advanced_metrics_detailed_tracking,
-                cost_per_1k_predictions=settings.advanced_metrics_cost_per_1k
+                cost_per_1k_predictions=settings.advanced_metrics_cost_per_1k,
             )
             logger.info("Advanced Metrics Collector initialized")
             app.state.metrics_collector = metrics_collector

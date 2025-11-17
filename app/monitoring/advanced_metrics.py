@@ -9,14 +9,13 @@ This module provides comprehensive metrics beyond basic observability:
 - Custom SLO/SLA tracking
 """
 
-import time
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import threading
 
-from prometheus_client import Counter, Histogram, Gauge, Summary
+from prometheus_client import Counter, Histogram, Gauge
 
 from app.core.logging import get_logger
 
@@ -26,6 +25,7 @@ logger = get_logger(__name__)
 @dataclass
 class PredictionRecord:
     """Record of a single prediction for analytics."""
+
     timestamp: datetime
     text_length: int
     confidence: float
@@ -64,7 +64,7 @@ class AdvancedMetricsCollector:
         self,
         enable_detailed_tracking: bool = True,
         history_window_hours: int = 24,
-        cost_per_1k_predictions: float = 0.01
+        cost_per_1k_predictions: float = 0.01,
     ):
         """
         Initialize advanced metrics collector.
@@ -109,83 +109,72 @@ class AdvancedMetricsCollector:
         """Initialize Prometheus metrics."""
         # Business metrics
         self.business_predictions_total = Counter(
-            'sentiment_business_predictions_total',
-            'Total predictions by label and confidence bucket',
-            ['label', 'confidence_bucket']
+            "sentiment_business_predictions_total",
+            "Total predictions by label and confidence bucket",
+            ["label", "confidence_bucket"],
         )
 
         self.business_confidence_distribution = Histogram(
-            'sentiment_business_confidence_distribution',
-            'Distribution of prediction confidence scores',
-            buckets=[0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1.0]
+            "sentiment_business_confidence_distribution",
+            "Distribution of prediction confidence scores",
+            buckets=[0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1.0],
         )
 
         # Quality metrics
         self.quality_low_confidence_total = Counter(
-            'sentiment_quality_low_confidence_total',
-            'Total low confidence predictions (<0.6)',
-            ['label']
+            "sentiment_quality_low_confidence_total",
+            "Total low confidence predictions (<0.6)",
+            ["label"],
         )
 
         self.quality_rejection_rate = Gauge(
-            'sentiment_quality_rejection_rate',
-            'Percentage of predictions below confidence threshold'
+            "sentiment_quality_rejection_rate",
+            "Percentage of predictions below confidence threshold",
         )
 
         # Cost metrics
-        self.cost_total_usd = Counter(
-            'sentiment_cost_total_usd',
-            'Total inference cost in USD'
-        )
+        self.cost_total_usd = Counter("sentiment_cost_total_usd", "Total inference cost in USD")
 
         self.cost_per_prediction_usd = Gauge(
-            'sentiment_cost_per_prediction_usd',
-            'Average cost per prediction in USD'
+            "sentiment_cost_per_prediction_usd", "Average cost per prediction in USD"
         )
 
         self.cost_monthly_burn_rate_usd = Gauge(
-            'sentiment_cost_monthly_burn_rate_usd',
-            'Estimated monthly cost burn rate in USD'
+            "sentiment_cost_monthly_burn_rate_usd", "Estimated monthly cost burn rate in USD"
         )
 
         # Performance metrics
         self.performance_latency_detailed = Histogram(
-            'sentiment_performance_latency_detailed_ms',
-            'Detailed latency distribution',
-            ['backend', 'cached'],
-            buckets=[1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000]
+            "sentiment_performance_latency_detailed_ms",
+            "Detailed latency distribution",
+            ["backend", "cached"],
+            buckets=[1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
         )
 
         self.performance_throughput = Gauge(
-            'sentiment_performance_throughput_rps',
-            'Current throughput in requests per second'
+            "sentiment_performance_throughput_rps", "Current throughput in requests per second"
         )
 
         # SLO metrics
         self.slo_availability = Gauge(
-            'sentiment_slo_availability_percent',
-            'Service availability percentage'
+            "sentiment_slo_availability_percent", "Service availability percentage"
         )
 
         self.slo_latency_p95_ms = Gauge(
-            'sentiment_slo_latency_p95_ms',
-            'P95 latency in milliseconds'
+            "sentiment_slo_latency_p95_ms", "P95 latency in milliseconds"
         )
 
         self.slo_latency_p99_ms = Gauge(
-            'sentiment_slo_latency_p99_ms',
-            'P99 latency in milliseconds'
+            "sentiment_slo_latency_p99_ms", "P99 latency in milliseconds"
         )
 
         # User engagement metrics
         self.engagement_unique_texts_total = Gauge(
-            'sentiment_engagement_unique_texts_total',
-            'Number of unique texts analyzed'
+            "sentiment_engagement_unique_texts_total", "Number of unique texts analyzed"
         )
 
         self.engagement_avg_text_length = Gauge(
-            'sentiment_engagement_avg_text_length',
-            'Average text length in characters'
+            "sentiment_engagement_avg_text_length", "Average text length in characters"
         )
 
     def record_prediction(
@@ -196,7 +185,7 @@ class AdvancedMetricsCollector:
         latency_ms: float,
         backend: str = "pytorch",
         cached: bool = False,
-        text_hash: Optional[str] = None
+        text_hash: Optional[str] = None,
     ) -> None:
         """
         Record a prediction for metrics tracking.
@@ -221,7 +210,7 @@ class AdvancedMetricsCollector:
                 latency_ms=latency_ms,
                 backend=backend,
                 cached=cached,
-                cost_estimate=cost
+                cost_estimate=cost,
             )
 
             # Store in history
@@ -257,16 +246,14 @@ class AdvancedMetricsCollector:
 
             # Update Prometheus metrics
             self.business_predictions_total.labels(
-                label=prediction,
-                confidence_bucket=confidence_bucket
+                label=prediction, confidence_bucket=confidence_bucket
             ).inc()
 
             self.business_confidence_distribution.observe(confidence)
 
-            self.performance_latency_detailed.labels(
-                backend=backend,
-                cached=str(cached)
-            ).observe(latency_ms)
+            self.performance_latency_detailed.labels(backend=backend, cached=str(cached)).observe(
+                latency_ms
+            )
 
             self.cost_total_usd.inc(cost)
 
@@ -315,7 +302,7 @@ class AdvancedMetricsCollector:
                 "avg_confidence": round(avg_confidence, 4),
                 "high_quality_ratio": round(high_quality_ratio, 4),
                 "predictions_by_label": dict(self.predictions_by_label),
-                "predictions_by_confidence": dict(self.predictions_by_confidence_bucket)
+                "predictions_by_confidence": dict(self.predictions_by_confidence_bucket),
             }
 
     def get_quality_metrics(self) -> Dict[str, Any]:
@@ -353,7 +340,7 @@ class AdvancedMetricsCollector:
                 "confidence_std": round(confidence_std, 4),
                 "confidence_p50": round(p50_confidence, 4),
                 "confidence_p95": round(p95_confidence, 4),
-                "confidence_p99": round(p99_confidence, 4)
+                "confidence_p99": round(p99_confidence, 4),
             }
 
     def get_cost_metrics(self) -> Dict[str, Any]:
@@ -371,14 +358,17 @@ class AdvancedMetricsCollector:
 
             # Estimated monthly cost (based on last 24h)
             recent_cost = sum(
-                r.cost_estimate for r in self.prediction_history
+                r.cost_estimate
+                for r in self.prediction_history
                 if r.timestamp > datetime.utcnow() - timedelta(hours=24)
             )
             monthly_estimate = recent_cost * 30
 
             # Cache efficiency (cost savings)
             cached_count = len([r for r in self.prediction_history if r.cached])
-            cache_savings_pct = (cached_count / total_predictions * 100) if total_predictions else 0.0
+            cache_savings_pct = (
+                (cached_count / total_predictions * 100) if total_predictions else 0.0
+            )
 
             # Update Prometheus gauges
             self.cost_per_prediction_usd.set(cost_per_pred)
@@ -391,7 +381,7 @@ class AdvancedMetricsCollector:
                 "total_predictions": total_predictions,
                 "cached_predictions": cached_count,
                 "cache_savings_percent": round(cache_savings_pct, 2),
-                "cost_by_day": {k: round(v, 6) for k, v in self.cost_by_day.items()}
+                "cost_by_day": {k: round(v, 6) for k, v in self.cost_by_day.items()},
             }
 
     def get_performance_metrics(self) -> Dict[str, Any]:
@@ -420,12 +410,13 @@ class AdvancedMetricsCollector:
                     latency_by_backend[backend] = {
                         "avg": round(sum(latency_list) / len(latency_list), 2),
                         "p95": round(self._calculate_percentile(latency_list, 95), 2),
-                        "count": len(latency_list)
+                        "count": len(latency_list),
                     }
 
             # Throughput (requests per second over last minute)
             recent_predictions = [
-                r for r in self.prediction_history
+                r
+                for r in self.prediction_history
                 if r.timestamp > datetime.utcnow() - timedelta(seconds=60)
             ]
             throughput = len(recent_predictions) / 60.0
@@ -442,14 +433,14 @@ class AdvancedMetricsCollector:
                 "latency_p95_ms": round(p95, 2),
                 "latency_p99_ms": round(p99, 2),
                 "latency_by_backend": latency_by_backend,
-                "throughput_rps": round(throughput, 2)
+                "throughput_rps": round(throughput, 2),
             }
 
     def get_slo_compliance(
         self,
         availability_target: float = 99.9,
         latency_p95_target_ms: float = 100,
-        latency_p99_target_ms: float = 250
+        latency_p99_target_ms: float = 250,
     ) -> Dict[str, Any]:
         """
         Check SLO compliance.
@@ -489,18 +480,18 @@ class AdvancedMetricsCollector:
                 "availability": {
                     "current": round(availability, 2),
                     "target": availability_target,
-                    "ok": availability_ok
+                    "ok": availability_ok,
                 },
                 "latency_p95": {
                     "current_ms": round(p95, 2),
                     "target_ms": latency_p95_target_ms,
-                    "ok": p95_ok
+                    "ok": p95_ok,
                 },
                 "latency_p99": {
                     "current_ms": round(p99, 2),
                     "target_ms": latency_p99_target_ms,
-                    "ok": p99_ok
-                }
+                    "ok": p99_ok,
+                },
             }
 
     def _calculate_percentile(self, data: List[float], percentile: int) -> float:
@@ -517,7 +508,7 @@ class AdvancedMetricsCollector:
             return 0.0
         mean = sum(data) / len(data)
         variance = sum((x - mean) ** 2 for x in data) / len(data)
-        return variance ** 0.5
+        return variance**0.5
 
 
 # Global metrics collector instance
@@ -530,13 +521,12 @@ def get_advanced_metrics_collector() -> Optional[AdvancedMetricsCollector]:
 
 
 def initialize_advanced_metrics_collector(
-    enable_detailed_tracking: bool = True,
-    cost_per_1k_predictions: float = 0.01
+    enable_detailed_tracking: bool = True, cost_per_1k_predictions: float = 0.01
 ) -> AdvancedMetricsCollector:
     """Initialize the global advanced metrics collector instance."""
     global _metrics_collector
     _metrics_collector = AdvancedMetricsCollector(
         enable_detailed_tracking=enable_detailed_tracking,
-        cost_per_1k_predictions=cost_per_1k_predictions
+        cost_per_1k_predictions=cost_per_1k_predictions,
     )
     return _metrics_collector

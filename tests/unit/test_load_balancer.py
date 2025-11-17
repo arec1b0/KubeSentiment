@@ -401,4 +401,3 @@ class TestSingleton:
         metrics1 = get_load_metrics()
         metrics2 = get_load_metrics()
         assert metrics1 is metrics2
-

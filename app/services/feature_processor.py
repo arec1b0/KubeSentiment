@@ -66,9 +66,7 @@ class FeatureProcessor:
             batch_logger: A contextual logger for logging batch-specific information.
         """
         try:
-            feature_dicts = [
-                feature_engineer.extract_features(text) for text in texts
-            ]
+            feature_dicts = [feature_engineer.extract_features(text) for text in texts]
             feature_df = pd.DataFrame(feature_dicts).fillna(0)
 
             available_features = [
@@ -86,9 +84,7 @@ class FeatureProcessor:
                     scaler_samples_seen=online_scaler.n_samples_seen_,
                 )
             else:
-                batch_logger.warning(
-                    "No numerical features available for normalization"
-                )
+                batch_logger.warning("No numerical features available for normalization")
         except Exception as fe_e:
             batch_logger.error(
                 "Feature engineering/normalization failed",

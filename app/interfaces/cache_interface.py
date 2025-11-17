@@ -11,6 +11,7 @@ from enum import Enum
 
 class CacheType(Enum):
     """Cache types for namespacing"""
+
     PREDICTION = "prediction"
     FEATURE = "feature"
     MODEL = "model"

@@ -57,14 +57,13 @@ class MessageBatch:
         texts: List[str] = []
         message_ids: List[str] = []
         for message in self._messages:
-            text = (
-                message.get("text", "") if isinstance(message, dict) else str(message)
-            )
-            message_id = (
-                message.get("id")
-                if isinstance(message, dict) and message.get("id") is not None
-                else f"{time.time_ns()}"
-            )
+            text = message.get("text", "") if isinstance(message, dict) else str(message)
+            # Ensure message_id is always a string
+            if isinstance(message, dict) and message.get("id") is not None:
+                message_id = str(message.get("id"))
+            else:
+                message_id = f"{time.time_ns()}"
+
             texts.append(text)
             message_ids.append(message_id)
         return texts, message_ids

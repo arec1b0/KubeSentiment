@@ -340,10 +340,7 @@ class TestBoundedAnomalyBuffer:
 
         # Add entries concurrently from multiple threads
         with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [
-                executor.submit(add_entries, i * 10, 10)
-                for i in range(10)
-            ]
+            futures = [executor.submit(add_entries, i * 10, 10) for i in range(10)]
             results = [f.result() for f in futures]
 
         # Flatten the list of IDs
@@ -378,10 +375,7 @@ class TestBoundedAnomalyBuffer:
 
         # Read entries concurrently
         with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [
-                executor.submit(read_entries, ids)
-                for _ in range(5)
-            ]
+            futures = [executor.submit(read_entries, ids) for _ in range(5)]
             results = [f.result() for f in futures]
 
         # All reads should return the same entries
@@ -433,6 +427,7 @@ class TestGetAnomalyBuffer:
     def teardown_method(self):
         """Reset the singleton after each test."""
         import app.services.anomaly_buffer
+
         app.services.anomaly_buffer._anomaly_buffer = None
 
     @patch("app.services.anomaly_buffer.get_settings")

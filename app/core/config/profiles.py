@@ -78,32 +78,26 @@ class DevelopmentProfile(ConfigProfile):
             "MLOPS_DEBUG": "true",
             "MLOPS_WORKERS": "1",
             "MLOPS_ENVIRONMENT": "development",
-
             # Logging and monitoring
             "MLOPS_LOG_LEVEL": "DEBUG",
             "MLOPS_ENABLE_METRICS": "true",
             "MLOPS_ENABLE_TRACING": "false",
-
             # External services (disabled by default in dev)
             "MLOPS_REDIS_ENABLED": "false",
             "MLOPS_KAFKA_ENABLED": "false",
             "MLOPS_VAULT_ENABLED": "false",
             "MLOPS_DATA_LAKE_ENABLED": "false",
-
             # MLOps features (disabled for faster startup)
             "MLOPS_MLFLOW_ENABLED": "false",
             "MLOPS_DRIFT_DETECTION_ENABLED": "false",
             "MLOPS_EXPLAINABILITY_ENABLED": "false",
-
             # Performance features (simplified for dev)
             "MLOPS_ASYNC_BATCH_ENABLED": "false",
             "MLOPS_ANOMALY_BUFFER_ENABLED": "false",
-
             # Security (relaxed for development)
             "MLOPS_API_KEY": "",
             "MLOPS_ALLOWED_ORIGINS": "*",
             "MLOPS_CORS_ORIGINS": "*",
-
             # Model configuration (smaller cache for dev)
             "MLOPS_PREDICTION_CACHE_MAX_SIZE": "100",
             "MLOPS_MAX_TEXT_LENGTH": "512",
@@ -135,39 +129,32 @@ class StagingProfile(ConfigProfile):
             "MLOPS_DEBUG": "false",
             "MLOPS_WORKERS": "2",
             "MLOPS_ENVIRONMENT": "staging",
-
             # Logging and monitoring
             "MLOPS_LOG_LEVEL": "INFO",
             "MLOPS_ENABLE_METRICS": "true",
             "MLOPS_ENABLE_TRACING": "true",
             "MLOPS_TRACING_BACKEND": "jaeger",
-
             # External services (enabled for realistic testing)
             "MLOPS_REDIS_ENABLED": "true",
             "MLOPS_KAFKA_ENABLED": "false",  # Optional in staging
             "MLOPS_VAULT_ENABLED": "true",
             "MLOPS_DATA_LAKE_ENABLED": "false",
-
             # MLOps features (enabled for testing)
             "MLOPS_MLFLOW_ENABLED": "true",
             "MLOPS_DRIFT_DETECTION_ENABLED": "true",
             "MLOPS_EXPLAINABILITY_ENABLED": "true",
-
             # Performance features
             "MLOPS_ASYNC_BATCH_ENABLED": "true",
             "MLOPS_ANOMALY_BUFFER_ENABLED": "true",
             "MLOPS_ASYNC_BATCH_SIZE": "50",
             "MLOPS_ASYNC_BATCH_TIMEOUT": "5.0",
-
             # Security (enforced but with staging credentials)
             "MLOPS_ALLOWED_ORIGINS": "https://staging.example.com,https://staging-app.example.com",
             "MLOPS_CORS_ORIGINS": "https://staging.example.com",
             "MLOPS_MAX_REQUEST_TIMEOUT": "60",
-
             # Model configuration (moderate caching)
             "MLOPS_PREDICTION_CACHE_MAX_SIZE": "1000",
             "MLOPS_MAX_TEXT_LENGTH": "512",
-
             # Redis configuration
             "MLOPS_REDIS_MAX_CONNECTIONS": "50",
             "MLOPS_REDIS_PREDICTION_CACHE_TTL": "3600",
@@ -200,51 +187,42 @@ class ProductionProfile(ConfigProfile):
             "MLOPS_DEBUG": "false",
             "MLOPS_WORKERS": "4",
             "MLOPS_ENVIRONMENT": "production",
-
             # Logging and monitoring (less verbose, more efficient)
             "MLOPS_LOG_LEVEL": "WARNING",
             "MLOPS_ENABLE_METRICS": "true",
             "MLOPS_ENABLE_TRACING": "true",
             "MLOPS_TRACING_BACKEND": "otlp",
             "MLOPS_METRICS_CACHE_TTL": "300",
-
             # External services (all enabled for production)
             "MLOPS_REDIS_ENABLED": "true",
             "MLOPS_KAFKA_ENABLED": "true",
             "MLOPS_VAULT_ENABLED": "true",
             "MLOPS_DATA_LAKE_ENABLED": "true",
-
             # MLOps features (fully enabled)
             "MLOPS_MLFLOW_ENABLED": "true",
             "MLOPS_DRIFT_DETECTION_ENABLED": "true",
             "MLOPS_EXPLAINABILITY_ENABLED": "true",
             "MLOPS_DRIFT_CHECK_INTERVAL": "3600",
-
             # Performance features (optimized for production load)
             "MLOPS_ASYNC_BATCH_ENABLED": "true",
             "MLOPS_ANOMALY_BUFFER_ENABLED": "true",
             "MLOPS_ASYNC_BATCH_SIZE": "100",
             "MLOPS_ASYNC_BATCH_TIMEOUT": "2.0",
             "MLOPS_ASYNC_MAX_WORKERS": "10",
-
             # Security (strict)
             "MLOPS_MAX_REQUEST_TIMEOUT": "30",
-
             # Model configuration (large cache for performance)
             "MLOPS_PREDICTION_CACHE_MAX_SIZE": "10000",
             "MLOPS_MAX_TEXT_LENGTH": "512",
             "MLOPS_ENABLE_FEATURE_ENGINEERING": "true",
-
             # Redis configuration (production-optimized)
             "MLOPS_REDIS_MAX_CONNECTIONS": "100",
             "MLOPS_REDIS_PREDICTION_CACHE_TTL": "7200",
             "MLOPS_REDIS_FEATURE_CACHE_TTL": "3600",
-
             # Kafka configuration
             "MLOPS_KAFKA_CONSUMER_THREADS": "8",
             "MLOPS_KAFKA_BATCH_SIZE": "200",
             "MLOPS_KAFKA_MAX_POLL_RECORDS": "1000",
-
             # Data Lake configuration
             "MLOPS_DATA_LAKE_BATCH_SIZE": "1000",
             "MLOPS_DATA_LAKE_FLUSH_INTERVAL": "300",
@@ -273,21 +251,21 @@ class LocalProfile(ConfigProfile):
         overrides = dev_profile.get_overrides().copy()
 
         # Override with local-specific settings
-        overrides.update({
-            "MLOPS_ENVIRONMENT": "local",
-            "MLOPS_HOST": "127.0.0.1",  # Localhost only
-            "MLOPS_WORKERS": "1",
-
-            # Ensure all external services are disabled
-            "MLOPS_REDIS_ENABLED": "false",
-            "MLOPS_KAFKA_ENABLED": "false",
-            "MLOPS_VAULT_ENABLED": "false",
-            "MLOPS_DATA_LAKE_ENABLED": "false",
-            "MLOPS_MLFLOW_ENABLED": "false",
-
-            # Minimal logging for cleaner output
-            "MLOPS_LOG_LEVEL": "INFO",
-        })
+        overrides.update(
+            {
+                "MLOPS_ENVIRONMENT": "local",
+                "MLOPS_HOST": "127.0.0.1",  # Localhost only
+                "MLOPS_WORKERS": "1",
+                # Ensure all external services are disabled
+                "MLOPS_REDIS_ENABLED": "false",
+                "MLOPS_KAFKA_ENABLED": "false",
+                "MLOPS_VAULT_ENABLED": "false",
+                "MLOPS_DATA_LAKE_ENABLED": "false",
+                "MLOPS_MLFLOW_ENABLED": "false",
+                # Minimal logging for cleaner output
+                "MLOPS_LOG_LEVEL": "INFO",
+            }
+        )
 
         return overrides
 
@@ -363,10 +341,7 @@ def load_profile(profile_name: Optional[str] = None) -> Dict[str, Any]:
 
     if profile is None:
         available = ", ".join(ProfileRegistry.get_available_profiles().keys())
-        raise ValueError(
-            f"Unknown profile '{profile_name}'. "
-            f"Available profiles: {available}"
-        )
+        raise ValueError(f"Unknown profile '{profile_name}'. " f"Available profiles: {available}")
 
     return profile.get_overrides()
 
@@ -378,7 +353,4 @@ def get_profile_info() -> Dict[str, Dict[str, str]]:
         Dictionary with profile information including name and description.
     """
     profiles = ProfileRegistry.get_available_profiles()
-    return {
-        name: {"name": name, "description": desc}
-        for name, desc in profiles.items()
-    }
+    return {name: {"name": name, "description": desc} for name, desc in profiles.items()}

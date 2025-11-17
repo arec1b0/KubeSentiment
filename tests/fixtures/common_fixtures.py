@@ -17,6 +17,7 @@ from tests.fixtures.common_mocks import (
 try:
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
+
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False

@@ -7,7 +7,6 @@ provides similar functionality to the PyTorch implementation but with improved
 performance characteristics.
 """
 
-import os
 import time
 from functools import lru_cache
 from pathlib import Path
@@ -348,8 +347,7 @@ class ONNXSentimentAnalyzer:
 
         # Clean and truncate texts
         cleaned_texts = [
-            t.strip()[: self.settings.max_text_length] if t and t.strip() else ""
-            for t in texts
+            t.strip()[: self.settings.max_text_length] if t and t.strip() else "" for t in texts
         ]
 
         # Filter out empty texts and track their indices

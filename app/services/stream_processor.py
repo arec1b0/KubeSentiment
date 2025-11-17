@@ -30,6 +30,7 @@ except Exception:  # pragma: no cover - fallback stub for lightweight tests
 
     class IStreamProcessor:  # type: ignore[no-redef]
         """Fallback interface for lightweight tests"""
+
         pass
 
 
@@ -136,17 +137,11 @@ class StreamProcessor(IStreamProcessor):
 
         try:
             self.online_scaler.load_state(str(self.scaler_state_path))
-            self.logger.info(
-                "Loaded existing scaler state", path=str(self.scaler_state_path)
-            )
+            self.logger.info("Loaded existing scaler state", path=str(self.scaler_state_path))
         except Exception as e:
-            self.logger.info(
-                "No existing scaler state found, starting fresh", error=str(e)
-            )
+            self.logger.info("No existing scaler state found, starting fresh", error=str(e))
 
-    async def predict_async(
-        self, text: str, request_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def predict_async(self, text: str, request_id: Optional[str] = None) -> Dict[str, Any]:
         """Adds a prediction request to the batch queue and awaits the result.
 
         This method queues the request and returns a future that will be
@@ -238,10 +233,7 @@ class StreamProcessor(IStreamProcessor):
             should_process = (
                 size_trigger
                 or timeout_trigger
-                or (
-                    min_size_trigger
-                    and wait_time_ms >= self.config.max_wait_time_ms * 0.5
-                )
+                or (min_size_trigger and wait_time_ms >= self.config.max_wait_time_ms * 0.5)
             )
 
             if should_process:
@@ -336,9 +328,11 @@ class StreamProcessor(IStreamProcessor):
             "Batch processed successfully",
             batch_size=len(batch),
             processing_time_ms=round(processing_time, 2),
-            throughput_requests_per_sec=round(len(batch) / (processing_time / 1000), 2)
-            if processing_time > 0
-            else float("inf"),
+            throughput_requests_per_sec=(
+                round(len(batch) / (processing_time / 1000), 2)
+                if processing_time > 0
+                else float("inf")
+            ),
             cache_hits=cache_hits,
             cache_hit_rate=round(cache_hits / len(batch), 2) if len(batch) > 0 else 0.0,
         )
@@ -367,9 +361,11 @@ class StreamProcessor(IStreamProcessor):
             "is_processing": self._processing,
             "cache_hits": self._stats["cache_hits"],
             "cache_hit_rate": round(
-                self._stats["cache_hits"] / self._stats["total_requests"]
-                if self._stats["total_requests"] > 0
-                else 0.0,
+                (
+                    self._stats["cache_hits"] / self._stats["total_requests"]
+                    if self._stats["total_requests"] > 0
+                    else 0.0
+                ),
                 2,
             ),
         }
@@ -408,9 +404,7 @@ class StreamProcessor(IStreamProcessor):
                 pass
         logger.info("Stream processor shutdown complete")
 
-    async def predict_async_batch(
-        self, texts: List[str], batch_id: str
-    ) -> List[Dict[str, Any]]:
+    async def predict_async_batch(self, texts: List[str], batch_id: str) -> List[Dict[str, Any]]:
         """Processes a batch of texts asynchronously for high throughput.
 
         This method is optimized for processing pre-formed batches of requests,

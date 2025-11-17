@@ -540,10 +540,7 @@ class TestBenchmarkIntegration:
         texts = ["test"] * 10
 
         # Run same benchmark multiple times
-        results = [
-            benchmark.benchmark_single_predictions(texts, warmup_runs=0)
-            for _ in range(3)
-        ]
+        results = [benchmark.benchmark_single_predictions(texts, warmup_runs=0) for _ in range(3)]
 
         # Results should be similar (within reasonable variance)
         avg_latencies = [r.avg_latency_ms for r in results]

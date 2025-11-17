@@ -6,6 +6,7 @@ performance, and status of the application and its components. These
 endpoints are essential for observability and are typically used by monitoring
 systems, orchestration platforms (like Kubernetes), and for debugging.
 """
+
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -282,7 +283,6 @@ async def get_async_batch_metrics(
 
 
 # Import and include the new monitoring routes for advanced features
-from app.api.routes.monitoring_routes import router as advanced_monitoring_router
 
 # Note: The advanced monitoring router is included here for backwards compatibility
 # It provides additional endpoints for drift detection, MLflow registry, explainability, and advanced KPIs

@@ -8,7 +8,6 @@ file access. It's designed to work with persistent volumes in Kubernetes environ
 
 import hashlib
 import json
-import os
 import shutil
 import time
 from pathlib import Path

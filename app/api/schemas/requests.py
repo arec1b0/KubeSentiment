@@ -122,15 +122,11 @@ class BatchTextInput(BaseModel):
         max_texts = 1000  # Reasonable batch limit
 
         if len(v) > max_texts:
-            raise ValueError(
-                f"Batch size of {len(v)} exceeds the maximum of {max_texts}."
-            )
+            raise ValueError(f"Batch size of {len(v)} exceeds the maximum of {max_texts}.")
 
         for i, text in enumerate(v):
             if not text or not text.strip():
-                raise ValueError(
-                    f"Text at index {i} is empty or contains only whitespace."
-                )
+                raise ValueError(f"Text at index {i} is empty or contains only whitespace.")
             if len(text) > settings.max_text_length:
                 raise ValueError(
                     f"Text at index {i} with length {len(text)} exceeds the maximum allowed length of {settings.max_text_length}."

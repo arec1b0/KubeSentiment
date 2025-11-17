@@ -8,7 +8,7 @@ responses, ensuring that API clients receive clear and predictable error informa
 """
 
 from enum import Enum
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import HTTPException
 
@@ -97,7 +97,6 @@ class ErrorMessages:
         ErrorCode.TEXT_INVALID_CHARACTERS: "The input text contains invalid or unsupported characters.",
         ErrorCode.BATCH_SIZE_EXCEEDED: "The batch size exceeds the maximum allowed limit.",
         ErrorCode.EMPTY_BATCH: "Batch processing request cannot be empty.",
-
         # Model errors
         ErrorCode.MODEL_NOT_LOADED: "The sentiment analysis model is currently not loaded or unavailable.",
         ErrorCode.MODEL_INFERENCE_FAILED: "An unexpected error occurred during the model inference process.",
@@ -109,14 +108,12 @@ class ErrorMessages:
         ErrorCode.INVALID_MODEL_PATH: "The specified model path is invalid or does not exist.",
         ErrorCode.MODEL_EXPORT_FAILED: "Failed to export the model to the requested format.",
         ErrorCode.UNSUPPORTED_BACKEND: "The requested ML backend is not supported by this service.",
-
         # Security and authentication errors
         ErrorCode.INVALID_MODEL_NAME: "The requested model name is invalid, not found, or not permitted.",
         ErrorCode.UNAUTHORIZED_ACCESS: "Unauthorized access. A valid authentication token is required.",
         ErrorCode.VAULT_AUTH_FAILED: "Failed to authenticate with HashiCorp Vault. Check credentials and configuration.",
         ErrorCode.K8S_AUTH_FAILED: "Kubernetes authentication failed. Check service account and RBAC permissions.",
         ErrorCode.INVALID_SECRETS_CONFIG: "Secrets configuration is invalid or missing required parameters.",
-
         # System and service errors
         ErrorCode.INTERNAL_SERVER_ERROR: "An unexpected internal server error occurred.",
         ErrorCode.SERVICE_UNAVAILABLE: "The service is temporarily unavailable. Please try again later.",
@@ -127,12 +124,10 @@ class ErrorMessages:
         ErrorCode.CIRCUIT_BREAKER_OPEN: "Circuit breaker is open. The service is temporarily unavailable due to detected failures.",
         ErrorCode.HEALTH_CHECK_FAILED: "Health check failed for one or more service components.",
         ErrorCode.TRACING_ERROR: "Distributed tracing operation failed. This should not affect service functionality.",
-
         # Configuration errors
         ErrorCode.SECURITY_CONFIG_ERROR: "Security configuration is invalid or missing required settings.",
         ErrorCode.MODEL_CONFIG_ERROR: "Model configuration is invalid or contains unsupported parameters.",
         ErrorCode.SETTINGS_VALIDATION_ERROR: "Application settings validation failed. Check environment variables and config files.",
-
         # Feature processing errors
         ErrorCode.FEATURE_MISMATCH: "Input features don't match the expected configuration or dimensions.",
         ErrorCode.UNFITTED_SCALER: "Cannot use an unfitted scaler. The scaler must be fitted on training data first.",
@@ -158,7 +153,7 @@ class ErrorMessages:
 
 def create_error_response(
     error_code: ErrorCode,
-    detail: str = None,
+    detail: Optional[str] = None,
     status_code: int = 400,
     **additional_context,
 ) -> Dict[str, Any]:
@@ -181,7 +176,7 @@ def create_error_response(
         JSON serialization.
     """
     error_message = ErrorMessages.get_message(error_code)
-    response = {
+    response: Dict[str, Any] = {
         "error_code": error_code.value,
         "error_message": error_message,
         "status_code": status_code,
@@ -195,7 +190,7 @@ def create_error_response(
 
 def raise_validation_error(
     error_code: ErrorCode,
-    detail: str = None,
+    detail: Optional[str] = None,
     status_code: int = 400,
     **additional_context,
 ) -> None:

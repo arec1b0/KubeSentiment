@@ -11,6 +11,7 @@ from enum import Enum
 
 class JobPriority(Enum):
     """Priority levels for batch jobs"""
+
     HIGH = 1
     MEDIUM = 2
     LOW = 3
@@ -18,6 +19,7 @@ class JobPriority(Enum):
 
 class JobStatus(Enum):
     """Batch job status"""
+
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"

@@ -102,15 +102,17 @@ class TestCorrelationIdMiddleware:
         """
         test_settings = Settings(debug=True, api_key=None, allowed_origins=["*"])
 
-        with patch("app.config.get_settings", return_value=test_settings), patch(
-            "app.main.get_settings", return_value=test_settings
-        ), patch("app.ml.sentiment.pipeline") as mock_pipeline:
+        with (
+            patch("app.config.get_settings", return_value=test_settings),
+            patch("app.main.get_settings", return_value=test_settings),
+            patch("app.ml.sentiment.pipeline") as mock_pipeline,
+        ):
             mock_model = Mock()
-                    mock_model.return_value = [{"label": "POSITIVE", "score": 0.95}]
-                    mock_pipeline.return_value = mock_model
+            mock_model.return_value = [{"label": "POSITIVE", "score": 0.95}]
+            mock_pipeline.return_value = mock_model
 
-                    app = create_app()
-                    yield TestClient(app)
+            app = create_app()
+            yield TestClient(app)
 
     def test_correlation_id_generated_automatically(self, client):
         """Tests that a correlation ID is automatically generated if none is provided."""
