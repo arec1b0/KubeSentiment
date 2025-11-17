@@ -5,6 +5,9 @@ generated, propagated through middleware, and included in structured logs,
 both for successful requests and error conditions.
 """
 
+import pytest
+
+
 import json
 import uuid
 from io import StringIO
@@ -25,6 +28,7 @@ from app.core.logging import (
 from app.main import create_app
 
 
+@pytest.mark.unit
 class TestCorrelationIdManagement:
     """A test suite for the correlation ID context management functions.
 
@@ -80,6 +84,7 @@ class TestCorrelationIdManagement:
             clear_correlation_id()
 
 
+@pytest.mark.unit
 class TestCorrelationIdMiddleware:
     """A test suite for the `CorrelationIdMiddleware`.
 
@@ -158,6 +163,7 @@ class TestCorrelationIdMiddleware:
         assert response.headers["X-Correlation-ID"] == test_correlation_id
 
 
+@pytest.mark.unit
 class TestStructuredLogging:
     """A test suite for the structured logging functionality.
 
@@ -251,6 +257,7 @@ class TestStructuredLogging:
             clear_correlation_id()
 
 
+@pytest.mark.unit
 class TestLoggingIntegration:
     """A test suite for end-to-end logging integration.
 

@@ -7,6 +7,9 @@ codes and detail messages.
 """
 
 import pytest
+
+
+import pytest
 from fastapi import HTTPException
 
 from app.utils.error_handlers import (
@@ -17,6 +20,7 @@ from app.utils.error_handlers import (
 )
 
 
+@pytest.mark.unit
 class TestErrorHandlers:
     """A test suite for the error handling utility functions."""
 

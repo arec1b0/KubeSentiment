@@ -6,6 +6,9 @@ service, and API layers, and confirms that the dependency injection system
 correctly provides service instances.
 """
 
+import pytest
+
+
 from unittest.mock import Mock, patch
 
 import pytest
@@ -18,6 +21,7 @@ from app.models.pytorch_sentiment import get_sentiment_analyzer
 from app.services.prediction import PredictionService
 
 
+@pytest.mark.unit
 class TestPredictionService:
     """A test suite for the `PredictionService` class.
 
@@ -102,6 +106,7 @@ class TestPredictionService:
         mock_model.get_model_info.assert_called_once()
 
 
+@pytest.mark.unit
 class TestDependencyInjectionFunctions:
     """A test suite for the dependency injection functions.
 
@@ -141,6 +146,7 @@ class TestDependencyInjectionFunctions:
         assert get_prediction_service.__name__ == "get_prediction_service"
 
 
+@pytest.mark.unit
 class TestTestingCapabilities:
     """A test suite to demonstrate the testability of the service-based architecture.
 
@@ -193,6 +199,7 @@ class TestTestingCapabilities:
         mock_service.predict.assert_called_once_with("Test text")
 
 
+@pytest.mark.unit
 class TestModelFactoryIntegration:
     """A test suite for the `ModelFactory` and its integration with the service layer.
 
@@ -244,6 +251,7 @@ class TestModelFactoryIntegration:
         # We don't assert on this since it varies by environment
 
 
+@pytest.mark.unit
 class TestServiceLayerIntegration:
     """A test suite for the end-to-end integration of the service and model layers.
 

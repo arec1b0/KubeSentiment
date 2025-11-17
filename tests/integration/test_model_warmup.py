@@ -5,6 +5,9 @@ Tests the ModelWarmupManager and WarmupHealthCheck classes,
 including model warm-up operations, health checks, and singleton behavior.
 """
 
+import pytest
+
+
 import asyncio
 from typing import Any, Dict
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -69,6 +72,7 @@ class MockAsyncModel:
         return {"label": "positive", "score": 0.95}
 
 
+@pytest.mark.integration
 class TestModelWarmupManager:
     """Tests for the ModelWarmupManager class."""
 
@@ -297,6 +301,7 @@ class TestModelWarmupManager:
         assert "avg_inference_time_ms" in stats_after["stats"]
 
 
+@pytest.mark.integration
 class TestWarmupHealthCheck:
     """Tests for the WarmupHealthCheck class."""
 
@@ -379,6 +384,7 @@ class TestWarmupHealthCheck:
         assert "avg_inference_time_ms" in perf
 
 
+@pytest.mark.integration
 class TestGetWarmupManager:
     """Tests for the get_warmup_manager singleton function."""
 
@@ -415,6 +421,7 @@ class TestGetWarmupManager:
         assert manager1 is not manager2
 
 
+@pytest.mark.integration
 class TestModelWarmupIntegration:
     """Integration tests for model warmup functionality."""
 

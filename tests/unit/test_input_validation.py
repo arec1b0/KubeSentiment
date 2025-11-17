@@ -6,6 +6,9 @@ security checks, API endpoint handling of invalid data, and various edge cases
 to ensure robust error handling and security.
 """
 
+import pytest
+
+
 from unittest.mock import Mock, patch
 
 import pytest
@@ -24,6 +27,7 @@ from app.utils.exceptions import (
 from pydantic import ValidationError as PydanticValidationError
 
 
+@pytest.mark.unit
 class TestTextInputValidation:
     """A test suite for the `TextInput` Pydantic model validation.
 
@@ -101,6 +105,7 @@ class TestTextInputValidation:
         assert valid_input.text == exact_length_text
 
 
+@pytest.mark.unit
 class TestModelValidation:
     """A test suite for model name validation and security checks.
 
@@ -147,6 +152,7 @@ class TestModelValidation:
         assert analyzer is not None
 
 
+@pytest.mark.unit
 class TestAPIEndpointValidation:
     """A test suite for input validation at the API endpoint layer.
 
@@ -227,6 +233,7 @@ class TestAPIEndpointValidation:
             assert "MODEL_NOT_LOADED" in response.json()["error_code"]
 
 
+@pytest.mark.unit
 class TestSecurityInputValidation:
     """A test suite for security-related input validation.
 
@@ -274,6 +281,7 @@ class TestSecurityInputValidation:
         assert valid_input.text == text_with_controls
 
 
+@pytest.mark.unit
 class TestEdgeCases:
     """A test suite for various edge cases and boundary conditions.
 
@@ -313,6 +321,7 @@ class TestEdgeCases:
             assert valid_input.text == text
 
 
+@pytest.mark.unit
 class TestPredictionServiceValidation:
     """A test suite for the `PredictionService` validation logic."""
 

@@ -5,6 +5,9 @@ Tests the BoundedAnomalyBuffer class and AnomalyEntry dataclass,
 including thread safety, TTL expiration, size limits, and singleton behavior.
 """
 
+import pytest
+
+
 import time
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock, patch
@@ -18,6 +21,7 @@ from app.services.anomaly_buffer import (
 )
 
 
+@pytest.mark.unit
 class TestAnomalyEntry:
     """Tests for the AnomalyEntry dataclass."""
 
@@ -111,6 +115,7 @@ class TestAnomalyEntry:
         assert result["expired"] is True
 
 
+@pytest.mark.unit
 class TestBoundedAnomalyBuffer:
     """Tests for the BoundedAnomalyBuffer class."""
 
@@ -421,6 +426,7 @@ class TestBoundedAnomalyBuffer:
         assert stats["max_size"] == 200
 
 
+@pytest.mark.unit
 class TestGetAnomalyBuffer:
     """Tests for the get_anomaly_buffer singleton function."""
 

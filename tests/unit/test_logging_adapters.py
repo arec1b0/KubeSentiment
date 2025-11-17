@@ -1,5 +1,7 @@
 import logging
 
+import pytest
+
 from app.utils.logging_adapters import (
     StdLibLoggerAdapter,
     get_fallback_contextual_logger,
@@ -7,6 +9,7 @@ from app.utils.logging_adapters import (
 )
 
 
+@pytest.mark.unit
 def test_adapter_formats_extra_fields(caplog):
     adapter = StdLibLoggerAdapter("test.logging")
 
@@ -16,6 +19,7 @@ def test_adapter_formats_extra_fields(caplog):
     assert "processed batch | request_id='abc123', duration_ms=42" in caplog.text
 
 
+@pytest.mark.unit
 def test_exception_logs_exc_info(caplog):
     adapter = StdLibLoggerAdapter("test.logging")
 
@@ -26,6 +30,7 @@ def test_exception_logs_exc_info(caplog):
     assert record.exc_info is not None
 
 
+@pytest.mark.unit
 def test_fallback_helpers_return_new_adapters():
     adapter = get_fallback_logger("test.logger")
     contextual_adapter = get_fallback_contextual_logger("test.logger")

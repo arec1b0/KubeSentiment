@@ -5,6 +5,9 @@ including API endpoints, model loading, caching, monitoring, and error
 handling across the full stack.
 """
 
+import pytest
+
+
 import asyncio
 import json
 import time
@@ -19,6 +22,7 @@ from app.core.dependencies import get_prediction_service
 from app.main import create_app
 
 
+@pytest.mark.integration
 class TestFullRequestFlow:
     """A test suite for the complete request flows, from API to model inference.
 
@@ -202,6 +206,7 @@ class TestFullRequestFlow:
         assert data["is_ready"] is True
 
 
+@pytest.mark.integration
 class TestErrorHandlingFlow:
     """A test suite for verifying error handling across the full application stack.
 
@@ -308,6 +313,7 @@ class TestErrorHandlingFlow:
         assert "TEXT_TOO_LONG" in response.json()["error_code"]
 
 
+@pytest.mark.integration
 class TestConcurrencyAndPerformance:
     """A test suite for concurrency and performance characteristics.
 
@@ -402,6 +408,7 @@ class TestConcurrencyAndPerformance:
         assert second_round_time < first_round_time * 0.5
 
 
+@pytest.mark.integration
 class TestConfigurationIntegration:
     """A test suite for configuration validation in a real application context.
 
@@ -444,6 +451,7 @@ class TestConfigurationIntegration:
                 os.environ.pop(key, None)
 
 
+@pytest.mark.integration
 class TestMonitoringIntegration:
     """A test suite for the monitoring and metrics integration.
 

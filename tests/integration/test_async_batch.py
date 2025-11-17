@@ -5,6 +5,9 @@ Tests cover functionality, performance, and error handling of the
 async batch service that achieves 85% performance improvement.
 """
 
+import pytest
+
+
 import asyncio
 import time
 from unittest.mock import MagicMock
@@ -113,6 +116,7 @@ def async_batch_service(prediction_service, stream_processor, mock_settings):
     return AsyncBatchService(prediction_service, stream_processor, mock_settings)
 
 
+@pytest.mark.integration
 class TestBatchJob:
     """Test BatchJob functionality."""
 
@@ -180,6 +184,7 @@ class TestBatchJob:
         assert estimated < 300
 
 
+@pytest.mark.integration
 class TestAsyncBatchServiceInitialization:
     """Test async batch service initialization."""
 
@@ -231,6 +236,7 @@ class TestAsyncBatchServiceInitialization:
         assert async_batch_service._get_optimal_batch_size(2000) == 1000  # Capped at max_batch_size
 
 
+@pytest.mark.integration
 class TestBatchJobSubmission:
     """Test batch job submission functionality."""
 
@@ -272,6 +278,7 @@ class TestBatchJobSubmission:
         assert queue_status["low_priority"] >= 1
 
 
+@pytest.mark.integration
 class TestJobProcessing:
     """Test job processing functionality."""
 
@@ -334,6 +341,7 @@ class TestJobProcessing:
         assert cancelled is False
 
 
+@pytest.mark.integration
 class TestJobStatusAndResults:
     """Test job status and results functionality."""
 
@@ -402,6 +410,7 @@ class TestJobStatusAndResults:
         assert results.summary["success_rate"] == 1.0
 
 
+@pytest.mark.integration
 class TestMetricsAndMonitoring:
     """Test metrics and monitoring functionality."""
 
@@ -457,6 +466,7 @@ class TestMetricsAndMonitoring:
         assert expired_job.error == "Job expired due to timeout"
 
 
+@pytest.mark.integration
 class TestCaching:
     """Test result caching functionality."""
 
@@ -502,6 +512,7 @@ class TestCaching:
         )
 
 
+@pytest.mark.integration
 class TestErrorHandling:
     """Test error handling and recovery."""
 
@@ -534,6 +545,7 @@ class TestErrorHandling:
         assert job.job_id is not None
 
 
+@pytest.mark.integration
 class TestPriorityProcessing:
     """Test priority-based processing."""
 
@@ -571,6 +583,7 @@ class TestPriorityProcessing:
         assert job.job_id is not None
 
 
+@pytest.mark.integration
 class TestPerformanceOptimizations:
     """Test performance optimizations."""
 
@@ -632,6 +645,7 @@ class TestPerformanceOptimizations:
         assert expired_job.status == BatchJobStatus.EXPIRED
 
 
+@pytest.mark.integration
 class TestIntegration:
     """Integration tests."""
 
