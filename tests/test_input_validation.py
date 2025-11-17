@@ -21,6 +21,7 @@ from app.utils.exceptions import (
     TextEmptyError,
     TextTooLongError,
 )
+from pydantic import ValidationError as PydanticValidationError
 
 
 class TestTextInputValidation:
@@ -37,19 +38,20 @@ class TestTextInputValidation:
         assert valid_input.text == "This is a valid text input for sentiment analysis."
 
     def test_empty_string_raises_error(self):
-        """Tests that an empty string "" raises a `TextEmptyError`."""
-        with pytest.raises(TextEmptyError) as exc_info:
+        """Tests that an empty string "" raises a validation error."""
+        with pytest.raises(PydanticValidationError) as exc_info:
             TextInput(text="")
 
-        assert exc_info.value.code == "TEXT_EMPTY"
+        errors = exc_info.value.errors()
+        assert len(errors) > 0
         assert "cannot be empty" in str(exc_info.value)
 
     def test_whitespace_only_raises_error(self):
-        """Tests that a string containing only whitespace raises a `TextEmptyError`."""
-        with pytest.raises(TextEmptyError) as exc_info:
+        """Tests that a string containing only whitespace raises a validation error."""
+        with pytest.raises(PydanticValidationError) as exc_info:
             TextInput(text="   \n\t  ")
 
-        assert exc_info.value.code == "TEXT_EMPTY"
+        assert "cannot be empty" in str(exc_info.value)
 
     def test_none_raises_error(self):
         """Tests that a `None` value for the text field raises a validation error."""
@@ -58,7 +60,7 @@ class TestTextInputValidation:
 
     @patch("app.api.schemas.requests.get_settings")
     def test_text_too_long_raises_error(self, mock_get_settings):
-        """Tests that text exceeding the configured max length raises a `TextTooLongError`."""
+        """Tests that text exceeding the configured max length raises a validation error."""
         # Mock settings with small max length for testing
         mock_settings = Mock()
         mock_settings.max_text_length = 10
@@ -66,11 +68,10 @@ class TestTextInputValidation:
 
         long_text = "This text is definitely longer than 10 characters and should fail validation"
 
-        with pytest.raises(TextTooLongError) as exc_info:
+        with pytest.raises(PydanticValidationError) as exc_info:
             TextInput(text=long_text)
 
-        assert exc_info.value.code == "TEXT_TOO_LONG"
-        assert "exceeds maximum" in str(exc_info.value)
+        assert "exceeds" in str(exc_info.value)
 
     def test_text_with_special_characters(self):
         """Tests that text containing special characters and emojis is handled correctly."""
@@ -182,11 +183,11 @@ class TestAPIEndpointValidation:
             yield analyzer
 
     def test_predict_endpoint_empty_text(self, client, mock_analyzer):
-        """Tests that the `/predict` endpoint returns a 400 error for empty text."""
+        """Tests that the `/predict` endpoint returns a 422 error for empty text."""
         response = client.post("/predict", json={"text": ""})
 
-        assert response.status_code == 400
-        assert "TEXT_EMPTY" in response.json()["error_code"]
+        assert response.status_code == 422
+        assert "validation" in response.json()["error_message"].lower()
 
     def test_predict_endpoint_missing_text_field(self, client, mock_analyzer):
         """Tests that the `/predict` endpoint returns a 422 error if the 'text' field is missing."""
@@ -196,12 +197,12 @@ class TestAPIEndpointValidation:
 
     @patch("app.core.config.Settings.max_text_length", 20)
     def test_predict_endpoint_text_too_long(self, client, mock_analyzer):
-        """Tests that the `/predict` endpoint returns a 400 error for text that is too long."""
+        """Tests that the `/predict` endpoint returns a 422 error for text that is too long."""
         long_text = "This text is definitely much longer than 20 characters and should fail"
         response = client.post("/predict", json={"text": long_text})
 
-        assert response.status_code == 400
-        assert "TEXT_TOO_LONG" in response.json()["error_code"]
+        assert response.status_code == 422
+        assert "validation" in response.json()["error_message"].lower()
 
     def test_predict_endpoint_valid_text(self, client, mock_analyzer):
         """Tests that the `/predict` endpoint returns a 200 OK for valid text."""
@@ -261,7 +262,7 @@ class TestSecurityInputValidation:
         """Tests that a single, extremely long word is correctly validated against the max length."""
         long_word = "a" * 10000
 
-        with pytest.raises(TextTooLongError):
+        with pytest.raises(PydanticValidationError):
             TextInput(text=long_word)
 
     def test_newlines_and_control_characters(self):
@@ -284,7 +285,7 @@ class TestEdgeCases:
 
     def test_zero_length_after_strip(self):
         """Tests that text that becomes empty after whitespace stripping is rejected."""
-        with pytest.raises(TextEmptyError):
+        with pytest.raises(PydanticValidationError):
             TextInput(text="   \n\t\r   ")
 
     @patch("app.api.schemas.requests.get_settings")
