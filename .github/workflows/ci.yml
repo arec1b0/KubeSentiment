@@ -129,9 +129,41 @@ jobs:
           flags: performance
           name: performance-tests
 
+  # Coverage verification - enforce 85% threshold on full test suite
+  coverage-check:
+    name: Coverage Verification
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, performance-tests]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Run all tests with coverage threshold
+        run: pytest tests/ -v --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=85
+        env:
+          MLOPS_DEBUG: true
+          MLOPS_LOG_LEVEL: DEBUG
+
+      - name: Upload combined coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: combined
+          name: combined-coverage
+          fail_ci_if_error: true
+
   # Build and push Docker image
   build:
-    needs: [lint, unit-tests, integration-tests, performance-tests]
+    needs: [lint, coverage-check]
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     outputs:

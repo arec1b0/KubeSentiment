@@ -153,9 +153,29 @@ The test suite uses the following pytest markers (defined in `pyproject.toml`):
 
 ## Coverage Requirements
 
-- **Minimum Coverage**: 85% (enforced in CI)
+- **Minimum Coverage**: 85% (enforced on combined test suite in CI)
 - **Target Coverage**: 90%+
 - **Coverage Reports**: Generated in `htmlcov/` directory and `coverage.xml`
+
+### Important: Coverage Threshold Behavior
+
+The 85% coverage threshold is **NOT** enforced on individual test categories (unit/integration/performance) when run separately. This is intentional:
+
+- **Unit tests alone** may only cover 40-50% of the codebase
+- **Integration tests alone** may cover different 40-50% of the codebase
+- **Combined tests** achieve the required 85%+ coverage
+
+**In CI**: The threshold is enforced only in the `coverage-check` job that runs all tests together.
+
+**Locally**: You can run tests without threshold enforcement:
+```bash
+# Run individual test categories (no threshold check)
+pytest tests/unit/ --cov=app
+pytest tests/integration/ --cov=app
+
+# Run all tests with threshold enforcement
+pytest tests/ --cov=app --cov-fail-under=85
+```
 
 ### View Coverage Report
 
@@ -222,17 +242,26 @@ Tests run automatically in GitHub Actions (`.github/workflows/ci.yml`) with sepa
 
 2. **Unit Tests (`unit-tests`)** - Runs in parallel with lint
    - Fast, isolated tests
+   - Coverage collected (no threshold enforcement)
    - Coverage uploaded with `unit` flag
 
 3. **Integration Tests (`integration-tests`)** - Runs after unit tests
    - Component interaction tests
+   - Coverage collected (no threshold enforcement)
    - Coverage uploaded with `integration` flag
 
 4. **Performance Tests (`performance-tests`)** - Runs after unit tests
    - Benchmark tests
+   - Coverage collected (no threshold enforcement)
    - Coverage uploaded with `performance` flag
 
-5. **Build** - Runs after all tests pass
+5. **Coverage Verification (`coverage-check`)** - Runs after all test stages
+   - **Enforces 85% coverage threshold on combined test suite**
+   - Runs all tests together to verify total coverage
+   - Uploads combined coverage report
+   - **CI fails here if coverage < 85%**
+
+6. **Build** - Runs after lint and coverage check pass
    - Docker image build and push
 
 ### CI Test Commands
@@ -244,14 +273,17 @@ isort --check-only app/ tests/
 ruff check app/ tests/
 flake8 app/ tests/
 
-# Unit tests
+# Unit tests (no threshold)
 pytest tests/unit/ -v -m "unit" --cov=app
 
-# Integration tests
+# Integration tests (no threshold)
 pytest tests/integration/ -v -m "integration" --cov=app
 
-# Performance tests
+# Performance tests (no threshold)
 pytest tests/performance/ -v -m "performance" --cov=app
+
+# Coverage verification (enforces 85% threshold)
+pytest tests/ -v --cov=app --cov-fail-under=85
 ```
 
 ## Writing New Tests
