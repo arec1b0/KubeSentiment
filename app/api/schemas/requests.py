@@ -7,12 +7,6 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, field_validator
 
 from app.core.config import get_settings
-from app.utils.exceptions import (
-    TextEmptyError,
-    TextTooLongError,
-    EmptyBatchError,
-    BatchSizeExceededError,
-)
 
 
 class TextInput(BaseModel):
@@ -53,21 +47,20 @@ class TextInput(BaseModel):
             The validated and stripped text.
 
         Raises:
-            TextEmptyError: If the input text is empty.
-            TextTooLongError: If the input text exceeds the maximum allowed length.
+            ValueError: If the input text is empty or exceeds the maximum allowed length.
         """
         if not v or not v.strip():
-            raise TextEmptyError(context={"text_length": len(v) if v else 0})
+            raise ValueError(
+                "The text field is required and cannot be empty or contain only whitespace."
+            )
 
         # Check for maximum length
         settings = get_settings()
         max_len = settings.max_text_length
 
         if len(v.strip()) > max_len:
-            raise TextTooLongError(
-                text_length=len(v.strip()),
-                max_length=max_len,
-                context={"raw_length": len(v)},
+            raise ValueError(
+                f"Text length {len(v.strip())} exceeds the maximum allowed length of {max_len}."
             )
 
         return v.strip()
@@ -120,32 +113,27 @@ class BatchTextInput(BaseModel):
         """Validate that all texts are non-empty and within length limits.
 
         Raises:
-            EmptyBatchError: If the batch contains no texts.
-            BatchSizeExceededError: If the batch size exceeds the maximum.
-            TextEmptyError: If any text in the batch is empty.
-            TextTooLongError: If any text exceeds the maximum length.
+            ValueError: If the batch is empty, exceeds maximum size, or contains invalid texts.
         """
         if not v or len(v) == 0:
-            raise EmptyBatchError(context={"provided_length": len(v) if v else 0})
+            raise ValueError("Batch processing request cannot be empty.")
 
         settings = get_settings()
         max_texts = 1000  # Reasonable batch limit
 
         if len(v) > max_texts:
-            raise BatchSizeExceededError(
-                batch_size=len(v),
-                max_batch_size=max_texts,
-                context={"batch_size": len(v)}
+            raise ValueError(
+                f"Batch size of {len(v)} exceeds the maximum of {max_texts}."
             )
 
         for i, text in enumerate(v):
             if not text or not text.strip():
-                raise TextEmptyError(context={"index": i, "text_length": len(text) if text else 0})
+                raise ValueError(
+                    f"Text at index {i} is empty or contains only whitespace."
+                )
             if len(text) > settings.max_text_length:
-                raise TextTooLongError(
-                    text_length=len(text),
-                    max_length=settings.max_text_length,
-                    context={"index": i}
+                raise ValueError(
+                    f"Text at index {i} with length {len(text)} exceeds the maximum allowed length of {settings.max_text_length}."
                 )
 
         return v
