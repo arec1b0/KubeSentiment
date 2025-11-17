@@ -196,7 +196,8 @@ build:docker:
         # Semantic version tag
         VERSION=${CI_COMMIT_TAG#v}
         MAJOR=$(echo $VERSION | cut -d. -f1)
-        MINOR=$(echo $VERSION | cut -d. -f1-2)
+        MINOR=$(echo $VERSION | cut -d. -f2)
+        PATCH=$(echo $VERSION | cut -d. -f3)
         TAGS="-t $IMAGE_NAME:$VERSION -t $IMAGE_NAME:$MAJOR.$MINOR -t $IMAGE_NAME:$MAJOR -t $IMAGE_NAME:latest"
       elif [[ "$CI_COMMIT_BRANCH" == "main" ]]; then
         TAGS="-t $IMAGE_NAME:main -t $IMAGE_NAME:latest"
@@ -393,8 +394,6 @@ deploy:production:
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
       when: manual
-  only:
-    - tags
 
 # =============================================================================
 # CLEANUP JOBS
