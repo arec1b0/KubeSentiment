@@ -1,0 +1,413 @@
+# GitLab CI/CD Pipeline for KubeSentiment
+# Production-ready MLOps Sentiment Analysis Microservice
+
+# Pipeline stages
+stages:
+  - lint
+  - test
+  - coverage
+  - build
+  - security
+  - deploy
+
+# Global variables
+variables:
+  PYTHON_VERSION: "3.11"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: "/certs"
+  # Container registry settings
+  REGISTRY: $CI_REGISTRY
+  IMAGE_NAME: $CI_REGISTRY_IMAGE
+  # Kubernetes settings
+  KUBECTL_VERSION: "1.28.0"
+  HELM_VERSION: "3.13.0"
+
+# Default configuration for Python jobs
+.python_base:
+  image: python:${PYTHON_VERSION}-slim
+  cache:
+    key:
+      files:
+        - requirements.txt
+        - requirements-dev.txt
+        - requirements-test.txt
+    paths:
+      - .cache/pip
+      - venv/
+  before_script:
+    - pip install --upgrade pip setuptools wheel
+    - python -m venv venv
+    - source venv/bin/activate
+
+# =============================================================================
+# LINT STAGE - Code Quality Checks
+# =============================================================================
+
+lint:code-quality:
+  stage: lint
+  extends: .python_base
+  script:
+    - pip install -r requirements-dev.txt
+    - echo "Running Black formatter check..."
+    - black --check app/ tests/ scripts/ run.py
+    - echo "Running isort import check..."
+    - isort --check-only app/ tests/ scripts/ run.py
+    - echo "Running Ruff linter..."
+    - ruff check app/ tests/ scripts/ run.py
+    - echo "Running Flake8 linter..."
+    - flake8 app/ tests/ scripts/ run.py
+    - echo "Running MyPy type checker..."
+    - mypy app/ --ignore-missing-imports --allow-untyped-decorators
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_TAG =~ /^v/'
+
+# =============================================================================
+# TEST STAGE - Unit, Integration, and Performance Tests
+# =============================================================================
+
+test:unit:
+  stage: test
+  extends: .python_base
+  needs: ["lint:code-quality"]
+  script:
+    - pip install -r requirements.txt
+    - pip install -r requirements-test.txt
+    - pytest tests/unit/ -v -m "unit" --cov=app --cov-report=xml --cov-report=term-missing --cov-report=html
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - htmlcov/
+      - coverage.xml
+    expire_in: 1 week
+  variables:
+    MLOPS_DEBUG: "true"
+    MLOPS_LOG_LEVEL: "DEBUG"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_TAG =~ /^v/'
+
+test:integration:
+  stage: test
+  extends: .python_base
+  needs: ["lint:code-quality", "test:unit"]
+  script:
+    - pip install -r requirements.txt
+    - pip install -r requirements-test.txt
+    - pytest tests/integration/ -v -m "integration" --cov=app --cov-report=xml --cov-report=term-missing --cov-report=html
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - htmlcov/
+      - coverage.xml
+    expire_in: 1 week
+  variables:
+    MLOPS_DEBUG: "true"
+    MLOPS_LOG_LEVEL: "DEBUG"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_TAG =~ /^v/'
+
+test:performance:
+  stage: test
+  extends: .python_base
+  needs: ["lint:code-quality", "test:unit"]
+  script:
+    - pip install -r requirements.txt
+    - pip install -r requirements-test.txt
+    - pytest tests/performance/ -v -m "performance" --cov=app --cov-report=xml --cov-report=term-missing --cov-report=html
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - htmlcov/
+      - coverage.xml
+    expire_in: 1 week
+  variables:
+    MLOPS_DEBUG: "true"
+    MLOPS_LOG_LEVEL: "DEBUG"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_TAG =~ /^v/'
+
+# =============================================================================
+# COVERAGE STAGE - Enforce Coverage Thresholds
+# =============================================================================
+
+coverage:verify:
+  stage: coverage
+  extends: .python_base
+  needs: ["test:unit", "test:integration", "test:performance"]
+  script:
+    - pip install -r requirements.txt
+    - pip install -r requirements-test.txt
+    - echo "Running all tests with 85% coverage threshold..."
+    - pytest tests/ -v --cov=app --cov-report=xml --cov-report=term-missing --cov-report=html --cov-fail-under=85
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - htmlcov/
+      - coverage.xml
+    expire_in: 30 days
+  variables:
+    MLOPS_DEBUG: "true"
+    MLOPS_LOG_LEVEL: "DEBUG"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_TAG =~ /^v/'
+
+# =============================================================================
+# BUILD STAGE - Docker Image Build and Push
+# =============================================================================
+
+build:docker:
+  stage: build
+  image: docker:24-dind
+  services:
+    - docker:24-dind
+  needs: ["lint:code-quality", "coverage:verify"]
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - |
+      # Determine image tags
+      if [[ "$CI_COMMIT_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        # Semantic version tag
+        VERSION=${CI_COMMIT_TAG#v}
+        MAJOR=$(echo $VERSION | cut -d. -f1)
+        MINOR=$(echo $VERSION | cut -d. -f1-2)
+        TAGS="-t $IMAGE_NAME:$VERSION -t $IMAGE_NAME:$MAJOR.$MINOR -t $IMAGE_NAME:$MAJOR -t $IMAGE_NAME:latest"
+      elif [[ "$CI_COMMIT_BRANCH" == "main" ]]; then
+        TAGS="-t $IMAGE_NAME:main -t $IMAGE_NAME:latest"
+      elif [[ "$CI_COMMIT_BRANCH" == "develop" ]]; then
+        TAGS="-t $IMAGE_NAME:develop"
+      else
+        TAGS="-t $IMAGE_NAME:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA"
+      fi
+
+      echo "Building Docker image with tags: $TAGS"
+
+      # Build and push image
+      docker build \
+        --build-arg BUILDTIME=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+        --build-arg VERSION=${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA} \
+        --build-arg REVISION=$CI_COMMIT_SHA \
+        --cache-from $IMAGE_NAME:latest \
+        $TAGS \
+        .
+
+      # Push all tags
+      docker push $IMAGE_NAME --all-tags
+
+      # Save primary tag for downstream jobs
+      if [[ "$CI_COMMIT_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "IMAGE_TAG=${CI_COMMIT_TAG#v}" >> build.env
+      elif [[ "$CI_COMMIT_BRANCH" == "main" ]]; then
+        echo "IMAGE_TAG=main" >> build.env
+      elif [[ "$CI_COMMIT_BRANCH" == "develop" ]]; then
+        echo "IMAGE_TAG=develop" >> build.env
+      else
+        echo "IMAGE_TAG=$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA" >> build.env
+      fi
+  artifacts:
+    reports:
+      dotenv: build.env
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_TAG =~ /^v/'
+
+# =============================================================================
+# SECURITY STAGE - Vulnerability Scanning
+# =============================================================================
+
+security:trivy-scan:
+  stage: security
+  image: aquasec/trivy:latest
+  needs: ["build:docker"]
+  before_script:
+    - export TRIVY_USERNAME=$CI_REGISTRY_USER
+    - export TRIVY_PASSWORD=$CI_REGISTRY_PASSWORD
+    - trivy --version
+  script:
+    - echo "Scanning image $IMAGE_NAME:$IMAGE_TAG for vulnerabilities..."
+    - |
+      trivy image \
+        --severity CRITICAL,HIGH \
+        --exit-code 0 \
+        --format table \
+        $IMAGE_NAME:$IMAGE_TAG
+    - |
+      trivy image \
+        --severity CRITICAL,HIGH \
+        --exit-code 0 \
+        --format json \
+        --output trivy-report.json \
+        $IMAGE_NAME:$IMAGE_TAG
+    - |
+      # Fail pipeline on critical vulnerabilities
+      trivy image \
+        --severity CRITICAL \
+        --exit-code 1 \
+        $IMAGE_NAME:$IMAGE_TAG || echo "⚠️ Critical vulnerabilities found!"
+  artifacts:
+    paths:
+      - trivy-report.json
+    expire_in: 30 days
+    when: always
+  allow_failure: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_TAG =~ /^v/'
+
+security:sast:
+  stage: security
+  needs: []
+  script:
+    - echo "Running SAST scan..."
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"'
+  # Include GitLab SAST template
+  include:
+    - template: Security/SAST.gitlab-ci.yml
+
+# =============================================================================
+# DEPLOY STAGE - Kubernetes Deployment with Helm
+# =============================================================================
+
+.deploy_base:
+  stage: deploy
+  image: alpine/helm:${HELM_VERSION}
+  needs: ["build:docker", "security:trivy-scan"]
+  before_script:
+    - apk add --no-cache curl
+    - |
+      # Install kubectl
+      curl -LO "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+      chmod +x kubectl
+      mv kubectl /usr/local/bin/
+    - |
+      # Setup kubeconfig
+      if [ -n "$KUBE_CONFIG" ]; then
+        mkdir -p ~/.kube
+        echo "$KUBE_CONFIG" | base64 -d > ~/.kube/config
+        chmod 600 ~/.kube/config
+        export KUBECONFIG=~/.kube/config
+        kubectl cluster-info
+      else
+        echo "⚠️ KUBE_CONFIG not set, skipping deployment"
+        exit 0
+      fi
+  script:
+    - |
+      echo "Deploying to $ENVIRONMENT environment..."
+
+      # Deploy with Helm
+      helm upgrade --install mlops-sentiment ./helm/mlops-sentiment \
+        --namespace $NAMESPACE \
+        --create-namespace \
+        --set image.repository=$IMAGE_NAME \
+        --set image.tag=$IMAGE_TAG \
+        --set replicaCount=$REPLICAS \
+        --values ./helm/mlops-sentiment/values.yaml \
+        --values ./helm/mlops-sentiment/values-${ENVIRONMENT}.yaml \
+        --wait --timeout=10m
+
+      echo "✅ Deployment completed successfully"
+
+      # Wait for pods to be ready
+      kubectl wait --for=condition=ready pod \
+        -l app.kubernetes.io/name=mlops-sentiment \
+        -n $NAMESPACE \
+        --timeout=300s
+
+      # Display deployment status
+      echo "📊 Deployment Status:"
+      kubectl get all -n $NAMESPACE -l app.kubernetes.io/name=mlops-sentiment
+
+      # Health check
+      echo "🏥 Running health check..."
+      POD_NAME=$(kubectl get pod -n $NAMESPACE -l app.kubernetes.io/name=mlops-sentiment -o jsonpath='{.items[0].metadata.name}')
+      kubectl exec -n $NAMESPACE $POD_NAME -- curl -f http://localhost:8000/api/v1/health || \
+        kubectl exec -n $NAMESPACE $POD_NAME -- curl -f http://localhost:8000/health
+
+      echo "✅ Health check passed"
+
+deploy:development:
+  extends: .deploy_base
+  environment:
+    name: development
+    url: https://dev.kubesentiment.example.com
+  variables:
+    ENVIRONMENT: "development"
+    NAMESPACE: "mlops-sentiment-dev"
+    REPLICAS: "1"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+
+deploy:staging:
+  extends: .deploy_base
+  environment:
+    name: staging
+    url: https://staging.kubesentiment.example.com
+  variables:
+    ENVIRONMENT: "staging"
+    NAMESPACE: "mlops-sentiment-staging"
+    REPLICAS: "2"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+
+deploy:production:
+  extends: .deploy_base
+  environment:
+    name: production
+    url: https://kubesentiment.example.com
+  variables:
+    ENVIRONMENT: "production"
+    NAMESPACE: "mlops-sentiment"
+    REPLICAS: "3"
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
+      when: manual
+  only:
+    - tags
+
+# =============================================================================
+# CLEANUP JOBS
+# =============================================================================
+
+cleanup:old-images:
+  stage: .post
+  image: alpine:latest
+  script:
+    - echo "🧹 Cleanup job - remove old container images from registry"
+    - echo "This would typically call the GitLab Container Registry API to remove old images"
+    - echo "Example: Keep only the last 10 images per tag"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+  allow_failure: true
