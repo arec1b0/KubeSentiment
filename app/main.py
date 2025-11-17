@@ -15,7 +15,6 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import ValidationError
 
 from app.api import router
 from app.api.middleware import (
@@ -29,7 +28,7 @@ from app.core.events import lifespan
 from app.core.logging import get_logger, setup_structured_logging
 from app.core.tracing import setup_tracing, instrument_fastapi_app
 from app.monitoring.routes import router as monitoring_router
-from app.utils.exceptions import ServiceError, ValidationError as CustomValidationError
+from app.utils.exceptions import ServiceError
 
 # Setup structured logging
 setup_structured_logging()
@@ -117,11 +116,13 @@ def create_app() -> FastAPI:
 
         error_details = []
         for error in exc.errors():
-            error_details.append({
-                "loc": error["loc"],
-                "msg": error["msg"],
-                "type": error["type"],
-            })
+            error_details.append(
+                {
+                    "loc": error["loc"],
+                    "msg": error["msg"],
+                    "type": error["type"],
+                }
+            )
 
         logger.warning(
             "Request validation failed",
@@ -227,6 +228,7 @@ def create_app() -> FastAPI:
 
     # Include advanced monitoring routes (drift detection, MLflow, explainability, KPIs)
     from app.api.routes.monitoring_routes import router as advanced_monitoring_router
+
     app.include_router(
         advanced_monitoring_router,
         prefix="/api/v1" if not settings.debug else "",

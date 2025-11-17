@@ -33,8 +33,37 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-v --cov=app --cov-report=term-missing --cov-report=html"
+addopts = [
+    "-v",
+    "--cov=app",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "--strict-markers",
+    "--tb=short",
+]
 asyncio_mode = "auto"
+
+# Test markers for filtering and organization
+markers = [
+    "unit: marks tests as unit tests (fast, isolated, heavily mocked)",
+    "integration: marks tests as integration tests (slower, test component interactions)",
+    "performance: marks tests as performance/benchmark tests",
+    "e2e: marks tests as end-to-end tests (slowest, test full system)",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "cache: marks tests for cache functionality",
+    "strategy: marks tests for strategy pattern",
+    "async: marks tests that use async/await",
+    "kafka: marks tests for Kafka integration",
+    "vault: marks tests for Vault integration",
+]
+
+# Filter warnings
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+]
 
 [tool.bandit]
 exclude_dirs = ["/tests", "/venv", "/.venv"]

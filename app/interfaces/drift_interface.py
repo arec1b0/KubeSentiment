@@ -12,6 +12,7 @@ from dataclasses import dataclass
 @dataclass
 class DriftMetrics:
     """Drift detection metrics"""
+
     psi_score: float
     ks_statistic: Optional[float]
     chi_squared: Optional[float]

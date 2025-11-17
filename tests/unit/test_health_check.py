@@ -2,9 +2,15 @@
 Tests for the detailed health check endpoint.
 """
 
+import pytest
+
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from fastapi.testclient import TestClient
+
+import pytest
 
 from app.main import app
 
@@ -14,6 +20,7 @@ client = TestClient(app)
 @patch("app.monitoring.routes.HealthChecker")
 @patch("app.monitoring.routes.get_secret_manager")
 @patch("app.monitoring.routes.get_model_service")
+@pytest.mark.unit
 def test_detailed_health_check_healthy(
     mock_get_model_service, mock_get_secret_manager, mock_health_checker
 ):
@@ -56,6 +63,7 @@ def test_detailed_health_check_healthy(
 @patch("app.monitoring.routes.HealthChecker")
 @patch("app.monitoring.routes.get_secret_manager")
 @patch("app.monitoring.routes.get_model_service")
+@pytest.mark.unit
 def test_detailed_health_check_unhealthy_model(
     mock_get_model_service, mock_get_secret_manager, mock_health_checker
 ):
@@ -100,6 +108,7 @@ def test_detailed_health_check_unhealthy_model(
 @patch("app.monitoring.routes.HealthChecker")
 @patch("app.monitoring.routes.get_secret_manager")
 @patch("app.monitoring.routes.get_model_service")
+@pytest.mark.unit
 def test_detailed_health_check_unhealthy_secrets_backend(
     mock_get_model_service, mock_get_secret_manager, mock_health_checker
 ):

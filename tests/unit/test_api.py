@@ -121,6 +121,7 @@ def client(app):
     return TestClient(app)
 
 
+@pytest.mark.unit
 class TestPredictEndpoint:
     """Contains test cases for the `/predict` endpoint."""
 
@@ -186,6 +187,7 @@ class TestPredictEndpoint:
         assert response.status_code == 200
 
 
+@pytest.mark.unit
 class TestHealthEndpoint:
     """Contains test cases for the `/health` endpoint."""
 
@@ -223,6 +225,7 @@ class TestHealthEndpoint:
         assert data["model_status"] in ["available", "unavailable"]
 
 
+@pytest.mark.unit
 class TestMetricsEndpoint:
     """Contains test cases for the `/metrics` and `/metrics-json` endpoints."""
 
@@ -257,6 +260,7 @@ class TestMetricsEndpoint:
             assert "cuda_available" in data
 
 
+@pytest.mark.unit
 class TestModelInfoEndpoint:
     """Contains test cases for the `/model-info` endpoint."""
 

@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 try:
     import psutil
+
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
@@ -202,15 +203,10 @@ class CircuitBreaker(ICircuitBreaker):
             self.state = CircuitState.OPEN
             self.success_count = 0
             logger.warning("Circuit breaker OPENED after failure in HALF_OPEN state")
-        elif (
-            self.state == CircuitState.CLOSED
-            and self.failure_count >= self.failure_threshold
-        ):
+        elif self.state == CircuitState.CLOSED and self.failure_count >= self.failure_threshold:
             # Too many failures, open the circuit
             self.state = CircuitState.OPEN
-            logger.warning(
-                f"Circuit breaker OPENED after {self.failure_count} failures"
-            )
+            logger.warning(f"Circuit breaker OPENED after {self.failure_count} failures")
 
 
 class LoadBalancingMetrics(ILoadMetrics):

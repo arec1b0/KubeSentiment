@@ -20,7 +20,7 @@ from typing import (
 
 from kafka import KafkaProducer
 
-from app.models.kafka_models import ConsumerMetrics, MessageMetadata, ProcessingResult
+from app.models.kafka_models import ConsumerMetrics, ProcessingResult
 from app.services.dead_letter_queue import DeadLetterQueue
 from app.services.message_batch import MessageBatch
 from app.services.stream_processor import StreamProcessor
@@ -43,6 +43,7 @@ except Exception:  # pragma: no cover - fallback when pydantic is unavailable
 
     class IKafkaConsumer:  # type: ignore[no-redef]
         """Fallback interface for lightweight tests"""
+
         pass
 
 
@@ -67,9 +68,7 @@ class KafkaConsumerPrometheusMetrics:
     def record_kafka_message_consumed(self, topic: str, group: str, count: int) -> None:
         self._consumed[(topic, group)] += count
 
-    def record_kafka_message_processed(
-        self, topic: str, group: str, count: int
-    ) -> None:
+    def record_kafka_message_processed(self, topic: str, group: str, count: int) -> None:
         self._processed[(topic, group)] += count
 
     def record_kafka_message_failed(self, topic: str, group: str, count: int) -> None:
@@ -79,9 +78,7 @@ class KafkaConsumerPrometheusMetrics:
 class AsyncBatchHandle:
     """A handle that is awaitable but also usable synchronously for tests."""
 
-    def __init__(
-        self, coroutine_factory: Callable[[], Awaitable[List[Dict[str, Any]]]]
-    ):
+    def __init__(self, coroutine_factory: Callable[[], Awaitable[List[Dict[str, Any]]]]):
         self._coroutine_factory = coroutine_factory
         self._result: Optional[List[Dict[str, Any]]] = None
 
@@ -164,9 +161,7 @@ class HighThroughputKafkaConsumer(IKafkaConsumer):
         self._running = True
         with self.metrics_lock:
             self.metrics.running = True
-            self.metrics.consumer_threads = getattr(
-                self.settings, "kafka_consumer_threads", 0
-            )
+            self.metrics.consumer_threads = getattr(self.settings, "kafka_consumer_threads", 0)
         logger.info("Kafka consumer marked as running", trace_id="kafka-consumer")
 
     async def stop(self) -> None:
@@ -210,9 +205,7 @@ class HighThroughputKafkaConsumer(IKafkaConsumer):
 
         return self._running
 
-    def _process_batch_async(
-        self, texts: List[str], message_ids: List[str]
-    ) -> AsyncBatchHandle:
+    def _process_batch_async(self, texts: List[str], message_ids: List[str]) -> AsyncBatchHandle:
         """Process a batch of messages asynchronously."""
 
         async def runner() -> List[Dict[str, Any]]:
@@ -225,9 +218,7 @@ class HighThroughputKafkaConsumer(IKafkaConsumer):
     ) -> List[Dict[str, Any]]:
         start = time.perf_counter()
         try:
-            predictions = await asyncio.to_thread(
-                self.stream_processor.model.predict_batch, texts
-            )
+            predictions = await asyncio.to_thread(self.stream_processor.model.predict_batch, texts)
             processing_time_ms = (time.perf_counter() - start) * 1000
             results: List[ProcessingResult] = []
             for message_id, prediction in zip(message_ids, predictions, strict=False):
@@ -293,14 +284,10 @@ class HighThroughputKafkaConsumer(IKafkaConsumer):
             if batch.is_empty():
                 del self._message_batches[batch_key]
 
-    def _handle_batch_results(
-        self, batch: MessageBatch, results: List[Dict[str, Any]]
-    ) -> None:
+    def _handle_batch_results(self, batch: MessageBatch, results: List[Dict[str, Any]]) -> None:
         """Handle processing results, dispatching failures to the DLQ if needed."""
 
-        for (message, metadata), result in zip(
-            batch.iter_messages(), results, strict=False
-        ):
+        for (message, metadata), result in zip(batch.iter_messages(), results, strict=False):
             if result.get("success", False):
                 continue
             message_id = result.get("message_id", "unknown")
@@ -325,9 +312,7 @@ class HighThroughputKafkaConsumer(IKafkaConsumer):
             else:
                 window = getattr(self.settings, "kafka_metrics_window_s", 5.0)
                 if elapsed >= window:
-                    self.metrics.throughput_tps = (
-                        self.metrics.messages_consumed / elapsed
-                    )
+                    self.metrics.throughput_tps = self.metrics.messages_consumed / elapsed
 
     def _is_duplicate_message(self, topic: str, partition: int, offset: int) -> bool:
         """Return ``True`` if the message offset was processed recently."""

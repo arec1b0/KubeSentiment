@@ -319,7 +319,9 @@ class SecretsError(ServiceError):
 class VaultAuthenticationError(AuthenticationError):
     """Raised when authentication with HashiCorp Vault fails."""
 
-    def __init__(self, message: str = "Failed to authenticate with Vault", context: Optional[Any] = None):
+    def __init__(
+        self, message: str = "Failed to authenticate with Vault", context: Optional[Any] = None
+    ):
         """Initializes the VaultAuthenticationError.
 
         Args:
@@ -332,7 +334,9 @@ class VaultAuthenticationError(AuthenticationError):
 class KubernetesAuthenticationError(AuthenticationError):
     """Raised when Kubernetes authentication fails."""
 
-    def __init__(self, message: str = "Kubernetes authentication failed", context: Optional[Any] = None):
+    def __init__(
+        self, message: str = "Kubernetes authentication failed", context: Optional[Any] = None
+    ):
         """Initializes the KubernetesAuthenticationError.
 
         Args:
@@ -367,7 +371,9 @@ class ModelLoadingError(ModelError):
 
     status_code = 500
 
-    def __init__(self, message: str, model_name: Optional[str] = None, context: Optional[Any] = None):
+    def __init__(
+        self, message: str, model_name: Optional[str] = None, context: Optional[Any] = None
+    ):
         """Initializes the ModelLoadingError.
 
         Args:
@@ -448,7 +454,13 @@ class ModelExportError(InternalError):
     (e.g., PyTorch to ONNX).
     """
 
-    def __init__(self, message: str, source_format: Optional[str] = None, target_format: Optional[str] = None, context: Optional[Any] = None):
+    def __init__(
+        self,
+        message: str,
+        source_format: Optional[str] = None,
+        target_format: Optional[str] = None,
+        context: Optional[Any] = None,
+    ):
         """Initializes the ModelExportError.
 
         Args:
@@ -485,7 +497,13 @@ class FeatureMismatchError(ValidationError):
     doesn't match what the model or scaler expects.
     """
 
-    def __init__(self, message: str, expected: Optional[int] = None, received: Optional[int] = None, context: Optional[Any] = None):
+    def __init__(
+        self,
+        message: str,
+        expected: Optional[int] = None,
+        received: Optional[int] = None,
+        context: Optional[Any] = None,
+    ):
         """Initializes the FeatureMismatchError.
 
         Args:
@@ -563,7 +581,13 @@ class QueueCapacityExceededError(ServiceUnavailableError):
     accept additional requests at this time.
     """
 
-    def __init__(self, queue_name: str = "processing", current_size: Optional[int] = None, max_size: Optional[int] = None, context: Optional[Any] = None):
+    def __init__(
+        self,
+        queue_name: str = "processing",
+        current_size: Optional[int] = None,
+        max_size: Optional[int] = None,
+        context: Optional[Any] = None,
+    ):
         """Initializes the QueueCapacityExceededError.
 
         Args:
@@ -599,7 +623,9 @@ class CircuitBreakerOpenError(ServiceUnavailableError):
     by temporarily blocking requests to a failing service.
     """
 
-    def __init__(self, service_name: str, retry_after: Optional[int] = None, context: Optional[Any] = None):
+    def __init__(
+        self, service_name: str, retry_after: Optional[int] = None, context: Optional[Any] = None
+    ):
         """Initializes the CircuitBreakerOpenError.
 
         Args:

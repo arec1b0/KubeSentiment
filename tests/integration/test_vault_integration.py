@@ -6,6 +6,9 @@ the factory for creating them, and the health monitoring for the Vault
 integration.
 """
 
+import pytest
+
+
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, Mock, patch
 
@@ -21,6 +24,7 @@ from app.monitoring.vault_health import (
 )
 
 
+@pytest.mark.integration
 class TestEnvSecretManager:
     """A test suite for the `EnvSecretManager` class.
 
@@ -72,6 +76,7 @@ class TestEnvSecretManager:
         assert "secret_count" in health
 
 
+@pytest.mark.integration
 class TestVaultSecretManager:
     """A test suite for the `VaultSecretManager` class.
 
@@ -206,6 +211,7 @@ class TestVaultSecretManager:
         assert len(manager._cache) == 0
 
 
+@pytest.mark.integration
 class TestSecretManagerFactory:
     """A test suite for the `get_secret_manager` factory function.
 
@@ -249,6 +255,7 @@ class TestSecretManagerFactory:
         assert manager1 is manager2
 
 
+@pytest.mark.integration
 class TestSecretManagerIntegration:
     """Integration tests for the secret manager implementations.
 
@@ -289,6 +296,7 @@ class TestSecretManagerIntegration:
         assert value == "fallback"
 
 
+@pytest.mark.integration
 class TestVaultErrorScenarios:
     """A test suite for various error scenarios and edge cases in the Vault integration.
 
@@ -415,6 +423,7 @@ class TestVaultErrorScenarios:
         assert success is False  # Should return False on error
 
 
+@pytest.mark.integration
 class TestVaultHealthMonitor:
     """A test suite for the `VaultHealthMonitor` class.
 

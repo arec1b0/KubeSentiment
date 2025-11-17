@@ -10,7 +10,7 @@ This module provides various explanation methods for sentiment predictions:
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, Optional, Any
 import torch
 from transformers import AutoTokenizer
 
@@ -19,12 +19,14 @@ from app.interfaces.explainability_interface import IExplainabilityEngine
 
 try:
     import shap
+
     SHAP_AVAILABLE = True
 except ImportError:
     SHAP_AVAILABLE = False
 
 try:
     from captum.attr import LayerIntegratedGradients, TokenReferenceBase
+
     CAPTUM_AVAILABLE = True
 except ImportError:
     CAPTUM_AVAILABLE = False
@@ -54,7 +56,7 @@ class ExplainabilityEngine(IExplainabilityEngine):
         model: Any,
         tokenizer: Optional[AutoTokenizer] = None,
         model_name: str = "distilbert-base-uncased-finetuned-sst-2-english",
-        enabled: bool = True
+        enabled: bool = True,
     ):
         """
         Initialize explainability engine.
@@ -81,7 +83,7 @@ class ExplainabilityEngine(IExplainabilityEngine):
             self.tokenizer = tokenizer
 
         # Check if model is PyTorch-based
-        self.is_pytorch = hasattr(model, 'eval') and hasattr(model, 'forward')
+        self.is_pytorch = hasattr(model, "eval") and hasattr(model, "forward")
 
         if not self.is_pytorch:
             logger.warning("Model is not PyTorch-based, some explainability features disabled")
@@ -89,9 +91,7 @@ class ExplainabilityEngine(IExplainabilityEngine):
         logger.info("Explainability engine initialized", model_name=model_name)
 
     def extract_attention_weights(
-        self,
-        text: str,
-        normalize: bool = True
+        self, text: str, normalize: bool = True
     ) -> Optional[Dict[str, Any]]:
         """
         Extract attention weights from transformer model.
@@ -109,11 +109,7 @@ class ExplainabilityEngine(IExplainabilityEngine):
         try:
             # Tokenize input
             inputs = self.tokenizer(
-                text,
-                return_tensors="pt",
-                truncation=True,
-                max_length=512,
-                padding=True
+                text, return_tensors="pt", truncation=True, max_length=512, padding=True
             )
 
             # Get model outputs with attention
@@ -138,34 +134,29 @@ class ExplainabilityEngine(IExplainabilityEngine):
                 cls_attention = cls_attention / cls_attention.sum()
 
             # Get tokens
-            tokens = self.tokenizer.convert_ids_to_tokens(inputs['input_ids'][0])
+            tokens = self.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
 
             # Create word-level importance (exclude special tokens)
             word_importance = []
             for i, (token, score) in enumerate(zip(tokens, cls_attention)):
-                if token not in ['[CLS]', '[SEP]', '[PAD]']:
+                if token not in ["[CLS]", "[SEP]", "[PAD]"]:
                     # Clean up subword tokens (##)
-                    clean_token = token.replace('##', '')
-                    word_importance.append({
-                        'word': clean_token,
-                        'importance': float(score),
-                        'position': i
-                    })
+                    clean_token = token.replace("##", "")
+                    word_importance.append(
+                        {"word": clean_token, "importance": float(score), "position": i}
+                    )
 
             return {
-                'tokens': tokens,
-                'attention_weights': cls_attention.tolist(),
-                'word_importance': word_importance
+                "tokens": tokens,
+                "attention_weights": cls_attention.tolist(),
+                "word_importance": word_importance,
             }
         except Exception as e:
             logger.error("Failed to extract attention weights", error=str(e), exc_info=True)
             return None
 
     def compute_integrated_gradients(
-        self,
-        text: str,
-        target_class: int = 1,
-        n_steps: int = 50
+        self, text: str, target_class: int = 1, n_steps: int = 50
     ) -> Optional[Dict[str, Any]]:
         """
         Compute Integrated Gradients for feature attribution.
@@ -184,32 +175,25 @@ class ExplainabilityEngine(IExplainabilityEngine):
         try:
             # Tokenize input
             inputs = self.tokenizer(
-                text,
-                return_tensors="pt",
-                truncation=True,
-                max_length=512,
-                padding=True
+                text, return_tensors="pt", truncation=True, max_length=512, padding=True
             )
 
             # Create baseline (all zeros or PAD tokens)
-            baseline_input_ids = torch.zeros_like(inputs['input_ids'])
+            baseline_input_ids = torch.zeros_like(inputs["input_ids"])
             baseline_input_ids[:] = self.tokenizer.pad_token_id
 
             # Create reference token for baseline
             token_reference = TokenReferenceBase(reference_token_idx=self.tokenizer.pad_token_id)
 
             # Initialize Integrated Gradients
-            lig = LayerIntegratedGradients(
-                self._forward_func,
-                self.model.get_input_embeddings()
-            )
+            lig = LayerIntegratedGradients(self._forward_func, self.model.get_input_embeddings())
 
             # Compute attributions
             attributions = lig.attribute(
-                inputs=inputs['input_ids'],
+                inputs=inputs["input_ids"],
                 baselines=baseline_input_ids,
                 target=target_class,
-                n_steps=n_steps
+                n_steps=n_steps,
             )
 
             # Sum attributions across embedding dimension
@@ -217,23 +201,21 @@ class ExplainabilityEngine(IExplainabilityEngine):
             attributions_sum = attributions_sum / torch.norm(attributions_sum)
 
             # Get tokens
-            tokens = self.tokenizer.convert_ids_to_tokens(inputs['input_ids'][0])
+            tokens = self.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
 
             # Create word-level attribution
             word_attributions = []
             for i, (token, score) in enumerate(zip(tokens, attributions_sum)):
-                if token not in ['[CLS]', '[SEP]', '[PAD]']:
-                    clean_token = token.replace('##', '')
-                    word_attributions.append({
-                        'word': clean_token,
-                        'attribution': float(score),
-                        'position': i
-                    })
+                if token not in ["[CLS]", "[SEP]", "[PAD]"]:
+                    clean_token = token.replace("##", "")
+                    word_attributions.append(
+                        {"word": clean_token, "attribution": float(score), "position": i}
+                    )
 
             return {
-                'tokens': tokens,
-                'attributions': attributions_sum.tolist(),
-                'word_attributions': word_attributions
+                "tokens": tokens,
+                "attributions": attributions_sum.tolist(),
+                "word_attributions": word_attributions,
             }
         except Exception as e:
             logger.error("Failed to compute integrated gradients", error=str(e), exc_info=True)
@@ -251,7 +233,7 @@ class ExplainabilityEngine(IExplainabilityEngine):
         prediction: str,
         confidence: float,
         use_attention: bool = True,
-        use_gradients: bool = False
+        use_gradients: bool = False,
     ) -> Dict[str, Any]:
         """
         Generate comprehensive explanation for a prediction.
@@ -273,7 +255,7 @@ class ExplainabilityEngine(IExplainabilityEngine):
             "text": text,
             "prediction": prediction,
             "confidence": confidence,
-            "explanation_methods": []
+            "explanation_methods": [],
         }
 
         # 1. Attention-based explanation
@@ -285,11 +267,9 @@ class ExplainabilityEngine(IExplainabilityEngine):
 
                 # Highlight top contributing words
                 top_words = sorted(
-                    attention_exp['word_importance'],
-                    key=lambda x: x['importance'],
-                    reverse=True
+                    attention_exp["word_importance"], key=lambda x: x["importance"], reverse=True
                 )[:5]
-                explanation["top_contributing_words"] = [w['word'] for w in top_words]
+                explanation["top_contributing_words"] = [w["word"] for w in top_words]
 
         # 2. Integrated Gradients explanation
         if use_gradients and CAPTUM_AVAILABLE and self.is_pytorch:
@@ -343,8 +323,26 @@ class ExplainabilityEngine(IExplainabilityEngine):
         words = text.split()
 
         # Positive/negative word indicators
-        positive_words = ['good', 'great', 'excellent', 'amazing', 'wonderful', 'fantastic', 'love', 'best']
-        negative_words = ['bad', 'terrible', 'awful', 'horrible', 'worst', 'hate', 'poor', 'disappointing']
+        positive_words = [
+            "good",
+            "great",
+            "excellent",
+            "amazing",
+            "wonderful",
+            "fantastic",
+            "love",
+            "best",
+        ]
+        negative_words = [
+            "bad",
+            "terrible",
+            "awful",
+            "horrible",
+            "worst",
+            "hate",
+            "poor",
+            "disappointing",
+        ]
 
         text_lower = text.lower()
 
@@ -357,7 +355,7 @@ class ExplainabilityEngine(IExplainabilityEngine):
             "has_exclamation": "!" in text,
             "has_question": "?" in text,
             "is_uppercase": text.isupper(),
-            "capitalized_word_count": sum(1 for w in words if w[0].isupper() if w)
+            "capitalized_word_count": sum(1 for w in words if w[0].isupper() if w),
         }
 
     def generate_html_explanation(self, explanation: Dict[str, Any]) -> str:
@@ -385,21 +383,21 @@ class ExplainabilityEngine(IExplainabilityEngine):
         """
 
         # Add word importance visualization
-        if 'attention' in explanation:
+        if "attention" in explanation:
             html += "<h3>Word Importance (Attention Weights)</h3><div class='word-importance'>"
-            for word_info in explanation['attention']['word_importance']:
+            for word_info in explanation["attention"]["word_importance"]:
                 # Color intensity based on importance
-                intensity = int(word_info['importance'] * 255)
+                intensity = int(word_info["importance"] * 255)
                 html += f"<span style='background-color: rgba(0, 123, 255, {word_info['importance']:.2f}); padding: 2px 5px; margin: 2px; border-radius: 3px;'>{word_info['word']}</span> "
             html += "</div>"
 
         # Add top contributing words
-        if 'top_contributing_words' in explanation:
+        if "top_contributing_words" in explanation:
             html += f"<h3>Top Contributing Words</h3><p>{', '.join(explanation['top_contributing_words'])}</p>"
 
         # Add text features
-        if 'text_features' in explanation:
-            features = explanation['text_features']
+        if "text_features" in explanation:
+            features = explanation["text_features"]
             html += f"""
             <h3>Text Features</h3>
             <ul>
@@ -427,14 +425,11 @@ def initialize_explainability_engine(
     model: Any,
     tokenizer: Optional[AutoTokenizer] = None,
     model_name: str = "distilbert-base-uncased-finetuned-sst-2-english",
-    enabled: bool = True
+    enabled: bool = True,
 ) -> ExplainabilityEngine:
     """Initialize the global explainability engine instance."""
     global _explainability_engine
     _explainability_engine = ExplainabilityEngine(
-        model=model,
-        tokenizer=tokenizer,
-        model_name=model_name,
-        enabled=enabled
+        model=model, tokenizer=tokenizer, model_name=model_name, enabled=enabled
     )
     return _explainability_engine

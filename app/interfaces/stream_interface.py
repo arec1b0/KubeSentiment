@@ -16,9 +16,7 @@ class IStreamProcessor(ABC):
     """
 
     @abstractmethod
-    async def predict_async(
-        self, text: str, request_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def predict_async(self, text: str, request_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Queue a single prediction for asynchronous processing.
 

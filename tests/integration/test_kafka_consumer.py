@@ -5,6 +5,9 @@ Tests cover functionality, performance, and error handling of the
 Kafka consumer implementation that achieves 10x throughput improvement.
 """
 
+import pytest
+
+
 import asyncio
 import json
 import time
@@ -105,6 +108,7 @@ def kafka_consumer(stream_processor, mock_settings):
     return HighThroughputKafkaConsumer(stream_processor, mock_settings)
 
 
+@pytest.mark.integration
 class TestMessageBatch:
     """Test MessageBatch functionality."""
 
@@ -138,6 +142,7 @@ class TestMessageBatch:
         assert batch.is_empty()
 
 
+@pytest.mark.integration
 class TestKafkaConsumerInitialization:
     """Test Kafka consumer initialization."""
 
@@ -161,6 +166,7 @@ class TestKafkaConsumerInitialization:
         assert metrics["consumer_threads"] == 0  # Not started yet
 
 
+@pytest.mark.integration
 class TestMessageProcessing:
     """Test message processing functionality."""
 
@@ -218,6 +224,7 @@ class TestMessageProcessing:
             pytest.fail("Message handling should handle errors gracefully")
 
 
+@pytest.mark.integration
 class TestDeadLetterQueue:
     """Test dead letter queue functionality."""
 
@@ -244,6 +251,7 @@ class TestDeadLetterQueue:
         mock_producer.send.assert_called_once()
 
 
+@pytest.mark.integration
 class TestPerformanceOptimizations:
     """Test performance optimizations."""
 
@@ -295,6 +303,7 @@ class TestPerformanceOptimizations:
         kafka_consumer._message_batches.clear()
 
 
+@pytest.mark.integration
 class TestMetricsAndMonitoring:
     """Test metrics and monitoring functionality."""
 
@@ -348,6 +357,7 @@ class TestMetricsAndMonitoring:
         assert metrics["throughput_tps"] == 500.0  # 5000 messages / 10 seconds
 
 
+@pytest.mark.integration
 class TestErrorHandling:
     """Test error handling and recovery."""
 
@@ -389,6 +399,7 @@ class TestErrorHandling:
         assert kafka_consumer.settings.kafka_max_retries < 5  # Should send to DLQ
 
 
+@pytest.mark.integration
 class TestIntegration:
     """Integration tests."""
 
@@ -411,6 +422,7 @@ class TestIntegration:
 
 
 # Performance benchmarks
+@pytest.mark.integration
 class TestPerformanceBenchmarks:
     """Performance benchmark tests."""
 

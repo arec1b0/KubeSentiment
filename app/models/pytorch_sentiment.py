@@ -94,9 +94,11 @@ class SentimentAnalyzer:
                 "sentiment-analysis",
                 model=self.settings.model_name,
                 device=device,
-                model_kwargs={"cache_dir": self.settings.model_cache_dir}
-                if self.settings.model_cache_dir
-                else {},
+                model_kwargs=(
+                    {"cache_dir": self.settings.model_cache_dir}
+                    if self.settings.model_cache_dir
+                    else {}
+                ),
             )
 
             load_time = time.time() - start_time
@@ -152,7 +154,7 @@ class SentimentAnalyzer:
             ModelInferenceError: If inference fails.
         """
         try:
-            result = self._pipeline(text[:self.settings.max_text_length])[0]
+            result = self._pipeline(text[: self.settings.max_text_length])[0]
             return (result["label"], result["score"])
         except Exception as e:
             logger.error(f"Inference failed: {e}")
@@ -263,8 +265,7 @@ class SentimentAnalyzer:
 
         # Clean and truncate texts
         cleaned_texts = [
-            t.strip()[: self.settings.max_text_length] if t and t.strip() else ""
-            for t in texts
+            t.strip()[: self.settings.max_text_length] if t and t.strip() else "" for t in texts
         ]
 
         # Filter out empty texts and track their indices

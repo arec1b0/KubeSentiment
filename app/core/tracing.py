@@ -70,7 +70,7 @@ class TracingConfig:
             logger.info(
                 "Distributed tracing initialized successfully",
                 service_name=self.settings.service_name,
-                tracing_backend=self.settings.tracing_backend
+                tracing_backend=self.settings.tracing_backend,
             )
 
         except Exception as e:
@@ -106,7 +106,7 @@ class TracingConfig:
         logger.info(
             "Jaeger exporter configured",
             host=self.settings.jaeger_agent_host,
-            port=self.settings.jaeger_agent_port
+            port=self.settings.jaeger_agent_port,
         )
 
     def _setup_zipkin_exporter(self) -> None:
@@ -316,4 +316,3 @@ class traced_operation:
             self.span.set_status(Status(StatusCode.OK))
         self.span.end()
         return False
-

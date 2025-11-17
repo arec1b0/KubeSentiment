@@ -5,7 +5,7 @@ Defines contracts for circuit breaker and load balancing services.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Callable, TypeVar, Optional
+from typing import Dict, Any, Callable, TypeVar
 from dataclasses import dataclass
 from enum import Enum
 
@@ -14,6 +14,7 @@ T = TypeVar("T")
 
 class CircuitState(Enum):
     """Circuit breaker states"""
+
     CLOSED = "closed"  # Normal operation
     OPEN = "open"  # Failing, reject requests
     HALF_OPEN = "half_open"  # Testing recovery
@@ -22,6 +23,7 @@ class CircuitState(Enum):
 @dataclass
 class InstanceLoad:
     """Instance load metrics"""
+
     cpu_percent: float
     memory_percent: float
     active_requests: int
@@ -30,8 +32,19 @@ class InstanceLoad:
     error_rate: float
 
     def calculate_health_score(self) -> float:
-        """Calculate weighted health score (0-100)"""
-        pass
+        """Calculate weighted health score (0-100)
+
+        Returns:
+            Health score from 0-100, where 100 is optimal health
+        """
+        # Weighted scoring: lower is better for most metrics
+        cpu_score = max(0, 100 - self.cpu_percent)
+        memory_score = max(0, 100 - self.memory_percent)
+        error_score = max(0, 100 - (self.error_rate * 100))
+        response_time_score = max(0, 100 - min(self.avg_response_time_ms / 10, 100))
+
+        # Weighted average
+        return cpu_score * 0.3 + memory_score * 0.2 + error_score * 0.3 + response_time_score * 0.2
 
 
 class ICircuitBreaker(ABC):

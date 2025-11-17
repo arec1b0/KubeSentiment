@@ -4,10 +4,13 @@ This module contains test cases to verify that the caching mechanism for
 Prometheus metrics respects the configured Time-To-Live (TTL).
 """
 
+import pytest
+
 from app.core.config import Settings
 from app.monitoring.prometheus import PrometheusMetrics
 
 
+@pytest.mark.unit
 def test_metrics_cache_ttl_respected():
     """Tests that the Prometheus metrics cache expires after the configured TTL.
 

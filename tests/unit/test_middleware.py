@@ -6,6 +6,9 @@ access when it is not.
 """
 
 import pytest
+
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -13,6 +16,7 @@ from app.api.middleware.auth import APIKeyAuthMiddleware
 from app.core.config import Settings
 
 
+@pytest.mark.unit
 def test_middleware_allows_when_no_api_key():
     """Tests that the middleware allows access when no API key is configured.
 
@@ -34,6 +38,7 @@ def test_middleware_allows_when_no_api_key():
     assert resp.status_code == 200
 
 
+@pytest.mark.unit
 def test_middleware_rejects_bad_key_and_accepts_good_key():
     """Tests that the middleware rejects requests with a missing or incorrect API key
     and accepts requests with the correct key when authentication is enabled.

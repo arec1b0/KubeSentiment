@@ -7,7 +7,6 @@ multi-GPU support, and intelligent load balancing for maximum throughput.
 
 import os
 from typing import Any, Dict, List, Optional
-from concurrent.futures import ThreadPoolExecutor
 import asyncio
 from dataclasses import dataclass
 from enum import Enum
@@ -21,6 +20,7 @@ logger = get_logger(__name__)
 
 class LoadBalancingStrategy(str, Enum):
     """GPU load balancing strategies."""
+
     ROUND_ROBIN = "round-robin"
     LEAST_LOADED = "least-loaded"
     GPU_UTILIZATION = "gpu-utilization-based"
@@ -29,6 +29,7 @@ class LoadBalancingStrategy(str, Enum):
 @dataclass
 class GPUConfig:
     """GPU configuration for batch processing."""
+
     enabled: bool
     gpu_count: int
     batch_size: int
@@ -109,15 +110,12 @@ class GPUBatchOptimizer(IGPUBatchOptimizer):
             # Set memory fraction to avoid OOM
             if self.config.memory_fraction < 1.0:
                 torch.cuda.set_per_process_memory_fraction(
-                    self.config.memory_fraction,
-                    device=None  # Apply to all devices
+                    self.config.memory_fraction, device=None  # Apply to all devices
                 )
-                self.logger.info(
-                    f"Set GPU memory fraction to {self.config.memory_fraction}"
-                )
+                self.logger.info(f"Set GPU memory fraction to {self.config.memory_fraction}")
 
             # Enable TF32 for Ampere+ GPUs (faster computation)
-            if hasattr(torch.backends.cuda, 'matmul'):
+            if hasattr(torch.backends.cuda, "matmul"):
                 torch.backends.cuda.matmul.allow_tf32 = True
                 torch.backends.cudnn.allow_tf32 = True
                 self.logger.info("Enabled TF32 for faster computation")
@@ -129,11 +127,7 @@ class GPUBatchOptimizer(IGPUBatchOptimizer):
             self.logger.error(f"Failed to initialize GPU: {e}")
             self.config.enabled = False
 
-    def get_optimal_batch_size(
-        self,
-        num_samples: int,
-        input_size: Optional[int] = None
-    ) -> int:
+    def get_optimal_batch_size(self, num_samples: int, input_size: Optional[int] = None) -> int:
         """
         Calculate optimal batch size based on GPU memory and input size.
 
@@ -163,10 +157,7 @@ class GPUBatchOptimizer(IGPUBatchOptimizer):
                     batch_size = max(self.config.batch_size // 2, 8)
                 elif memory_usage < 0.5:
                     # Low memory usage, can increase batch size
-                    batch_size = min(
-                        self.config.max_batch_size,
-                        int(self.config.batch_size * 1.5)
-                    )
+                    batch_size = min(self.config.max_batch_size, int(self.config.batch_size * 1.5))
                 else:
                     batch_size = self.config.batch_size
 
@@ -220,10 +211,7 @@ class GPUBatchOptimizer(IGPUBatchOptimizer):
         self.current_gpu_index = (self.current_gpu_index + 1) % self.config.gpu_count
         return gpu_id
 
-    def distribute_batches(
-        self,
-        texts: List[str]
-    ) -> List[tuple[int, List[str]]]:
+    def distribute_batches(self, texts: List[str]) -> List[tuple[int, List[str]]]:
         """
         Distribute batches across GPUs for multi-GPU inference.
 
@@ -238,7 +226,7 @@ class GPUBatchOptimizer(IGPUBatchOptimizer):
             batch_size = self.get_optimal_batch_size(len(texts))
             batches = []
             for i in range(0, len(texts), batch_size):
-                batch = texts[i:i + batch_size]
+                batch = texts[i : i + batch_size]
                 batches.append((0, batch))
             return batches
 
@@ -247,7 +235,7 @@ class GPUBatchOptimizer(IGPUBatchOptimizer):
         batch_size = self.get_optimal_batch_size(len(texts))
 
         for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
+            batch = texts[i : i + batch_size]
             gpu_id = self._select_gpu()
             gpu_batches.append((gpu_id, batch))
 
@@ -257,10 +245,7 @@ class GPUBatchOptimizer(IGPUBatchOptimizer):
         return gpu_batches
 
     async def process_batch_parallel(
-        self,
-        predict_fn,
-        texts: List[str],
-        max_workers: Optional[int] = None
+        self, predict_fn, texts: List[str], max_workers: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
         Process batches in parallel across GPUs.
@@ -294,8 +279,7 @@ class GPUBatchOptimizer(IGPUBatchOptimizer):
 
                 # Update load tracking
                 self.gpu_loads[gpu_id] = max(
-                    0.0,
-                    self.gpu_loads.get(gpu_id, 0.0) - len(batch_texts)
+                    0.0, self.gpu_loads.get(gpu_id, 0.0) - len(batch_texts)
                 )
 
                 return results
@@ -306,10 +290,7 @@ class GPUBatchOptimizer(IGPUBatchOptimizer):
                 return predict_fn(batch_texts)
 
         # Execute batches in parallel
-        tasks = [
-            process_batch(gpu_id, batch_texts)
-            for gpu_id, batch_texts in gpu_batches
-        ]
+        tasks = [process_batch(gpu_id, batch_texts) for gpu_id, batch_texts in gpu_batches]
 
         batch_results = await asyncio.gather(*tasks)
 
@@ -338,7 +319,7 @@ class GPUBatchOptimizer(IGPUBatchOptimizer):
                 "gpu_count": self.config.gpu_count,
                 "multi_gpu_enabled": self.config.multi_gpu_enabled,
                 "batch_size": self.config.batch_size,
-                "gpus": []
+                "gpus": [],
             }
 
             for i in range(self.config.gpu_count):
@@ -348,15 +329,13 @@ class GPUBatchOptimizer(IGPUBatchOptimizer):
                         "name": torch.cuda.get_device_name(i),
                         "memory_allocated_mb": torch.cuda.memory_allocated(i) / 1e6,
                         "memory_reserved_mb": torch.cuda.memory_reserved(i) / 1e6,
-                        "load": self.gpu_loads.get(i, 0.0)
+                        "load": self.gpu_loads.get(i, 0.0),
                     }
 
                     free_mem, total_mem = torch.cuda.mem_get_info(i)
                     gpu_info["memory_free_mb"] = free_mem / 1e6
                     gpu_info["memory_total_mb"] = total_mem / 1e6
-                    gpu_info["memory_utilization_pct"] = (
-                        (total_mem - free_mem) / total_mem * 100
-                    )
+                    gpu_info["memory_utilization_pct"] = (total_mem - free_mem) / total_mem * 100
 
                     stats["gpus"].append(gpu_info)
 

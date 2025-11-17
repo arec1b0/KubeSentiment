@@ -5,6 +5,9 @@ Tests the PerformanceBenchmark class and related dataclasses,
 including benchmarking methods, result comparisons, and metrics calculations.
 """
 
+import pytest
+
+
 import asyncio
 import time
 from typing import Any, Dict, List
@@ -52,6 +55,7 @@ class MockModel:
         return [{"label": "positive", "score": 0.95} for _ in texts]
 
 
+@pytest.mark.performance
 class TestBenchmarkResult:
     """Tests for the BenchmarkResult dataclass."""
 
@@ -82,6 +86,7 @@ class TestBenchmarkResult:
         assert result.p99_latency_ms == 18.0
 
 
+@pytest.mark.performance
 class TestComparisonResult:
     """Tests for the ComparisonResult dataclass."""
 
@@ -128,6 +133,7 @@ class TestComparisonResult:
         assert comparison.speedup_factor == 2.0
 
 
+@pytest.mark.performance
 class TestPerformanceBenchmark:
     """Tests for the PerformanceBenchmark class."""
 
@@ -502,6 +508,7 @@ class TestPerformanceBenchmark:
         assert "2.00" in captured.out  # speedup factor
 
 
+@pytest.mark.performance
 class TestBenchmarkIntegration:
     """Integration tests for benchmark functionality."""
 
@@ -533,10 +540,7 @@ class TestBenchmarkIntegration:
         texts = ["test"] * 10
 
         # Run same benchmark multiple times
-        results = [
-            benchmark.benchmark_single_predictions(texts, warmup_runs=0)
-            for _ in range(3)
-        ]
+        results = [benchmark.benchmark_single_predictions(texts, warmup_runs=0) for _ in range(3)]
 
         # Results should be similar (within reasonable variance)
         avg_latencies = [r.avg_latency_ms for r in results]

@@ -82,9 +82,7 @@ class DataLakeWriter(IDataWriter):
             region_name=self.settings.data_lake_s3_region,
             endpoint_url=self.settings.data_lake_s3_endpoint_url,
         )
-        self.logger.info(
-            f"Initialized S3 client for region {self.settings.data_lake_s3_region}"
-        )
+        self.logger.info(f"Initialized S3 client for region {self.settings.data_lake_s3_region}")
 
     def _initialize_gcs_client(self):
         """Initialize Google Cloud Storage client."""
@@ -96,9 +94,7 @@ class DataLakeWriter(IDataWriter):
             )
         else:
             # Use default credentials (e.g., from GOOGLE_APPLICATION_CREDENTIALS env var)
-            self.storage_client = storage.Client(
-                project=self.settings.data_lake_gcs_project
-            )
+            self.storage_client = storage.Client(project=self.settings.data_lake_gcs_project)
         self.logger.info("Initialized GCS client")
 
     def _initialize_azure_client(self):
@@ -110,10 +106,11 @@ class DataLakeWriter(IDataWriter):
                 self.settings.data_lake_azure_connection_string
             )
         elif (
-            self.settings.data_lake_azure_account_name
-            and self.settings.data_lake_azure_account_key
+            self.settings.data_lake_azure_account_name and self.settings.data_lake_azure_account_key
         ):
-            account_url = f"https://{self.settings.data_lake_azure_account_name}.blob.core.windows.net"
+            account_url = (
+                f"https://{self.settings.data_lake_azure_account_name}.blob.core.windows.net"
+            )
             self.storage_client = BlobServiceClient(
                 account_url=account_url,
                 credential=self.settings.data_lake_azure_account_key,
@@ -410,9 +407,7 @@ class DataLakeWriter(IDataWriter):
             path: Blob path.
             data: Parquet file content.
         """
-        container_client = self.storage_client.get_container_client(
-            self.settings.data_lake_bucket
-        )
+        container_client = self.storage_client.get_container_client(self.settings.data_lake_bucket)
 
         # Create container if it doesn't exist
         loop = asyncio.get_event_loop()
@@ -437,9 +432,7 @@ class DataLakeWriter(IDataWriter):
                 },
             ),
         )
-        self.logger.debug(
-            f"Uploaded to Azure: {self.settings.data_lake_bucket}/{path}"
-        )
+        self.logger.debug(f"Uploaded to Azure: {self.settings.data_lake_bucket}/{path}")
 
     def get_stats(self) -> Dict[str, Any]:
         """Get current writer statistics.

@@ -26,6 +26,7 @@ try:
     from evidently.test_suite import TestSuite
     from evidently.tests import TestNumberOfDriftedColumns
     import pandas as pd
+
     DRIFT_DETECTION_AVAILABLE = True
 except ImportError:
     DRIFT_DETECTION_AVAILABLE = False
@@ -37,6 +38,7 @@ logger = get_logger(__name__)
 @dataclass
 class DriftMetrics:
     """Container for drift detection metrics."""
+
     timestamp: datetime
     data_drift_detected: bool
     prediction_drift_detected: bool
@@ -71,7 +73,7 @@ class DriftDetector(IDriftDetector):
         psi_threshold: float = 0.1,
         ks_threshold: float = 0.05,
         enabled: bool = True,
-        min_samples: int = 100
+        min_samples: int = 100,
     ):
         """
         Initialize drift detector.
@@ -115,14 +117,12 @@ class DriftDetector(IDriftDetector):
         # Baseline established flag
         self.baseline_established = False
 
-        logger.info("Drift detector initialized", window_size=window_size, psi_threshold=psi_threshold)
+        logger.info(
+            "Drift detector initialized", window_size=window_size, psi_threshold=psi_threshold
+        )
 
     def add_prediction(
-        self,
-        text: str,
-        confidence: float,
-        prediction: str,
-        is_reference: bool = False
+        self, text: str, confidence: float, prediction: str, is_reference: bool = False
     ) -> None:
         """
         Add a prediction to the drift detector.
@@ -155,12 +155,7 @@ class DriftDetector(IDriftDetector):
                 self.current_confidences.append(confidence)
                 self.current_text_lengths.append(text_length)
 
-    def calculate_psi(
-        self,
-        reference: List[float],
-        current: List[float],
-        bins: int = 10
-    ) -> float:
+    def calculate_psi(self, reference: List[float], current: List[float], bins: int = 10) -> float:
         """
         Calculate Population Stability Index (PSI).
 
@@ -225,11 +220,7 @@ class DriftDetector(IDriftDetector):
         statistic, p_value = stats.ks_2samp(reference, current)
         return float(statistic), float(p_value)
 
-    def chi_squared_test(
-        self,
-        reference: List[str],
-        current: List[str]
-    ) -> Tuple[float, float]:
+    def chi_squared_test(self, reference: List[str], current: List[str]) -> Tuple[float, float]:
         """
         Perform Chi-squared test for categorical data.
 
@@ -278,33 +269,28 @@ class DriftDetector(IDriftDetector):
                 timestamp=datetime.utcnow(),
                 data_drift_detected=False,
                 prediction_drift_detected=False,
-                drift_score=0.0
+                drift_score=0.0,
             )
 
             # 1. Test confidence score drift (PSI and KS test)
             confidence_psi = self.calculate_psi(
-                list(self.reference_confidences),
-                list(self.current_confidences)
+                list(self.reference_confidences), list(self.current_confidences)
             )
             confidence_ks_stat, confidence_ks_p = self.ks_test(
-                list(self.reference_confidences),
-                list(self.current_confidences)
+                list(self.reference_confidences), list(self.current_confidences)
             )
 
             # 2. Test text length drift (PSI and KS test)
             length_psi = self.calculate_psi(
-                list(self.reference_text_lengths),
-                list(self.current_text_lengths)
+                list(self.reference_text_lengths), list(self.current_text_lengths)
             )
             length_ks_stat, length_ks_p = self.ks_test(
-                list(self.reference_text_lengths),
-                list(self.current_text_lengths)
+                list(self.reference_text_lengths), list(self.current_text_lengths)
             )
 
             # 3. Test prediction distribution drift (Chi-squared)
             pred_chi2, pred_chi2_p = self.chi_squared_test(
-                list(self.reference_predictions),
-                list(self.current_predictions)
+                list(self.reference_predictions), list(self.current_predictions)
             )
 
             # Store test results
@@ -316,14 +302,14 @@ class DriftDetector(IDriftDetector):
                 "text_length_ks_statistic": length_ks_stat,
                 "text_length_ks_pvalue": length_ks_p,
                 "prediction_chi2_statistic": pred_chi2,
-                "prediction_chi2_pvalue": pred_chi2_p
+                "prediction_chi2_pvalue": pred_chi2_p,
             }
 
             # Feature-level drift scores
             drift_metrics.feature_drifts = {
                 "confidence": confidence_psi,
                 "text_length": length_psi,
-                "prediction_distribution": pred_chi2_p
+                "prediction_distribution": pred_chi2_p,
             }
 
             # Overall drift score (average PSI)
@@ -332,10 +318,10 @@ class DriftDetector(IDriftDetector):
             # Determine if drift detected
             # Data drift: PSI > threshold OR KS test significant
             drift_metrics.data_drift_detected = (
-                confidence_psi > self.psi_threshold or
-                length_psi > self.psi_threshold or
-                confidence_ks_p < self.ks_threshold or
-                length_ks_p < self.ks_threshold
+                confidence_psi > self.psi_threshold
+                or length_psi > self.psi_threshold
+                or confidence_ks_p < self.ks_threshold
+                or length_ks_p < self.ks_threshold
             )
 
             # Prediction drift: Chi-squared test significant
@@ -351,7 +337,7 @@ class DriftDetector(IDriftDetector):
                     "Drift detected",
                     data_drift_detected=drift_metrics.data_drift_detected,
                     prediction_drift_detected=drift_metrics.prediction_drift_detected,
-                    drift_score=drift_metrics.drift_score
+                    drift_score=drift_metrics.drift_score,
                 )
             else:
                 logger.debug("No drift detected", drift_score=drift_metrics.drift_score)
@@ -397,7 +383,8 @@ class DriftDetector(IDriftDetector):
 
         with self._lock:
             recent_drifts = [
-                d for d in self.drift_history
+                d
+                for d in self.drift_history
                 if d.timestamp > datetime.utcnow() - timedelta(hours=24)
             ]
 
@@ -408,12 +395,17 @@ class DriftDetector(IDriftDetector):
                 "current_window_size": len(self.current_predictions),
                 "last_check": self.last_drift_check.isoformat() if self.last_drift_check else None,
                 "total_drift_checks": len(self.drift_history),
-                "drifts_last_24h": len([d for d in recent_drifts if d.data_drift_detected or d.prediction_drift_detected]),
-                "latest_drift_score": self.drift_history[-1].drift_score if self.drift_history else 0.0,
-                "thresholds": {
-                    "psi": self.psi_threshold,
-                    "ks_pvalue": self.ks_threshold
-                }
+                "drifts_last_24h": len(
+                    [
+                        d
+                        for d in recent_drifts
+                        if d.data_drift_detected or d.prediction_drift_detected
+                    ]
+                ),
+                "latest_drift_score": (
+                    self.drift_history[-1].drift_score if self.drift_history else 0.0
+                ),
+                "thresholds": {"psi": self.psi_threshold, "ks_pvalue": self.ks_threshold},
             }
 
     def export_drift_report(self) -> Optional[str]:
@@ -431,23 +423,24 @@ class DriftDetector(IDriftDetector):
 
         try:
             # Create DataFrames
-            reference_df = pd.DataFrame({
-                'confidence': list(self.reference_confidences),
-                'text_length': list(self.reference_text_lengths),
-                'prediction': list(self.reference_predictions)
-            })
+            reference_df = pd.DataFrame(
+                {
+                    "confidence": list(self.reference_confidences),
+                    "text_length": list(self.reference_text_lengths),
+                    "prediction": list(self.reference_predictions),
+                }
+            )
 
-            current_df = pd.DataFrame({
-                'confidence': list(self.current_confidences),
-                'text_length': list(self.current_text_lengths),
-                'prediction': list(self.current_predictions)
-            })
+            current_df = pd.DataFrame(
+                {
+                    "confidence": list(self.current_confidences),
+                    "text_length": list(self.current_text_lengths),
+                    "prediction": list(self.current_predictions),
+                }
+            )
 
             # Create drift report
-            report = Report(metrics=[
-                DataDriftPreset(),
-                DataQualityPreset()
-            ])
+            report = Report(metrics=[DataDriftPreset(), DataQualityPreset()])
 
             report.run(reference_data=reference_df, current_data=current_df)
 
@@ -468,15 +461,11 @@ def get_drift_detector() -> Optional[DriftDetector]:
 
 
 def initialize_drift_detector(
-    window_size: int = 1000,
-    psi_threshold: float = 0.1,
-    enabled: bool = True
+    window_size: int = 1000, psi_threshold: float = 0.1, enabled: bool = True
 ) -> DriftDetector:
     """Initialize the global drift detector instance."""
     global _drift_detector_instance
     _drift_detector_instance = DriftDetector(
-        window_size=window_size,
-        psi_threshold=psi_threshold,
-        enabled=enabled
+        window_size=window_size, psi_threshold=psi_threshold, enabled=enabled
     )
     return _drift_detector_instance

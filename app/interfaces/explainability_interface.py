@@ -16,9 +16,7 @@ class IExplainabilityEngine(ABC):
     """
 
     @abstractmethod
-    def extract_attention_weights(
-        self, text: str, normalize: bool = True
-    ) -> List[Dict[str, Any]]:
+    def extract_attention_weights(self, text: str, normalize: bool = True) -> List[Dict[str, Any]]:
         """
         Extract attention weights from transformer model.
 

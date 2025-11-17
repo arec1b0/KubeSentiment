@@ -5,6 +5,9 @@ Tests cover InstanceLoad health score calculation, CircuitBreaker state
 transitions, and LoadBalancingMetrics collection.
 """
 
+import pytest
+
+
 import time
 from unittest.mock import patch
 
@@ -19,6 +22,7 @@ from app.services.load_balancer import (
 )
 
 
+@pytest.mark.unit
 class TestInstanceLoad:
     """Test InstanceLoad functionality."""
 
@@ -97,6 +101,7 @@ class TestInstanceLoad:
         assert "timestamp" in result
 
 
+@pytest.mark.unit
 class TestCircuitBreaker:
     """Test CircuitBreaker functionality."""
 
@@ -195,6 +200,7 @@ class TestCircuitBreaker:
         assert cb.state == CircuitState.OPEN
 
 
+@pytest.mark.unit
 class TestLoadBalancingMetrics:
     """Test LoadBalancingMetrics functionality."""
 
@@ -386,6 +392,7 @@ class TestLoadBalancingMetrics:
         assert metrics.queue_size == 0
 
 
+@pytest.mark.unit
 class TestSingleton:
     """Test singleton pattern for LoadBalancingMetrics."""
 
@@ -394,4 +401,3 @@ class TestSingleton:
         metrics1 = get_load_metrics()
         metrics2 = get_load_metrics()
         assert metrics1 is metrics2
-

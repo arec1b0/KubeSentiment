@@ -16,9 +16,7 @@ class IGPUBatchOptimizer(ABC):
     """
 
     @abstractmethod
-    def get_optimal_batch_size(
-        self, num_samples: int, input_size: Optional[int] = None
-    ) -> int:
+    def get_optimal_batch_size(self, num_samples: int, input_size: Optional[int] = None) -> int:
         """
         Calculate optimal batch size based on GPU memory and input size.
 

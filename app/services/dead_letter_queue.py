@@ -59,7 +59,9 @@ class DeadLetterQueue:
             "timestamp": time.time(),
         }
 
-        backoff_base = 0.002  # seconds; keeps retries fast in tests while honouring exponential backoff
+        backoff_base = (
+            0.002  # seconds; keeps retries fast in tests while honouring exponential backoff
+        )
         for attempt in range(1, self.max_retries + 1):
             try:
                 future = self.producer.send(
