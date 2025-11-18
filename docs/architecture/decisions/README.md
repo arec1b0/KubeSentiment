@@ -26,17 +26,59 @@ Each ADR follows this structure:
 | [004](004-use-fastapi-as-web-framework.md) | Use FastAPI as Web Framework | Accepted | 2024-01-10 |
 | [005](005-use-helm-for-kubernetes-deployments.md) | Use Helm for Kubernetes Deployments | Accepted | 2024-01-25 |
 | [006](006-use-hashicorp-vault-for-secrets.md) | Use HashiCorp Vault for Secrets Management | Accepted | 2024-02-10 |
+| [007](007-three-pillars-of-observability.md) | Implement Three Pillars of Observability | Accepted | 2024-03-01 |
+| [008](008-use-terraform-for-iac.md) | Use Terraform for Multi-Cloud Infrastructure as Code | Accepted | 2024-03-10 |
+| [009](009-profile-based-configuration.md) | Implement Profile-Based Configuration System | Accepted | 2024-03-15 |
+
+## ADR Categories
+
+Our ADRs are organized into the following categories:
+
+### Infrastructure & Deployment
+- [ADR 005](005-use-helm-for-kubernetes-deployments.md) - Helm for Kubernetes Deployments
+- [ADR 008](008-use-terraform-for-iac.md) - Terraform for Infrastructure as Code
+
+### Application Framework & APIs
+- [ADR 004](004-use-fastapi-as-web-framework.md) - FastAPI as Web Framework
+- [ADR 009](009-profile-based-configuration.md) - Profile-Based Configuration System
+
+### Data & Caching
+- [ADR 002](002-use-redis-for-distributed-caching.md) - Redis for Distributed Caching
+- [ADR 003](003-use-kafka-for-async-processing.md) - Kafka for Async Message Processing
+
+### ML/AI
+- [ADR 001](001-use-onnx-for-model-optimization.md) - ONNX for Model Optimization
+
+### Security
+- [ADR 006](006-use-hashicorp-vault-for-secrets.md) - HashiCorp Vault for Secrets Management
+
+### Observability
+- [ADR 007](007-three-pillars-of-observability.md) - Three Pillars of Observability
 
 ## Creating New ADRs
 
 When creating a new ADR:
 
 1. Create a new file named `NNN-title-with-dashes.md`
-2. Use the next available number (NNN)
-3. Follow the ADR template below
+2. Use the next available number (NNN - next is 010)
+3. Follow the [ADR template](TEMPLATE.md)
 4. Update this index
+5. Add to the appropriate category above
 
-### ADR Template
+### Using the Template
+
+A comprehensive ADR template is available at [TEMPLATE.md](TEMPLATE.md). The template includes:
+
+- Standard ADR structure (Context, Decision, Consequences)
+- Sections for alternatives considered
+- Implementation details and code examples
+- Performance metrics and validation
+- Operational considerations
+- Related ADRs and references
+
+### Quick Template
+
+For a minimal ADR, use this structure:
 
 ```markdown
 # ADR NNN: [Title]
