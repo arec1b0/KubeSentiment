@@ -2,15 +2,14 @@
 """A script for running a suite of code quality checks.
 
 This script automates the process of checking code quality by running several
-linters and formatters, including Black, isort, Flake8, mypy, and Bandit. It
-then generates a consolidated report of the results and suggests commands for
-fixing any issues that were found.
+linters and formatters, including Black, isort, Ruff, mypy, Radon, and Bandit.
+It then generates a consolidated report of the results and suggests commands
+for fixing any issues that were found.
 """
 
+from pathlib import Path
 import subprocess
 import sys
-from pathlib import Path
-from typing import Dict, List, Tuple
 
 
 class CodeQualityChecker:
@@ -31,13 +30,12 @@ class CodeQualityChecker:
             project_root: The path to the project's root directory.
         """
         self.project_root = project_root
-        self.results: Dict[str, Dict] = {}
+        self.results: dict[str, dict] = {}
 
-    def run_command(self, name: str, cmd: List[str]) -> Tuple[bool, str]:
+    def run_command(self, cmd: list[str]) -> tuple[bool, str]:
         """Executes a command-line tool and captures its output.
 
         Args:
-            name: The name of the tool being run (for logging purposes).
             cmd: A list of strings representing the command to be executed.
 
         Returns:
@@ -46,21 +44,27 @@ class CodeQualityChecker:
         """
         try:
             result = subprocess.run(
-                cmd, cwd=self.project_root, capture_output=True, text=True, timeout=60
+                cmd,
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
             )
-            success = result.returncode == 0
-            output = result.stdout + result.stderr
-            return success, output
         except subprocess.TimeoutExpired:
             return False, "Command timed out"
         except Exception as e:
             return False, str(e)
+        else:
+            success = result.returncode == 0
+            output = result.stdout + result.stderr
+            return success, output
 
     def check_black(self) -> None:
         """Checks code formatting using the Black tool."""
         print("🎨 Checking Black formatting...", end=" ")
         success, output = self.run_command(
-            "black", ["black", "--check", "app/", "tests/", "scripts/", "run.py"]
+            ["black", "--check", "app/", "tests/", "scripts/", "run.py"]
         )
         self.results["black"] = {"success": success, "output": output}
         print("✅" if success else "❌")
@@ -69,32 +73,40 @@ class CodeQualityChecker:
         """Checks import sorting using the isort tool."""
         print("📦 Checking isort...", end=" ")
         success, output = self.run_command(
-            "isort",
-            ["isort", "--check-only", "app/", "tests/", "scripts/", "run.py"],
+            ["isort", "--check-only", "app/", "tests/", "scripts/", "run.py"]
         )
         self.results["isort"] = {"success": success, "output": output}
         print("✅" if success else "❌")
 
-    def check_flake8(self) -> None:
-        """Checks for style guide enforcement using the Flake8 tool."""
-        print("🔍 Checking Flake8...", end=" ")
+    def check_ruff(self) -> None:
+        """Checks for style guide enforcement using the Ruff linter."""
+        print("🔎 Checking Ruff...", end=" ")
         success, output = self.run_command(
-            "flake8", ["flake8", "app/", "tests/", "scripts/", "run.py"]
+            ["ruff", "check", "app/", "tests/", "scripts/", "run.py"]
         )
-        self.results["flake8"] = {"success": success, "output": output}
+        self.results["ruff"] = {"success": success, "output": output}
+        print("✅" if success else "❌")
+
+    def check_complexity(self) -> None:
+        """Checks code complexity using Radon."""
+        print("📊 Checking code complexity...", end=" ")
+        success, output = self.run_command(
+            ["radon", "cc", "app/", "--min", "B", "--show-complexity"]
+        )
+        self.results["complexity"] = {"success": success, "output": output}
         print("✅" if success else "❌")
 
     def check_mypy(self) -> None:
         """Performs static type checking using the mypy tool."""
         print("🔬 Checking mypy...", end=" ")
-        success, output = self.run_command("mypy", ["mypy", "app/", "--ignore-missing-imports"])
+        success, output = self.run_command(["mypy", "app/", "--config-file=pyproject.toml"])
         self.results["mypy"] = {"success": success, "output": output}
         print("✅" if success else "❌")
 
     def check_bandit(self) -> None:
         """Performs security analysis using the Bandit tool."""
         print("🔒 Checking Bandit security...", end=" ")
-        success, output = self.run_command("bandit", ["bandit", "-r", "app/"])
+        success, output = self.run_command(["bandit", "-r", "app/", "-c", "pyproject.toml"])
         self.results["bandit"] = {"success": success, "output": output}
         print("✅" if success else "❌")
 
@@ -110,8 +122,9 @@ class CodeQualityChecker:
 
         self.check_black()
         self.check_isort()
-        self.check_flake8()
+        self.check_ruff()
         self.check_mypy()
+        self.check_complexity()
         self.check_bandit()
 
         return all(result["success"] for result in self.results.values())
@@ -160,11 +173,17 @@ class CodeQualityChecker:
             print("   # or")
             print("   make lint-fix\n")
 
-        if "flake8" in failed:
-            print("🔧 To fix flake8 issues:")
-            print("   1. Review errors above")
-            print("   2. Fix manually or run: make format")
-            print("   3. Some issues require manual intervention\n")
+        if "ruff" in failed:
+            print("🔧 To fix Ruff linting issues:")
+            print("   1. Auto-fix issues: ruff check --fix app/ tests/")
+            print("   2. Or run: make lint-fix")
+            print("   3. Review remaining issues manually\n")
+
+        if "complexity" in failed:
+            print("📊 To fix complexity issues:")
+            print("   1. Review complexity report above")
+            print("   2. Refactor functions with complexity > 10")
+            print("   3. Extract complex logic into smaller functions\n")
 
         if "mypy" in failed:
             print("🔬 To fix mypy type errors:")

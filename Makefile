@@ -36,18 +36,34 @@ test: ## Run tests with coverage
 	pytest tests/ -v --cov=app --cov-report=term-missing
 
 lint: ## Run code quality checks
-	@echo "Running black check..."
-	black --check app/ tests/ scripts/ run.py
-	@echo "Running isort check..."
-	isort --check-only app/ tests/ scripts/ run.py
-	@echo "Running flake8..."
-	flake8 app/ tests/ scripts/ run.py
-	@echo "Running mypy..."
-	mypy app/ --ignore-missing-imports
+	@echo "🔍 Running code quality checks..."
+	@echo "📝 Checking Black formatting..."
+	@black --check app/ tests/ scripts/ run.py || (echo "❌ Black check failed. Run 'make format' to fix." && exit 1)
+	@echo "📦 Checking isort..."
+	@isort --check-only app/ tests/ scripts/ run.py || (echo "❌ isort check failed. Run 'make format' to fix." && exit 1)
+	@echo "🔎 Running Ruff linter..."
+	@ruff check app/ tests/ scripts/ run.py || (echo "❌ Ruff check failed. Run 'make lint-fix' to auto-fix issues." && exit 1)
+	@echo "🔬 Running mypy type checker..."
+	@mypy app/ --config-file=pyproject.toml || (echo "❌ mypy check failed." && exit 1)
+	@echo "📊 Checking code complexity..."
+	@radon cc app/ --min B --show-complexity || (echo "❌ Complexity check failed." && exit 1)
+	@echo "🔒 Running Bandit security scan..."
+	@bandit -r app/ -c pyproject.toml || (echo "⚠️  Bandit found security issues." && exit 1)
+	@echo "✅ All code quality checks passed!"
 
 lint-fix: ## Auto-fix linting issues
-	black app/ tests/ scripts/ run.py
-	isort app/ tests/ scripts/ run.py
+	@echo "🔧 Auto-fixing linting issues..."
+	@black app/ tests/ scripts/ run.py
+	@isort app/ tests/ scripts/ run.py
+	@ruff check --fix app/ tests/ scripts/ run.py
+	@echo "✅ Auto-fix complete!"
+
+complexity: ## Check code complexity metrics
+	@echo "📊 Code Complexity Report:"
+	@radon cc app/ --min B --show-complexity
+	@echo ""
+	@echo "📈 Complexity Summary:"
+	@radon cc app/ --min B --total-average
 
 format: ## Format code
 	@echo "Formatting with black..."
