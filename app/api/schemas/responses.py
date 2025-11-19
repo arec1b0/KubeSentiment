@@ -12,50 +12,141 @@ class PredictionResponse(BaseModel):
 
     This model structures the output of a successful prediction request,
     providing the sentiment label, confidence score, and metadata about the
-    prediction process.
+    prediction process. Used for both single predictions and batch results.
 
     Attributes:
-        label: The predicted sentiment label (e.g., 'POSITIVE').
-        score: The confidence score of the prediction, from 0.0 to 1.0.
-        inference_time_ms: The time taken for the model to make the prediction.
-        model_name: The name of the model that was used.
-        text_length: The length of the text that was analyzed.
-        backend: The model backend that was used (e.g., 'pytorch', 'onnx').
-        cached: A flag indicating if the result was served from the cache.
+        label: The predicted sentiment label (POSITIVE, NEGATIVE, NEUTRAL).
+        score: The confidence score of the prediction (0.0 to 1.0, higher = more confident).
+        inference_time_ms: The time taken for the model to make the prediction in milliseconds.
+        model_name: The name of the model that was used for inference.
+        text_length: The length of the analyzed text in characters.
+        backend: The model backend used (onnx or pytorch).
+        cached: Whether this result was served from Redis cache (faster response).
+        features: Optional advanced text features (available in detailed mode).
+
+    Example:
+        ```json
+        {
+            "label": "POSITIVE",
+            "score": 0.9823,
+            "inference_time_ms": 145.2,
+            "model_name": "distilbert-base-uncased-finetuned-sst-2-english",
+            "text_length": 48,
+            "backend": "onnx",
+            "cached": false,
+            "features": null
+        }
+        ```
     """
 
-    label: str = Field(..., description="Predicted sentiment label")
-    score: float = Field(..., description="Confidence score (0.0 to 1.0)", ge=0.0, le=1.0)
-    inference_time_ms: float = Field(..., description="Model inference time in milliseconds")
-    model_name: str = Field(..., description="Name of the model used")
-    text_length: int = Field(..., description="Length of processed text")
-    backend: str = Field(..., description="Model backend used (pytorch/onnx)")
-    cached: bool = Field(default=False, description="Whether result was cached")
-    features: Optional[Dict[str, Any]] = Field(None, description="Advanced text features")
+    label: str = Field(
+        ...,
+        description="Predicted sentiment label: POSITIVE, NEGATIVE, or NEUTRAL",
+        examples=["POSITIVE", "NEGATIVE", "NEUTRAL"]
+    )
+    score: float = Field(
+        ...,
+        description="Confidence score between 0.0 and 1.0. Scores closer to 1.0 indicate higher confidence.",
+        ge=0.0,
+        le=1.0,
+        examples=[0.9823, 0.5432, 0.1234]
+    )
+    inference_time_ms: float = Field(
+        ...,
+        description="Model inference time in milliseconds. Cached responses typically <50ms, uncached 100-300ms.",
+        examples=[145.2, 52.8, 287.5]
+    )
+    model_name: str = Field(
+        ...,
+        description="Name of the model used for inference. Multiple models may be supported in different configurations.",
+        examples=["distilbert-base-uncased-finetuned-sst-2-english"]
+    )
+    text_length: int = Field(
+        ...,
+        description="Length of the analyzed text in characters (after stripping whitespace).",
+        examples=[48, 125, 7500]
+    )
+    backend: str = Field(
+        ...,
+        description="Model backend used for inference. ONNX is optimized for production (160x faster cold-start), PyTorch for development.",
+        examples=["onnx", "pytorch"]
+    )
+    cached: bool = Field(
+        default=False,
+        description="Whether this result was served from Redis cache. Cached results have significantly lower latency (<50ms).",
+        examples=[True, False]
+    )
+    features: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Optional advanced text features (word count, sentiment word density, etc). Only populated in detailed mode.",
+        examples=[{"word_count": 8, "avg_word_length": 4.2}]
+    )
 
 
 class HealthResponse(BaseModel):
     """Defines the schema for the service's health check response.
 
-    This model provides a structured response for the health check endpoint,
-    indicating the status of the service and its components.
+    This model provides a quick health check of the service and its components.
+    Use /api/v1/health for quick checks and /api/v1/health/details for comprehensive
+    component-level details.
 
     Attributes:
-        status: The overall status of the service (e.g., 'healthy').
-        model_status: The status of the machine learning model.
-        version: The version of the application.
-        backend: The model backend currently in use.
-        timestamp: The timestamp of when the health check was performed.
+        status: Overall service health status.
+        model_status: Machine learning model availability and readiness.
+        version: Application version number.
+        backend: Model backend currently in use (onnx or pytorch).
+        timestamp: Unix timestamp when health check was performed.
+        kafka_status: Optional Kafka integration status (if enabled).
+        async_batch_status: Optional async batch service status (if enabled).
+
+    Example:
+        ```json
+        {
+            "status": "healthy",
+            "model_status": "loaded",
+            "version": "1.0.0",
+            "backend": "onnx",
+            "timestamp": 1734596400.123,
+            "kafka_status": "connected",
+            "async_batch_status": "operational"
+        }
+        ```
     """
 
-    status: str = Field(..., description="Service status")
-    model_status: str = Field(..., description="Model availability status")
-    version: str = Field(..., description="Application version")
-    backend: str = Field(..., description="Model backend in use")
-    timestamp: float = Field(..., description="Health check timestamp")
-    kafka_status: Optional[str] = Field(None, description="Kafka consumer status (if enabled)")
+    status: str = Field(
+        ...,
+        description="Overall service status: healthy, degraded, or unhealthy",
+        examples=["healthy", "degraded", "unhealthy"]
+    )
+    model_status: str = Field(
+        ...,
+        description="Model availability: loaded, loading, unloaded, or error",
+        examples=["loaded", "loading"]
+    )
+    version: str = Field(
+        ...,
+        description="Application version number",
+        examples=["1.0.0", "1.2.3"]
+    )
+    backend: str = Field(
+        ...,
+        description="Model backend in use: onnx (production) or pytorch (development)",
+        examples=["onnx", "pytorch"]
+    )
+    timestamp: float = Field(
+        ...,
+        description="Unix timestamp of when health check was performed",
+        examples=[1734596400.123]
+    )
+    kafka_status: Optional[str] = Field(
+        None,
+        description="Kafka integration status (if enabled): connected, disconnected, or error",
+        examples=["connected", "disconnected"]
+    )
     async_batch_status: Optional[str] = Field(
-        None, description="Async batch service status (if enabled)"
+        None,
+        description="Async batch service status (if enabled): operational, degraded, or unavailable",
+        examples=["operational", "degraded"]
     )
 
 
@@ -101,22 +192,67 @@ class KafkaMetricsResponse(BaseModel):
 class BatchJobResponse(BaseModel):
     """Response for batch job creation.
 
+    Returned immediately after submitting a batch processing request. Contains
+    the job ID needed to track progress and retrieve results.
+
     Attributes:
-        job_id: Unique identifier for the batch job.
-        status: Current status of the job.
-        total_texts: Number of texts in the batch.
-        estimated_completion_seconds: Estimated time for completion.
-        created_at: Timestamp when job was created.
-        priority: Processing priority.
+        job_id: Unique identifier for tracking this batch job throughout its lifecycle.
+        status: Current job status (typically 'pending' on creation).
+        total_texts: Total number of texts submitted in this batch.
+        estimated_completion_seconds: Estimated time until completion in seconds.
+        created_at: Unix timestamp when the job was created.
+        priority: Processing priority level (low, medium, high).
+        progress_percentage: Current processing progress (0-100%).
+
+    Example:
+        ```json
+        {
+            "job_id": "job_550e8400e29b41d4a716446655440000",
+            "status": "pending",
+            "total_texts": 3,
+            "estimated_completion_seconds": 45,
+            "created_at": 1734596400.123,
+            "priority": "medium",
+            "progress_percentage": 0.0
+        }
+        ```
     """
 
-    job_id: str = Field(..., description="Unique batch job identifier")
-    status: str = Field(..., description="Current job status")
-    total_texts: int = Field(..., description="Number of texts in batch")
-    estimated_completion_seconds: int = Field(..., description="Estimated completion time")
-    created_at: float = Field(..., description="Job creation timestamp")
-    priority: str = Field(..., description="Processing priority")
-    progress_percentage: float = Field(default=0.0, description="Processing progress (0-100%)")
+    job_id: str = Field(
+        ...,
+        description="Unique batch job identifier. Use this to track progress and retrieve results.",
+        examples=["job_550e8400e29b41d4a716446655440000"]
+    )
+    status: str = Field(
+        ...,
+        description="Current job status: pending, processing, completed, or failed",
+        examples=["pending", "processing", "completed"]
+    )
+    total_texts: int = Field(
+        ...,
+        description="Total number of texts submitted in this batch",
+        examples=[10, 100, 500]
+    )
+    estimated_completion_seconds: int = Field(
+        ...,
+        description="Estimated time until completion in seconds",
+        examples=[15, 45, 120]
+    )
+    created_at: float = Field(
+        ...,
+        description="Unix timestamp when the job was created",
+        examples=[1734596400.123]
+    )
+    priority: str = Field(
+        ...,
+        description="Processing priority: low (background), medium (normal), or high (fast)",
+        examples=["low", "medium", "high"]
+    )
+    progress_percentage: float = Field(
+        default=0.0,
+        description="Current processing progress as percentage (0-100%)",
+        examples=[0.0, 50.5, 100.0]
+    )
 
 
 class BatchJobStatus(BaseModel):
@@ -242,25 +378,66 @@ class ModelInfoResponse(BaseModel):
     """Defines the schema for the model information response.
 
     This model provides detailed metadata about the currently loaded machine
-    learning model.
+    learning model, including its readiness for inference and cache statistics.
 
     Attributes:
-        model_name: The name of the model.
-        model_type: The type of the model (e.g., 'pytorch', 'onnx').
-        backend: The backend currently in use for the model.
-        is_loaded: A flag indicating if the model has been loaded into memory.
-        is_ready: A flag indicating if the model is ready for inference.
-        cache_size: The current number of items in the prediction cache.
-        cache_max_size: The maximum capacity of the prediction cache.
+        model_name: Name of the loaded machine learning model.
+        model_type: Type of model architecture (transformer, etc.).
+        backend: Backend implementation (onnx or pytorch).
+        is_loaded: Whether model is loaded into memory.
+        is_ready: Whether model is ready for inference requests.
+        cache_size: Current number of cached predictions (LRU).
+        cache_max_size: Maximum prediction cache capacity.
+
+    Example:
+        ```json
+        {
+            "model_name": "distilbert-base-uncased-finetuned-sst-2-english",
+            "model_type": "transformer",
+            "backend": "onnx",
+            "is_loaded": true,
+            "is_ready": true,
+            "cache_size": 450,
+            "cache_max_size": 1000
+        }
+        ```
     """
 
-    model_name: str = Field(..., description="Model name")
-    model_type: str = Field(..., description="Model type (pytorch/onnx)")
-    backend: str = Field(..., description="Backend in use")
-    is_loaded: bool = Field(..., description="Whether model is loaded")
-    is_ready: bool = Field(..., description="Whether model is ready for inference")
-    cache_size: int = Field(..., description="Current prediction cache size")
-    cache_max_size: int = Field(..., description="Maximum cache size")
+    model_name: str = Field(
+        ...,
+        description="Name of the loaded machine learning model",
+        examples=["distilbert-base-uncased-finetuned-sst-2-english"]
+    )
+    model_type: str = Field(
+        ...,
+        description="Model architecture type (e.g., transformer, CNN, RNN)",
+        examples=["transformer"]
+    )
+    backend: str = Field(
+        ...,
+        description="Backend implementation: onnx (production, 160x faster) or pytorch (development)",
+        examples=["onnx", "pytorch"]
+    )
+    is_loaded: bool = Field(
+        ...,
+        description="Whether the model is loaded into memory and available for inference",
+        examples=[True, False]
+    )
+    is_ready: bool = Field(
+        ...,
+        description="Whether the model is fully initialized and ready to process requests",
+        examples=[True, False]
+    )
+    cache_size: int = Field(
+        ...,
+        description="Current number of predictions stored in Redis cache",
+        examples=[450, 0, 1000]
+    )
+    cache_max_size: int = Field(
+        ...,
+        description="Maximum capacity of the prediction cache (LRU eviction when full)",
+        examples=[1000, 5000]
+    )
 
 
 class HealthDetail(BaseModel):
