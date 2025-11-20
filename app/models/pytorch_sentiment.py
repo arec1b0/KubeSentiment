@@ -6,15 +6,16 @@ using Hugging Face Transformers. It implements the ModelStrategy protocol and
 provides caching, metrics tracking, and comprehensive error handling.
 """
 
-import time
 from functools import lru_cache
-from typing import Any, Dict, List, Optional
+import time
+from typing import Any, Optional
 
 import torch
 from transformers import pipeline
 
 from app.core.config import Settings, get_settings
 from app.core.logging import get_contextual_logger, get_logger
+from app.models.base import BaseModelMetrics
 from app.utils.exceptions import ModelInferenceError, ModelNotLoadedError, TextEmptyError
 
 logger = get_logger(__name__)
@@ -23,7 +24,7 @@ logger = get_logger(__name__)
 _sentiment_analyzer_instance: Optional["SentimentAnalyzer"] = None
 
 
-class SentimentAnalyzer:
+class SentimentAnalyzer(BaseModelMetrics):
     """PyTorch-based sentiment analysis model.
 
     This class provides sentiment analysis using a Hugging Face Transformers
@@ -31,30 +32,26 @@ class SentimentAnalyzer:
     and includes features like prediction caching, performance metrics tracking,
     and batch prediction support.
 
+    Inherits from BaseModelMetrics for shared metrics tracking functionality.
+
     Attributes:
         settings: Application configuration settings.
         _pipeline: The Hugging Face sentiment analysis pipeline.
         _is_loaded: Flag indicating whether the model is loaded.
-        _prediction_count: Total number of predictions made.
-        _total_inference_time: Cumulative inference time in seconds.
-        _cache_hits: Number of cache hits.
-        _cache_misses: Number of cache misses.
+        _device: The device being used for inference (cuda, mps, or cpu).
     """
 
-    def __init__(self, settings: Optional[Settings] = None):
+    def __init__(self, settings: Settings | None = None):
         """Initialize the sentiment analyzer.
 
         Args:
             settings: Optional settings instance. If not provided, will use
                 the default settings from get_settings().
         """
+        super().__init__()  # Initialize BaseModelMetrics
         self.settings = settings or get_settings()
         self._pipeline = None
         self._is_loaded = False
-        self._prediction_count = 0
-        self._total_inference_time = 0.0
-        self._cache_hits = 0
-        self._cache_misses = 0
         self._device = self._determine_device()
 
         # Initialize the model
@@ -160,7 +157,7 @@ class SentimentAnalyzer:
             logger.error(f"Inference failed: {e}")
             raise ModelInferenceError(f"Model inference failed: {e}") from e
 
-    def predict(self, text: str) -> Dict[str, Any]:
+    def predict(self, text: str) -> dict[str, Any]:
         """Perform sentiment analysis on a single text input.
 
         Args:
@@ -212,16 +209,11 @@ class SentimentAnalyzer:
 
         # Update cache statistics
         cache_info_after = self._cached_predict.cache_info()
-        if cache_info_after.hits > cache_info_before.hits:
-            self._cache_hits += 1
-            ctx_logger.debug("Cache hit")
-        else:
-            self._cache_misses += 1
-            ctx_logger.debug("Cache miss")
+        is_cache_hit = self._track_cache_stats(cache_info_before, cache_info_after)
+        ctx_logger.debug("Cache hit" if is_cache_hit else "Cache miss")
 
         # Update metrics
-        self._prediction_count += 1
-        self._total_inference_time += inference_time
+        self._update_metrics(inference_time, prediction_count=1)
 
         ctx_logger.info(
             "Prediction completed",
@@ -238,7 +230,7 @@ class SentimentAnalyzer:
             "inference_time_ms": inference_time_ms,
         }
 
-    def predict_batch(self, texts: List[str]) -> List[Dict[str, Any]]:
+    def predict_batch(self, texts: list[str]) -> list[dict[str, Any]]:
         """Perform sentiment analysis on a batch of texts.
 
         This method uses the pipeline's native batch processing capabilities
@@ -292,8 +284,7 @@ class SentimentAnalyzer:
         inference_time_ms = inference_time * 1000
 
         # Update metrics
-        self._prediction_count += len(valid_texts)
-        self._total_inference_time += inference_time
+        self._update_metrics(inference_time, prediction_count=len(valid_texts))
 
         # Build results array with placeholders for invalid texts
         results = []
@@ -329,7 +320,7 @@ class SentimentAnalyzer:
 
         return results
 
-    def get_model_info(self) -> Dict[str, Any]:
+    def get_model_info(self) -> dict[str, Any]:
         """Get information about the model.
 
         Returns:
@@ -347,46 +338,13 @@ class SentimentAnalyzer:
             "cache_maxsize": cache_info.maxsize,
         }
 
-    def get_performance_metrics(self) -> Dict[str, Any]:
-        """Get performance metrics for the model.
-
-        Returns:
-            A dictionary containing performance statistics.
-        """
-        cache_info = self._cached_predict.cache_info()
-        total_cache_requests = self._cache_hits + self._cache_misses
-        cache_hit_rate = (
-            self._cache_hits / total_cache_requests if total_cache_requests > 0 else 0.0
-        )
-
-        avg_inference_time = (
-            (self._total_inference_time / self._prediction_count) * 1000
-            if self._prediction_count > 0
-            else 0.0
-        )
-
-        return {
-            "total_predictions": self._prediction_count,
-            "avg_inference_time_ms": avg_inference_time,
-            "total_inference_time_seconds": self._total_inference_time,
-            "cache_hits": self._cache_hits,
-            "cache_misses": self._cache_misses,
-            "cache_hit_rate": cache_hit_rate,
-            "cache_info": {
-                "hits": cache_info.hits,
-                "misses": cache_info.misses,
-                "maxsize": cache_info.maxsize,
-                "currsize": cache_info.currsize,
-            },
-        }
-
     def clear_cache(self) -> None:
         """Clear the prediction cache.
 
         This method clears the LRU cache, forcing all subsequent predictions
-        to be recomputed.
+        to be recomputed. Extends the base class method to add logging.
         """
-        self._cached_predict.cache_clear()
+        super().clear_cache()
         logger.info("Prediction cache cleared")
 
 
