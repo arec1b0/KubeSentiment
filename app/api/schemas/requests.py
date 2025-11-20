@@ -1,12 +1,15 @@
 """
 Request schemas for API endpoints.
+
+This module defines Pydantic models for request validation. These models handle
+STRUCTURAL validation only (format, type, basic constraints). Business logic
+validation (e.g., max_text_length from settings) is handled in the service layer
+for better separation of concerns and testability.
 """
 
 from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
-
-from app.core.config import get_settings
 
 
 class TextInput(BaseModel):
@@ -47,11 +50,12 @@ class TextInput(BaseModel):
     def validate_text(cls, v: str) -> str:
         """Validates and sanitizes the input text.
 
-        This validator checks two main conditions:
-        1. The text must not be empty or contain only whitespace.
-        2. The text's length must not exceed the `max_text_length` setting.
+        This validator performs STRUCTURAL validation only:
+        1. Ensures the text is not empty or whitespace-only
+        2. Strips leading and trailing whitespace
 
-        It also strips leading and trailing whitespace from the text.
+        Business logic validation (e.g., max_text_length) is handled in the
+        service layer for better separation of concerns and testability.
 
         Args:
             v: The raw input text from the request.
@@ -60,20 +64,11 @@ class TextInput(BaseModel):
             The validated and stripped text.
 
         Raises:
-            ValueError: If the input text is empty or exceeds the maximum allowed length.
+            ValueError: If the input text is empty or contains only whitespace.
         """
         if not v or not v.strip():
             raise ValueError(
                 "The text field is required and cannot be empty or contain only whitespace."
-            )
-
-        # Check for maximum length
-        settings = get_settings()
-        max_len = settings.max_text_length
-
-        if len(v.strip()) > max_len:
-            raise ValueError(
-                f"Text length {len(v.strip())} exceeds the maximum allowed length of {max_len}."
             )
 
         return v.strip()
@@ -153,16 +148,29 @@ class BatchTextInput(BaseModel):
     @field_validator("texts")
     @classmethod
     def validate_texts(cls, v: List[str]) -> List[str]:
-        """Validate that all texts are non-empty and within length limits.
+        """Validate texts list structure.
+
+        This validator performs STRUCTURAL validation only:
+        1. Ensures the list is not empty
+        2. Ensures batch size doesn't exceed hard limit (1000)
+        3. Ensures each text is non-empty
+
+        Business logic validation (e.g., max_text_length from settings) is
+        handled in the service layer for better separation of concerns and testability.
+
+        Args:
+            v: List of texts to validate.
+
+        Returns:
+            The validated list of texts.
 
         Raises:
-            ValueError: If the batch is empty, exceeds maximum size, or contains invalid texts.
+            ValueError: If the batch is empty, exceeds maximum size, or contains empty texts.
         """
         if not v or len(v) == 0:
             raise ValueError("Batch processing request cannot be empty.")
 
-        settings = get_settings()
-        max_texts = 1000  # Reasonable batch limit
+        max_texts = 1000  # Hard limit for structural validation
 
         if len(v) > max_texts:
             raise ValueError(f"Batch size of {len(v)} exceeds the maximum of {max_texts}.")
@@ -170,9 +178,5 @@ class BatchTextInput(BaseModel):
         for i, text in enumerate(v):
             if not text or not text.strip():
                 raise ValueError(f"Text at index {i} is empty or contains only whitespace.")
-            if len(text) > settings.max_text_length:
-                raise ValueError(
-                    f"Text at index {i} with length {len(text)} exceeds the maximum allowed length of {settings.max_text_length}."
-                )
 
         return v

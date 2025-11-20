@@ -80,6 +80,24 @@ class ErrorCode(str, Enum):
     SCALER_PERSISTENCE_FAILED = "E6003"
     INVALID_SCALER_STATE = "E6004"
 
+    # Batch and async processing errors (7000-7099)
+    BATCH_JOB_NOT_FOUND = "E7001"
+    BATCH_JOB_NOT_CANCELLABLE = "E7002"
+    BATCH_JOB_SUBMISSION_FAILED = "E7003"
+    BATCH_RESULTS_NOT_READY = "E7004"
+    BATCH_QUEUE_STATUS_ERROR = "E7005"
+    BATCH_METRICS_ERROR = "E7006"
+
+    # Monitoring and observability errors (8000-8099)
+    MONITORING_FEATURE_DISABLED = "E8001"
+    MONITORING_SERVICE_NOT_INITIALIZED = "E8002"
+    MONITORING_DATA_INSUFFICIENT = "E8003"
+    DRIFT_DETECTION_FAILED = "E8004"
+    METRICS_COLLECTION_FAILED = "E8005"
+    KPI_CALCULATION_FAILED = "E8006"
+    MODEL_REGISTRY_ERROR = "E8007"
+    EXPLAINABILITY_ERROR = "E8008"
+
 
 class ErrorMessages:
     """Provides human-readable messages for each defined error code.
@@ -133,6 +151,22 @@ class ErrorMessages:
         ErrorCode.UNFITTED_SCALER: "Cannot use an unfitted scaler. The scaler must be fitted on training data first.",
         ErrorCode.SCALER_PERSISTENCE_FAILED: "Failed to persist scaler state to storage.",
         ErrorCode.INVALID_SCALER_STATE: "Scaler state file is corrupted or invalid. Cannot restore scaler.",
+        # Batch and async processing errors
+        ErrorCode.BATCH_JOB_NOT_FOUND: "The requested batch job was not found. It may have expired or been deleted.",
+        ErrorCode.BATCH_JOB_NOT_CANCELLABLE: "The batch job cannot be cancelled in its current state. Only pending or processing jobs can be cancelled.",
+        ErrorCode.BATCH_JOB_SUBMISSION_FAILED: "Failed to submit the batch job for processing. The service may be under heavy load.",
+        ErrorCode.BATCH_RESULTS_NOT_READY: "The batch job results are not yet available. The job may still be processing or may have failed.",
+        ErrorCode.BATCH_QUEUE_STATUS_ERROR: "Failed to retrieve the current batch queue status.",
+        ErrorCode.BATCH_METRICS_ERROR: "Failed to retrieve batch processing metrics.",
+        # Monitoring and observability errors
+        ErrorCode.MONITORING_FEATURE_DISABLED: "The requested monitoring feature is not enabled in the current configuration.",
+        ErrorCode.MONITORING_SERVICE_NOT_INITIALIZED: "The monitoring service has not been initialized or is not available.",
+        ErrorCode.MONITORING_DATA_INSUFFICIENT: "Insufficient data available for the requested monitoring operation.",
+        ErrorCode.DRIFT_DETECTION_FAILED: "Failed to perform drift detection analysis.",
+        ErrorCode.METRICS_COLLECTION_FAILED: "Failed to collect the requested metrics.",
+        ErrorCode.KPI_CALCULATION_FAILED: "Failed to calculate key performance indicators.",
+        ErrorCode.MODEL_REGISTRY_ERROR: "Failed to access or update the model registry.",
+        ErrorCode.EXPLAINABILITY_ERROR: "Failed to generate model explainability insights.",
     }
 
     @classmethod

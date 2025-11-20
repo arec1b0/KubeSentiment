@@ -20,10 +20,16 @@ from app.api.schemas.responses import (
     BatchPredictionResults,
 )
 from app.core.config import Settings, get_settings
-from app.core.dependencies import get_model_backend, get_prediction_service
+from app.core.dependencies import (
+    get_model_backend,
+    get_prediction_service,
+    handle_operation_error,
+    require_service,
+)
 from app.core.logging import get_contextual_logger
 from app.services.async_batch_service import AsyncBatchService
 from app.services.prediction import PredictionService
+from app.utils.error_codes import ErrorCode, raise_validation_error
 
 router = APIRouter()
 
@@ -50,15 +56,13 @@ async def get_async_batch_service(
         HTTPException: If the async batch service is not available, which
             might occur if it failed to initialize on startup.
     """
-    if (
-        not hasattr(request.app.state, "async_batch_service")
-        or not request.app.state.async_batch_service
-    ):
-        raise HTTPException(
-            status_code=503, detail="Async batch service is not available. Please try again later."
-        )
-
-    return request.app.state.async_batch_service  # type: ignore
+    service = getattr(request.app.state, "async_batch_service", None)
+    return require_service(
+        service,
+        error_code=ErrorCode.SERVICE_NOT_STARTED,
+        detail="Async batch service is not available. Please try again later.",
+        service_name="async_batch_service",
+    )
 
 
 @router.post(
@@ -137,14 +141,14 @@ async def submit_batch_prediction(
         return response
 
     except Exception as e:
-        logger.error(
-            "Async batch prediction submission failed",
-            error=str(e),
-            error_type=type(e).__name__,
-            operation="batch_submit_failed",
-            exc_info=True,
+        handle_operation_error(
+            error=e,
+            error_code=ErrorCode.BATCH_JOB_SUBMISSION_FAILED,
+            operation="batch_submit",
+            logger_name=__name__,
+            batch_size=len(payload.texts),
+            priority=payload.priority,
         )
-        raise HTTPException(status_code=500, detail=f"Failed to process batch request: {str(e)}")
 
 
 @router.get(
@@ -187,7 +191,12 @@ async def get_batch_job_status(
 
         if not job:
             logger.warning("Batch job not found", job_id=job_id)
-            raise HTTPException(status_code=404, detail=f"Batch job {job_id} not found")
+            raise_validation_error(
+                error_code=ErrorCode.BATCH_JOB_NOT_FOUND,
+                detail=f"Batch job {job_id} not found",
+                status_code=404,
+                job_id=job_id,
+            )
 
         # Convert to response format
         return BatchJobStatus(
@@ -208,13 +217,13 @@ async def get_batch_job_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(
-            "Failed to get batch job status",
+        handle_operation_error(
+            error=e,
+            error_code=ErrorCode.BATCH_JOB_SUBMISSION_FAILED,
+            operation="batch_status_check",
+            logger_name=__name__,
             job_id=job_id,
-            error=str(e),
-            exc_info=True,
         )
-        raise HTTPException(status_code=500, detail=f"Failed to process batch request: {str(e)}")
 
 
 @router.get(
@@ -262,8 +271,11 @@ async def get_batch_results(
 
         if not results:
             logger.warning("Batch job not found or not completed", job_id=job_id)
-            raise HTTPException(
-                status_code=404, detail=f"Batch job {job_id} not found or not completed"
+            raise_validation_error(
+                error_code=ErrorCode.BATCH_RESULTS_NOT_READY,
+                detail=f"Batch job {job_id} not found or not completed",
+                status_code=404,
+                job_id=job_id,
             )
 
         logger.info(
@@ -279,13 +291,15 @@ async def get_batch_results(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(
-            "Failed to get batch results",
+        handle_operation_error(
+            error=e,
+            error_code=ErrorCode.BATCH_JOB_SUBMISSION_FAILED,
+            operation="batch_results_retrieve",
+            logger_name=__name__,
             job_id=job_id,
-            error=str(e),
-            exc_info=True,
+            page=page,
+            page_size=page_size,
         )
-        raise HTTPException(status_code=500, detail=f"Failed to process batch request: {str(e)}")
 
 
 @router.delete(
@@ -326,8 +340,11 @@ async def cancel_batch_job(
 
         if not cancelled:
             logger.warning("Batch job not found or not cancellable", job_id=job_id)
-            raise HTTPException(
-                status_code=404, detail=f"Batch job {job_id} not found or cannot be cancelled"
+            raise_validation_error(
+                error_code=ErrorCode.BATCH_JOB_NOT_CANCELLABLE,
+                detail=f"Batch job {job_id} not found or cannot be cancelled",
+                status_code=404,
+                job_id=job_id,
             )
 
         logger.info("Batch job cancelled successfully", job_id=job_id)
@@ -341,13 +358,13 @@ async def cancel_batch_job(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(
-            "Failed to cancel batch job",
+        handle_operation_error(
+            error=e,
+            error_code=ErrorCode.BATCH_JOB_SUBMISSION_FAILED,
+            operation="batch_cancel",
+            logger_name=__name__,
             job_id=job_id,
-            error=str(e),
-            exc_info=True,
         )
-        raise HTTPException(status_code=500, detail=f"Failed to process batch request: {str(e)}")
 
 
 @router.get(
@@ -399,13 +416,15 @@ async def get_batch_metrics(
 
         return metrics  # type: ignore
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(
-            "Failed to get batch metrics",
-            error=str(e),
-            exc_info=True,
+        handle_operation_error(
+            error=e,
+            error_code=ErrorCode.BATCH_METRICS_ERROR,
+            operation="batch_metrics_retrieve",
+            logger_name=__name__,
         )
-        raise HTTPException(status_code=500, detail=f"Failed to process batch request: {str(e)}")
 
 
 @router.get(
@@ -456,9 +475,9 @@ async def get_batch_queue_status(
         }
 
     except Exception as e:
-        logger.error(
-            "Failed to get batch queue status",
-            error=str(e),
-            exc_info=True,
+        handle_operation_error(
+            error=e,
+            error_code=ErrorCode.BATCH_QUEUE_STATUS_ERROR,
+            operation="batch_queue_status",
+            logger_name=__name__,
         )
-        raise HTTPException(status_code=500, detail=f"Failed to process batch request: {str(e)}")

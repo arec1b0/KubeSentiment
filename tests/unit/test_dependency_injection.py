@@ -12,9 +12,17 @@ import pytest
 from unittest.mock import Mock, patch
 
 import pytest
+from fastapi import HTTPException
 
-from app.core.dependencies import get_prediction_service
+from app.core.dependencies import (
+    get_prediction_service,
+    handle_operation_error,
+    require_feature_enabled,
+    require_initialized,
+    require_service,
+)
 from app.models.base import ModelStrategy
+from app.utils.error_codes import ErrorCode
 
 # Import for backward compatibility tests
 from app.models.pytorch_sentiment import get_sentiment_analyzer
@@ -276,6 +284,156 @@ class TestServiceLayerIntegration:
         assert isinstance(service, PredictionService)
         assert hasattr(service, "predict")
         assert hasattr(service, "get_model_status")
+
+
+@pytest.mark.unit
+class TestErrorHandlingUtilities:
+    """Test suite for error handling utilities in app.core.dependencies.
+
+    These tests verify that the standardized error handling utilities work correctly,
+    ensuring consistent error responses across all API endpoints.
+    """
+
+    def test_require_service_returns_service_when_available(self):
+        """Tests that require_service returns the service when it is not None."""
+        mock_service = Mock()
+        mock_service.name = "test_service"
+
+        result = require_service(
+            mock_service,
+            error_code=ErrorCode.SERVICE_NOT_STARTED,
+            detail="Service not available",
+        )
+
+        assert result is mock_service
+
+    def test_require_service_raises_when_none(self):
+        """Tests that require_service raises HTTPException when service is None."""
+        with pytest.raises(HTTPException) as exc_info:
+            require_service(
+                None,
+                error_code=ErrorCode.SERVICE_NOT_STARTED,
+                detail="Service not available",
+                service_name="test_service",
+            )
+
+        assert exc_info.value.status_code == 503
+        assert "error_code" in exc_info.value.detail
+        assert exc_info.value.detail["error_code"] == "E4006"
+
+    def test_require_feature_enabled_passes_when_enabled(self):
+        """Tests that require_feature_enabled passes when feature is enabled."""
+        # Should not raise an exception
+        require_feature_enabled(
+            enabled=True,
+            feature_name="test_feature",
+        )
+
+    def test_require_feature_enabled_raises_when_disabled(self):
+        """Tests that require_feature_enabled raises HTTPException when disabled."""
+        with pytest.raises(HTTPException) as exc_info:
+            require_feature_enabled(
+                enabled=False,
+                feature_name="drift_detection",
+                error_code=ErrorCode.MONITORING_FEATURE_DISABLED,
+            )
+
+        assert exc_info.value.status_code == 503
+        assert "error_code" in exc_info.value.detail
+        assert exc_info.value.detail["error_code"] == "E8001"
+        assert "drift_detection" in exc_info.value.detail["detail"]
+
+    def test_require_initialized_returns_service_when_not_none(self):
+        """Tests that require_initialized returns service when not None."""
+        mock_service = Mock()
+        mock_service.initialized = True
+
+        result = require_initialized(
+            mock_service,
+            service_name="test_service",
+        )
+
+        assert result is mock_service
+
+    def test_require_initialized_raises_when_none(self):
+        """Tests that require_initialized raises HTTPException when None."""
+        with pytest.raises(HTTPException) as exc_info:
+            require_initialized(
+                None,
+                service_name="drift_detector",
+                error_code=ErrorCode.MONITORING_SERVICE_NOT_INITIALIZED,
+            )
+
+        assert exc_info.value.status_code == 503
+        assert "error_code" in exc_info.value.detail
+        assert exc_info.value.detail["error_code"] == "E8002"
+
+    def test_handle_operation_error_logs_and_raises(self):
+        """Tests that handle_operation_error logs the error and raises HTTPException."""
+        error = ValueError("Test error message")
+
+        with pytest.raises(HTTPException) as exc_info:
+            handle_operation_error(
+                error=error,
+                error_code=ErrorCode.BATCH_JOB_SUBMISSION_FAILED,
+                operation="batch_submit",
+                logger_name=__name__,
+                job_id="test-job-123",
+            )
+
+        assert exc_info.value.status_code == 500
+        assert "error_code" in exc_info.value.detail
+        assert exc_info.value.detail["error_code"] == "E7003"
+        assert "Test error message" in exc_info.value.detail["detail"]
+
+    def test_handle_operation_error_with_custom_status_code(self):
+        """Tests that handle_operation_error uses custom status code when provided."""
+        error = RuntimeError("Custom error")
+
+        with pytest.raises(HTTPException) as exc_info:
+            handle_operation_error(
+                error=error,
+                error_code=ErrorCode.BATCH_METRICS_ERROR,
+                operation="metrics_retrieve",
+                logger_name=__name__,
+                status_code=503,
+            )
+
+        assert exc_info.value.status_code == 503
+        assert "error_code" in exc_info.value.detail
+        assert exc_info.value.detail["error_code"] == "E7006"
+
+    def test_handle_operation_error_with_custom_detail(self):
+        """Tests that handle_operation_error uses custom detail message when provided."""
+        error = Exception("Original error")
+
+        with pytest.raises(HTTPException) as exc_info:
+            handle_operation_error(
+                error=error,
+                error_code=ErrorCode.BATCH_QUEUE_STATUS_ERROR,
+                operation="queue_status",
+                logger_name=__name__,
+                detail="Custom error message",
+            )
+
+        assert exc_info.value.status_code == 500
+        assert exc_info.value.detail["detail"] == "Custom error message"
+
+    def test_require_service_includes_additional_context(self):
+        """Tests that require_service includes additional context in error."""
+        with pytest.raises(HTTPException) as exc_info:
+            require_service(
+                None,
+                error_code=ErrorCode.SERVICE_NOT_STARTED,
+                detail="Service not available",
+                service_name="async_batch_service",
+                environment="production",
+            )
+
+        assert exc_info.value.status_code == 503
+        assert "context" in exc_info.value.detail
+        assert exc_info.value.detail["context"]["service_name"] == "async_batch_service"
+        assert exc_info.value.detail["context"]["environment"] == "production"
 
 
 if __name__ == "__main__":
