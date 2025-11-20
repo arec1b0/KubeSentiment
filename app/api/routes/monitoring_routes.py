@@ -13,10 +13,12 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.core.dependencies import require_initialized
 from app.services.drift_detection import get_drift_detector
 from app.services.mlflow_registry import get_model_registry
 from app.services.explainability import get_explainability_engine
 from app.monitoring.advanced_metrics import get_advanced_metrics_collector
+from app.utils.error_codes import ErrorCode, raise_validation_error
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +64,12 @@ async def check_drift() -> Dict[str, Any]:
     Performs statistical tests and returns drift metrics.
     """
     detector = get_drift_detector()
-
-    if detector is None or not detector.enabled:
-        raise HTTPException(status_code=503, detail="Drift detection not available")
+    detector = require_initialized(
+        detector,
+        service_name="drift_detector",
+        error_code=ErrorCode.MONITORING_SERVICE_NOT_INITIALIZED,
+        detail="Drift detection not available",
+    )
 
     drift_metrics = detector.check_drift()
 
@@ -93,9 +98,12 @@ async def reset_drift_window() -> Dict[str, str]:
     Useful after deploying a new model or when baseline needs updating.
     """
     detector = get_drift_detector()
-
-    if detector is None or not detector.enabled:
-        raise HTTPException(status_code=503, detail="Drift detection not available")
+    detector = require_initialized(
+        detector,
+        service_name="drift_detector",
+        error_code=ErrorCode.MONITORING_SERVICE_NOT_INITIALIZED,
+        detail="Drift detection not available",
+    )
 
     detector.reset_current_window()
     return {"message": "Drift detection window reset successfully"}
@@ -109,9 +117,12 @@ async def update_drift_baseline() -> Dict[str, str]:
     Moves current data to baseline and resets current window.
     """
     detector = get_drift_detector()
-
-    if detector is None or not detector.enabled:
-        raise HTTPException(status_code=503, detail="Drift detection not available")
+    detector = require_initialized(
+        detector,
+        service_name="drift_detector",
+        error_code=ErrorCode.MONITORING_SERVICE_NOT_INITIALIZED,
+        detail="Drift detection not available",
+    )
 
     detector.update_baseline()
     return {"message": "Drift baseline updated successfully"}
@@ -125,14 +136,21 @@ async def export_drift_report():
     Uses Evidently library to generate comprehensive drift analysis.
     """
     detector = get_drift_detector()
-
-    if detector is None or not detector.enabled:
-        raise HTTPException(status_code=503, detail="Drift detection not available")
+    detector = require_initialized(
+        detector,
+        service_name="drift_detector",
+        error_code=ErrorCode.MONITORING_SERVICE_NOT_INITIALIZED,
+        detail="Drift detection not available",
+    )
 
     report_html = detector.export_drift_report()
 
     if report_html is None:
-        raise HTTPException(status_code=400, detail="Not enough data to generate drift report")
+        raise_validation_error(
+            error_code=ErrorCode.MONITORING_DATA_INSUFFICIENT,
+            detail="Not enough data to generate drift report",
+            status_code=400,
+        )
 
     from fastapi.responses import HTMLResponse
 
@@ -153,9 +171,12 @@ async def get_business_kpis() -> Dict[str, Any]:
     - Predictions by label and confidence bucket
     """
     collector = get_advanced_metrics_collector()
-
-    if collector is None:
-        raise HTTPException(status_code=503, detail="Advanced metrics not available")
+    collector = require_initialized(
+        collector,
+        service_name="advanced_metrics_collector",
+        error_code=ErrorCode.MONITORING_SERVICE_NOT_INITIALIZED,
+        detail="Advanced metrics not available",
+    )
 
     return collector.get_business_kpis()
 
@@ -171,9 +192,12 @@ async def get_quality_metrics() -> Dict[str, Any]:
     - Confidence percentiles (P50, P95, P99)
     """
     collector = get_advanced_metrics_collector()
-
-    if collector is None:
-        raise HTTPException(status_code=503, detail="Advanced metrics not available")
+    collector = require_initialized(
+        collector,
+        service_name="advanced_metrics_collector",
+        error_code=ErrorCode.MONITORING_SERVICE_NOT_INITIALIZED,
+        detail="Advanced metrics not available",
+    )
 
     return collector.get_quality_metrics()
 
@@ -191,9 +215,12 @@ async def get_cost_metrics() -> Dict[str, Any]:
     - Cost breakdown by day
     """
     collector = get_advanced_metrics_collector()
-
-    if collector is None:
-        raise HTTPException(status_code=503, detail="Advanced metrics not available")
+    collector = require_initialized(
+        collector,
+        service_name="advanced_metrics_collector",
+        error_code=ErrorCode.MONITORING_SERVICE_NOT_INITIALIZED,
+        detail="Advanced metrics not available",
+    )
 
     return collector.get_cost_metrics()
 
@@ -209,9 +236,12 @@ async def get_performance_metrics() -> Dict[str, Any]:
     - Current throughput (requests per second)
     """
     collector = get_advanced_metrics_collector()
-
-    if collector is None:
-        raise HTTPException(status_code=503, detail="Advanced metrics not available")
+    collector = require_initialized(
+        collector,
+        service_name="advanced_metrics_collector",
+        error_code=ErrorCode.MONITORING_SERVICE_NOT_INITIALIZED,
+        detail="Advanced metrics not available",
+    )
 
     return collector.get_performance_metrics()
 
@@ -234,9 +264,12 @@ async def check_slo_compliance(
         SLO compliance status for availability and latency targets
     """
     collector = get_advanced_metrics_collector()
-
-    if collector is None:
-        raise HTTPException(status_code=503, detail="Advanced metrics not available")
+    collector = require_initialized(
+        collector,
+        service_name="advanced_metrics_collector",
+        error_code=ErrorCode.MONITORING_SERVICE_NOT_INITIALIZED,
+        detail="Advanced metrics not available",
+    )
 
     return collector.get_slo_compliance(
         availability_target=availability_target,
@@ -283,14 +316,22 @@ async def get_production_model(model_name: str) -> Dict[str, Any]:
         Production model version information
     """
     registry = get_model_registry()
-
-    if registry is None or not registry.enabled:
-        raise HTTPException(status_code=503, detail="Model registry not available")
+    registry = require_initialized(
+        registry,
+        service_name="model_registry",
+        error_code=ErrorCode.MONITORING_SERVICE_NOT_INITIALIZED,
+        detail="Model registry not available",
+    )
 
     model_info = registry.get_production_model(model_name)
 
     if model_info is None:
-        raise HTTPException(status_code=404, detail=f"No production model found for {model_name}")
+        raise_validation_error(
+            error_code=ErrorCode.MODEL_REGISTRY_ERROR,
+            detail=f"No production model found for {model_name}",
+            status_code=404,
+            model_name=model_name,
+        )
 
     return model_info
 
@@ -307,9 +348,12 @@ async def get_all_production_models(model_name: str) -> Dict[str, Any]:
         List of production model versions
     """
     registry = get_model_registry()
-
-    if registry is None or not registry.enabled:
-        raise HTTPException(status_code=503, detail="Model registry not available")
+    registry = require_initialized(
+        registry,
+        service_name="model_registry",
+        error_code=ErrorCode.MONITORING_SERVICE_NOT_INITIALIZED,
+        detail="Model registry not available",
+    )
 
     versions = registry.get_all_production_models(model_name)
 
@@ -368,9 +412,12 @@ async def get_html_explanation(request: ExplainRequest):
         HTML page with visualization
     """
     explainer = get_explainability_engine()
-
-    if explainer is None or not explainer.enabled:
-        raise HTTPException(status_code=503, detail="Explainability engine not available")
+    explainer = require_initialized(
+        explainer,
+        service_name="explainability_engine",
+        error_code=ErrorCode.MONITORING_SERVICE_NOT_INITIALIZED,
+        detail="Explainability engine not available",
+    )
 
     explanation = explainer.explain_prediction(
         text=request.text,
