@@ -49,7 +49,7 @@ class DataLakeWriter(IDataWriter):
         self._initialized = False
         self.logger = get_logger(__name__)
 
-        if settings.data_lake_enabled:
+        if settings.data_lake.data_lake_enabled:
             self._initialize_storage_client()
 
     def _initialize_storage_client(self):
@@ -123,7 +123,7 @@ class DataLakeWriter(IDataWriter):
 
     async def start(self):
         """Start the background batch flushing task."""
-        if not self.settings.data_lake_enabled or not self._initialized:
+        if not self.settings.data_lake.data_lake_enabled or not self._initialized:
             return
 
         if self.batch_task is None or self.batch_task.done():
@@ -149,7 +149,7 @@ class DataLakeWriter(IDataWriter):
         Args:
             prediction_data: Prediction data including text, label, score, features, etc.
         """
-        if not self.settings.data_lake_enabled or not self._initialized:
+        if not self.settings.data_lake.data_lake_enabled or not self._initialized:
             return
 
         # Enrich prediction with metadata
@@ -183,11 +183,11 @@ class DataLakeWriter(IDataWriter):
             "label": prediction_data.get("label", ""),
             "score": prediction_data.get("score", 0.0),
             "inference_time_ms": prediction_data.get("inference_time_ms", 0.0),
-            "model_name": self.settings.model_name,
+            "model_name": self.settings.model.model_name,
             "backend": prediction_data.get("backend", "unknown"),
             "cached": prediction_data.get("cached", False),
-            "app_version": self.settings.app_version,
-            "environment": self.settings.environment,
+            "app_version": self.settings.server.app_version,
+            "environment": self.settings.server.environment,
         }
 
         # Add features if available
@@ -206,7 +206,7 @@ class DataLakeWriter(IDataWriter):
 
     async def flush(self):
         """Flush the current buffer to cloud storage."""
-        if not self.settings.data_lake_enabled or not self._initialized:
+        if not self.settings.data_lake.data_lake_enabled or not self._initialized:
             return
 
         async with self.buffer_lock:
@@ -337,7 +337,7 @@ class DataLakeWriter(IDataWriter):
             partition = f"{base_prefix}/year={timestamp.year}/month={timestamp.month:02d}/day={timestamp.day:02d}/hour={timestamp.hour:02d}"
         elif self.settings.data_lake_partition_by == "model":
             partition = (
-                f"{base_prefix}/model={self.settings.model_name}/"
+                f"{base_prefix}/model={self.settings.model.model_name}/"
                 f"year={timestamp.year}/month={timestamp.month:02d}/day={timestamp.day:02d}"
             )
         else:
@@ -364,7 +364,7 @@ class DataLakeWriter(IDataWriter):
                 ContentType="application/x-parquet",
                 Metadata={
                     "writer": "kubesentiment",
-                    "version": self.settings.app_version,
+                    "version": self.settings.server.app_version,
                     "compression": self.settings.data_lake_compression,
                 },
             ),
@@ -393,7 +393,7 @@ class DataLakeWriter(IDataWriter):
         # Set metadata
         blob.metadata = {
             "writer": "kubesentiment",
-            "version": self.settings.app_version,
+            "version": self.settings.server.app_version,
             "compression": self.settings.data_lake_compression,
         }
         await loop.run_in_executor(None, blob.patch)
@@ -427,7 +427,7 @@ class DataLakeWriter(IDataWriter):
                 },
                 metadata={
                     "writer": "kubesentiment",
-                    "version": self.settings.app_version,
+                    "version": self.settings.server.app_version,
                     "compression": self.settings.data_lake_compression,
                 },
             ),
@@ -441,7 +441,7 @@ class DataLakeWriter(IDataWriter):
             Dictionary with buffer size and status info.
         """
         return {
-            "enabled": self.settings.data_lake_enabled,
+            "enabled": self.settings.data_lake.data_lake_enabled,
             "initialized": self._initialized,
             "provider": self.settings.data_lake_provider,
             "buffer_size": len(self.buffer),

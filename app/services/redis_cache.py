@@ -162,10 +162,10 @@ def get_redis_cache() -> RedisCacheClient:
     if _cache_instance is None:
         settings = get_settings()
         _cache_instance = RedisCacheClient(
-            host=settings.redis_host,
-            port=settings.redis_port,
-            db=settings.redis_db,
-            password=settings.redis_password,
-            namespace=settings.redis_namespace,
+            host=settings.redis.redis_host,
+            port=settings.redis.redis_port,
+            db=settings.redis.redis_db,
+            password=settings.redis.redis_password,
+            namespace=settings.redis.redis_namespace,
         )
     return _cache_instance

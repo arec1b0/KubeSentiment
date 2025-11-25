@@ -37,7 +37,7 @@ class TracingConfig:
 
     def setup_tracing(self) -> None:
         """Initialize and configure OpenTelemetry distributed tracing."""
-        if not self.settings.enable_tracing:
+        if not self.settings.monitoring.enable_tracing:
             logger.info("Distributed tracing is disabled")
             return
 
@@ -45,9 +45,9 @@ class TracingConfig:
             # Create resource with service information
             resource = Resource(
                 attributes={
-                    SERVICE_NAME: self.settings.service_name,
-                    SERVICE_VERSION: self.settings.app_version,
-                    "deployment.environment": self.settings.environment,
+                    SERVICE_NAME: self.settings.monitoring.service_name,
+                    SERVICE_VERSION: self.settings.server.app_version,
+                    "deployment.environment": self.settings.server.environment,
                     "service.namespace": "mlops",
                 }
             )
@@ -62,15 +62,15 @@ class TracingConfig:
             trace.set_tracer_provider(self.tracer_provider)
 
             # Get tracer instance
-            self.tracer = trace.get_tracer(__name__, self.settings.app_version)
+            self.tracer = trace.get_tracer(__name__, self.settings.server.app_version)
 
             # Instrument libraries
             self._instrument_libraries()
 
             logger.info(
                 "Distributed tracing initialized successfully",
-                service_name=self.settings.service_name,
-                tracing_backend=self.settings.tracing_backend,
+                service_name=self.settings.monitoring.service_name,
+                tracing_backend=self.settings.monitoring.tracing_backend,
             )
 
         except Exception as e:
@@ -78,7 +78,7 @@ class TracingConfig:
 
     def _configure_exporters(self) -> None:
         """Configure trace exporters based on settings."""
-        backend = self.settings.tracing_backend.lower()
+        backend = self.settings.monitoring.tracing_backend.lower()
 
         if backend == "jaeger":
             self._setup_jaeger_exporter()
@@ -95,8 +95,8 @@ class TracingConfig:
     def _setup_jaeger_exporter(self) -> None:
         """Configure Jaeger exporter."""
         jaeger_exporter = JaegerExporter(
-            agent_host_name=self.settings.jaeger_agent_host,
-            agent_port=self.settings.jaeger_agent_port,
+            agent_host_name=self.settings.monitoring.jaeger_agent_host,
+            agent_port=self.settings.monitoring.jaeger_agent_port,
             udp_split_oversized_batches=True,
         )
 
@@ -105,32 +105,32 @@ class TracingConfig:
 
         logger.info(
             "Jaeger exporter configured",
-            host=self.settings.jaeger_agent_host,
-            port=self.settings.jaeger_agent_port,
+            host=self.settings.monitoring.jaeger_agent_host,
+            port=self.settings.monitoring.jaeger_agent_port,
         )
 
     def _setup_zipkin_exporter(self) -> None:
         """Configure Zipkin exporter."""
         zipkin_exporter = ZipkinExporter(
-            endpoint=f"{self.settings.zipkin_endpoint}/api/v2/spans",
+            endpoint=f"{self.settings.monitoring.zipkin_endpoint}/api/v2/spans",
         )
 
         span_processor = BatchSpanProcessor(zipkin_exporter)
         self.tracer_provider.add_span_processor(span_processor)
 
-        logger.info("Zipkin exporter configured", endpoint=self.settings.zipkin_endpoint)
+        logger.info("Zipkin exporter configured", endpoint=self.settings.monitoring.zipkin_endpoint)
 
     def _setup_otlp_exporter(self) -> None:
         """Configure OTLP (OpenTelemetry Protocol) exporter."""
         otlp_exporter = OTLPSpanExporter(
-            endpoint=self.settings.otlp_endpoint,
+            endpoint=self.settings.monitoring.otlp_endpoint,
             insecure=True,  # Use True for development, False for production with TLS
         )
 
         span_processor = BatchSpanProcessor(otlp_exporter)
         self.tracer_provider.add_span_processor(span_processor)
 
-        logger.info("OTLP exporter configured", endpoint=self.settings.otlp_endpoint)
+        logger.info("OTLP exporter configured", endpoint=self.settings.monitoring.otlp_endpoint)
 
     def _setup_console_exporter(self) -> None:
         """Configure console exporter for debugging."""
@@ -163,14 +163,14 @@ class TracingConfig:
         Args:
             app: FastAPI application instance
         """
-        if not self.settings.enable_tracing:
+        if not self.settings.monitoring.enable_tracing:
             return
 
         try:
             FastAPIInstrumentor.instrument_app(
                 app,
                 tracer_provider=self.tracer_provider,
-                excluded_urls=self.settings.tracing_excluded_urls,
+                excluded_urls=self.settings.monitoring.tracing_excluded_urls,
             )
             logger.info("FastAPI instrumentation enabled")
         except Exception as e:

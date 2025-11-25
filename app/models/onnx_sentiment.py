@@ -133,10 +133,10 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
             else:
                 # Fall back to downloading tokenizer for the model
                 self._tokenizer = AutoTokenizer.from_pretrained(
-                    self.settings.model_name,
-                    cache_dir=self.settings.model_cache_dir,
+                    self.settings.model.model_name,
+                    cache_dir=self.settings.model.model_cache_dir,
                 )
-                logger.info(f"Loaded tokenizer for {self.settings.model_name}")
+                logger.info(f"Loaded tokenizer for {self.settings.model.model_name}")
 
             load_time = time.time() - start_time
             self._is_loaded = True
@@ -209,10 +209,10 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
         try:
             # Tokenize input
             inputs = self._tokenizer(
-                text[: self.settings.max_text_length],
+                text[: self.settings.model.max_text_length],
                 padding=True,
                 truncation=True,
-                max_length=self.settings.max_text_length,
+                max_length=self.settings.model.max_text_length,
                 return_tensors="np",
             )
 
@@ -267,13 +267,13 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
 
         # Clean and truncate text
         cleaned_text = text.strip()
-        if len(cleaned_text) > self.settings.max_text_length:
-            cleaned_text = cleaned_text[: self.settings.max_text_length]
+        if len(cleaned_text) > self.settings.model.max_text_length:
+            cleaned_text = cleaned_text[: self.settings.model.max_text_length]
             ctx_logger.warning(
                 "Text truncated",
                 extra={
                     "original_length": len(text),
-                    "max_length": self.settings.max_text_length,
+                    "max_length": self.settings.model.max_text_length,
                 },
             )
 
@@ -339,7 +339,7 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
 
         # Clean and truncate texts
         cleaned_texts = [
-            t.strip()[: self.settings.max_text_length] if t and t.strip() else "" for t in texts
+            t.strip()[: self.settings.model.max_text_length] if t and t.strip() else "" for t in texts
         ]
 
         # Filter out empty texts and track their indices
@@ -360,7 +360,7 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
                     valid_texts,
                     padding=True,
                     truncation=True,
-                    max_length=self.settings.max_text_length,
+                    max_length=self.settings.model.max_text_length,
                     return_tensors="np",
                 )
 
@@ -440,12 +440,12 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
         cache_info = self._cached_predict.cache_info()
 
         return {
-            "model_name": self.settings.model_name,
+            "model_name": self.settings.model.model_name,
             "backend": "onnx",
             "model_path": str(self.model_path),
             "execution_providers": self._session.get_providers() if self._session else [],
             "is_loaded": self._is_loaded,
-            "max_text_length": self.settings.max_text_length,
+            "max_text_length": self.settings.model.max_text_length,
             "cache_size": cache_info.currsize,
             "cache_maxsize": cache_info.maxsize,
         }

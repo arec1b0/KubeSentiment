@@ -39,9 +39,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup logic
     logger.info(
         "Starting application",
-        app_name=settings.app_name,
-        version=settings.app_version,
-        debug=settings.debug,
+        app_name=settings.server.app_name,
+        version=settings.server.app_version,
+        debug=settings.server.debug,
     )
 
     # Initialize and warm up the machine learning model
@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         from app.models.factory import ModelFactory
         from app.monitoring.model_warmup import get_warmup_manager
 
-        default_backend = "onnx" if settings.onnx_model_path else "pytorch"
+        default_backend = "onnx" if settings.model.onnx_model_path else "pytorch"
         model = ModelFactory.create_model(default_backend)
 
         if model.is_ready():
@@ -71,12 +71,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.error("Model initialization failed", error=str(e), exc_info=True)
 
     # Initialize MLflow Model Registry
-    if settings.mlflow_enabled:
+    if settings.mlops.mlflow_enabled:
         try:
             from app.services.mlflow_registry import initialize_model_registry
 
             registry = initialize_model_registry(
-                tracking_uri=settings.mlflow_tracking_uri, enabled=settings.mlflow_enabled
+                tracking_uri=settings.mlops.mlflow_tracking_uri, enabled=settings.mlops.mlflow_enabled
             )
             logger.info("MLflow Model Registry initialized")
             app.state.model_registry = registry
@@ -84,14 +84,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.error("MLflow initialization failed", error=str(e), exc_info=True)
 
     # Initialize Drift Detection
-    if settings.drift_detection_enabled:
+    if settings.mlops.drift_detection_enabled:
         try:
             from app.services.drift_detection import initialize_drift_detector
 
             drift_detector = initialize_drift_detector(
-                window_size=settings.drift_window_size,
-                psi_threshold=settings.drift_psi_threshold,
-                enabled=settings.drift_detection_enabled,
+                window_size=settings.mlops.drift_window_size,
+                psi_threshold=settings.mlops.drift_psi_threshold,
+                enabled=settings.mlops.drift_detection_enabled,
             )
             logger.info("Drift Detection initialized")
             app.state.drift_detector = drift_detector
@@ -99,14 +99,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.error("Drift detection initialization failed", error=str(e), exc_info=True)
 
     # Initialize Explainability Engine
-    if settings.explainability_enabled:
+    if settings.mlops.explainability_enabled:
         try:
             from app.services.explainability import initialize_explainability_engine
 
             explainer = initialize_explainability_engine(
                 model=model if "model" in locals() else None,
-                model_name=settings.model_name,
-                enabled=settings.explainability_enabled,
+                model_name=settings.model.model_name,
+                enabled=settings.mlops.explainability_enabled,
             )
             logger.info("Explainability Engine initialized")
             app.state.explainability_engine = explainer
@@ -128,7 +128,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.error("Advanced metrics initialization failed", error=str(e), exc_info=True)
 
     # Initialize and start the Kafka consumer if enabled
-    if settings.kafka_enabled:
+    if settings.kafka.kafka_enabled:
         try:
             from app.services.kafka_consumer import HighThroughputKafkaConsumer
             from app.services.stream_processor import StreamProcessor
@@ -159,7 +159,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.error("Async batch service initialization failed", error=str(e), exc_info=True)
 
     # Initialize and start the data lake writer
-    if settings.data_lake_enabled:
+    if settings.data_lake.data_lake_enabled:
         try:
             from app.services.data_writer import get_data_writer
 
@@ -168,8 +168,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             app.state.data_writer = data_writer
             logger.info(
                 "Data lake writer started successfully",
-                provider=settings.data_lake_provider,
-                bucket=settings.data_lake_bucket,
+                provider=settings.data_lake.data_lake_provider,
+                bucket=settings.data_lake.data_lake_bucket,
             )
 
         except Exception as e:

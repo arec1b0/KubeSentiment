@@ -92,7 +92,7 @@ async def predict_sentiment(
         result["backend"] = backend
 
         # Stream prediction to data lake asynchronously
-        if settings.data_lake_enabled:
+        if settings.data_lake.data_lake_enabled:
             prediction_data = {
                 "text": payload.text,
                 "label": result["label"],

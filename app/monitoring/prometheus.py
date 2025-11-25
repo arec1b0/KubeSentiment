@@ -83,7 +83,7 @@ class PrometheusMetrics:
             A byte string containing the metrics in Prometheus format.
         """
         now = time.time()
-        ttl = self.settings.metrics_cache_ttl
+        ttl = self.settings.monitoring.metrics_cache_ttl
         if self._metrics_cache and self._metrics_cache_ts and (now - self._metrics_cache_ts) < ttl:
             return self._metrics_cache
 

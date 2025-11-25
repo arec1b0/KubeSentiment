@@ -58,7 +58,7 @@ class APIKeyAuthMiddleware(BaseHTTPMiddleware):
             The response from the next middleware or a `JSONResponse` if
             authentication fails.
         """
-        expected = self.settings.api_key
+        expected = self.settings.security.api_key
         # Allow OPTIONS preflight without auth
         if request.method == "OPTIONS":
             return await call_next(request)

@@ -45,7 +45,7 @@ def get_model_backend(
     """
     if backend:
         return backend.lower()
-    elif settings.onnx_model_path:
+    elif settings.model.onnx_model_path:
         return "onnx"
     else:
         return "pytorch"

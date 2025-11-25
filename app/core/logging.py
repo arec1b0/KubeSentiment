@@ -36,7 +36,7 @@ def setup_structured_logging() -> None:
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
-        level=getattr(logging, settings.log_level.upper(), logging.INFO),
+        level=getattr(logging, settings.monitoring.log_level.upper(), logging.INFO),
     )
 
     # Define the chain of structlog processors
@@ -81,7 +81,7 @@ def _add_request_context(
         The enriched log entry dictionary.
     """
     event_dict.setdefault("service", "sentiment-analysis")
-    event_dict.setdefault("version", get_settings().app_version)
+    event_dict.setdefault("version", get_settings().server.app_version)
     event_dict.setdefault("component", getattr(logger, "name", "unknown"))
 
     correlation_id = correlation_id_var.get()

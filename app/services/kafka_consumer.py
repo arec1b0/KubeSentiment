@@ -137,17 +137,17 @@ class HighThroughputKafkaConsumer(IKafkaConsumer):
         if getattr(self.settings, "kafka_dlq_enabled", False):
             try:
                 producer = KafkaProducer(
-                    bootstrap_servers=self.settings.kafka_producer_bootstrap_servers,
-                    acks=self.settings.kafka_producer_acks,
-                    retries=self.settings.kafka_producer_retries,
-                    batch_size=self.settings.kafka_producer_batch_size,
-                    linger_ms=self.settings.kafka_producer_linger_ms,
-                    compression_type=self.settings.kafka_producer_compression_type,
+                    bootstrap_servers=self.settings.kafka.kafka_producer_bootstrap_servers,
+                    acks=self.settings.kafka.kafka_producer_acks,
+                    retries=self.settings.kafka.kafka_producer_retries,
+                    batch_size=self.settings.kafka.kafka_producer_batch_size,
+                    linger_ms=self.settings.kafka.kafka_producer_linger_ms,
+                    compression_type=self.settings.kafka.kafka_producer_compression_type,
                 )
                 self._dlq = DeadLetterQueue(
                     producer,
-                    self.settings.kafka_dlq_topic,
-                    self.settings.kafka_max_retries,
+                    self.settings.kafka.kafka_dlq_topic,
+                    self.settings.kafka.kafka_max_retries,
                 )
             except Exception as exc:  # pragma: no cover - defensive branch
                 logger.error("Failed to initialise Kafka DLQ producer", error=str(exc))

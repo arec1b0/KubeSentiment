@@ -190,7 +190,9 @@ class AsyncBatchService(IAsyncBatchService):
         cached_results = await self.cache_manager.get_cached_result(job_id)
         if cached_results is not None:
             job = await self.job_manager.get_job(job_id)
-            return self._paginate_results(job_id, cached_results, page, page_size)
+            # Only return cached results if job is actually completed
+            if job and job.status == BatchJobStatus.COMPLETED:
+                return self._paginate_results(job_id, cached_results, page, page_size)
 
         # Get job from job manager
         job = await self.job_manager.get_job(job_id)
@@ -319,11 +321,10 @@ class AsyncBatchService(IAsyncBatchService):
                     ) / metrics.completed_jobs
                     metrics.average_batch_size = batch_size_avg
 
-            # Cache results
-            if current_job:
-                await self.cache_manager.cache_result(
-                    job.job_id, current_job.to_dict(), all_results
-                )
+                    # Cache results only for successfully completed jobs
+                    await self.cache_manager.cache_result(
+                        job.job_id, current_job.to_dict(), all_results
+                    )
 
             logger.info(
                 f"Completed batch job {job.job_id}",

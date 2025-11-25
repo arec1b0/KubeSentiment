@@ -75,13 +75,13 @@ class PredictionService(IPredictionService):
         """
         if not text or not text.strip():
             raise TextEmptyError()
-        if len(text) > self.settings.max_text_length:
-            raise TextTooLongError(len(text), self.settings.max_text_length)
+        if len(text) > self.settings.model.max_text_length:
+            raise TextTooLongError(len(text), self.settings.model.max_text_length)
         if not self.model.is_ready():
             raise ModelNotLoadedError(getattr(self.model.settings, "model_name", "unknown"))
 
         result = self.model.predict(text.strip())
-        if self.settings.enable_feature_engineering:
+        if self.settings.model.enable_feature_engineering:
             result["features"] = self.feature_engineer.extract_features(text.strip())
 
         return result
@@ -104,7 +104,7 @@ class PredictionService(IPredictionService):
 
         # Pre-validate texts and prepare for batch prediction
         valid_texts = [
-            t.strip() if t and t.strip() and len(t) <= self.settings.max_text_length else None
+            t.strip() if t and t.strip() and len(t) <= self.settings.model.max_text_length else None
             for t in texts
         ]
 

@@ -75,7 +75,7 @@ class ModelFactory:
 
                 # Use provided path, or fall back to settings
                 onnx_path = (
-                    model_path or settings.onnx_model_path or settings.onnx_model_path_default
+                    model_path or settings.model.onnx_model_path or settings.model.onnx_model_path_default
                 )
                 model = get_onnx_sentiment_analyzer(onnx_path)
                 _model_cache[cache_key] = model

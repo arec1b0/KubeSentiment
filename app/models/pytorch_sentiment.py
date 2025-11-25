@@ -81,7 +81,7 @@ class SentimentAnalyzer(BaseModelMetrics):
             RuntimeError: If model loading fails.
         """
         try:
-            logger.info(f"Loading model: {self.settings.model_name}")
+            logger.info(f"Loading model: {self.settings.model.model_name}")
             start_time = time.time()
 
             # Determine device index
@@ -89,11 +89,11 @@ class SentimentAnalyzer(BaseModelMetrics):
 
             self._pipeline = pipeline(
                 "sentiment-analysis",
-                model=self.settings.model_name,
+                model=self.settings.model.model_name,
                 device=device,
                 model_kwargs=(
-                    {"cache_dir": self.settings.model_cache_dir}
-                    if self.settings.model_cache_dir
+                    {"cache_dir": self.settings.model.model_cache_dir}
+                    if self.settings.model.model_cache_dir
                     else {}
                 ),
             )
@@ -103,7 +103,7 @@ class SentimentAnalyzer(BaseModelMetrics):
             logger.info(f"Model loaded successfully in {load_time:.2f} seconds")
 
         except Exception as e:
-            logger.error(f"Failed to load model {self.settings.model_name}: {e}")
+            logger.error(f"Failed to load model {self.settings.model.model_name}: {e}")
             self._is_loaded = False
             raise RuntimeError(f"Failed to load model: {e}") from e
 
@@ -128,7 +128,7 @@ class SentimentAnalyzer(BaseModelMetrics):
         """
         if not self.is_ready():
             ctx_logger.error("Model not loaded")
-            raise ModelNotLoadedError(self.settings.model_name)
+            raise ModelNotLoadedError(self.settings.model.model_name)
 
         if not text or not text.strip():
             ctx_logger.error("Empty text provided")
@@ -151,7 +151,7 @@ class SentimentAnalyzer(BaseModelMetrics):
             ModelInferenceError: If inference fails.
         """
         try:
-            result = self._pipeline(text[: self.settings.max_text_length])[0]
+            result = self._pipeline(text[: self.settings.model.max_text_length])[0]
             return (result["label"], result["score"])
         except Exception as e:
             logger.error(f"Inference failed: {e}")
@@ -182,13 +182,13 @@ class SentimentAnalyzer(BaseModelMetrics):
 
         # Clean and truncate text
         cleaned_text = text.strip()
-        if len(cleaned_text) > self.settings.max_text_length:
-            cleaned_text = cleaned_text[: self.settings.max_text_length]
+        if len(cleaned_text) > self.settings.model.max_text_length:
+            cleaned_text = cleaned_text[: self.settings.model.max_text_length]
             ctx_logger.warning(
                 "Text truncated",
                 extra={
                     "original_length": len(text),
-                    "max_length": self.settings.max_text_length,
+                    "max_length": self.settings.model.max_text_length,
                 },
             )
 
@@ -250,14 +250,14 @@ class SentimentAnalyzer(BaseModelMetrics):
         ctx_logger.info("Starting batch prediction", extra={"batch_size": len(texts)})
 
         if not self.is_ready():
-            raise ModelNotLoadedError(self.settings.model_name)
+            raise ModelNotLoadedError(self.settings.model.model_name)
 
         if not texts:
             return []
 
         # Clean and truncate texts
         cleaned_texts = [
-            t.strip()[: self.settings.max_text_length] if t and t.strip() else "" for t in texts
+            t.strip()[: self.settings.model.max_text_length] if t and t.strip() else "" for t in texts
         ]
 
         # Filter out empty texts and track their indices
@@ -329,11 +329,11 @@ class SentimentAnalyzer(BaseModelMetrics):
         cache_info = self._cached_predict.cache_info()
 
         return {
-            "model_name": self.settings.model_name,
+            "model_name": self.settings.model.model_name,
             "backend": "pytorch",
             "device": self._device,
             "is_loaded": self._is_loaded,
-            "max_text_length": self.settings.max_text_length,
+            "max_text_length": self.settings.model.max_text_length,
             "cache_size": cache_info.currsize,
             "cache_maxsize": cache_info.maxsize,
         }

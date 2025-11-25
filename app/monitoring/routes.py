@@ -48,7 +48,7 @@ async def get_async_batch_service_dependency(
     Raises:
         HTTPException: If the service is not available or disabled.
     """
-    if not settings.async_batch_enabled:
+    if not settings.performance.async_batch_enabled:
         raise HTTPException(status_code=404, detail="Async batch processing is disabled")
     if (
         not hasattr(request.app.state, "async_batch_service")
@@ -93,11 +93,11 @@ async def detailed_health_check(
         "secrets_backend": health_checker.check_secrets_backend_health(secret_manager),
     }
     # Optional components
-    if settings.kafka_enabled:
+    if settings.kafka.kafka_enabled:
         checks["kafka"] = health_checker.check_kafka_health(
             getattr(request.app.state, "kafka_consumer", None)
         )
-    if settings.async_batch_enabled:
+    if settings.performance.async_batch_enabled:
         checks["async_batch"] = health_checker.check_async_batch_health(
             getattr(request.app.state, "async_batch_service", None)
         )
@@ -116,7 +116,7 @@ async def detailed_health_check(
 
     return DetailedHealthResponse(
         status=overall_status,
-        version=settings.app_version,
+        version=settings.server.app_version,
         timestamp=time.time(),
         dependencies=dependencies,
     )
@@ -196,7 +196,7 @@ async def get_prometheus_metrics(settings: Settings = Depends(get_settings)):
     Returns:
         A `Response` object with the metrics in Prometheus text format.
     """
-    if not settings.enable_metrics:
+    if not settings.monitoring.enable_metrics:
         raise HTTPException(status_code=404, detail="Metrics endpoint is disabled")
     try:
         from app.monitoring.prometheus import get_metrics
@@ -250,7 +250,7 @@ async def get_kafka_metrics(request: Request, settings: Settings = Depends(get_s
     Returns:
         A `KafkaMetricsResponse` with consumer performance data.
     """
-    if not settings.kafka_enabled:
+    if not settings.kafka.kafka_enabled:
         raise HTTPException(status_code=404, detail="Kafka consumer is disabled")
     consumer = getattr(request.app.state, "kafka_consumer", None)
     if not consumer:

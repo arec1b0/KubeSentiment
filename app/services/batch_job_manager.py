@@ -237,6 +237,9 @@ class BatchJobManager:
                 if old_status != BatchJobStatus.CANCELLED:
                     self._metrics.active_jobs -= 1
                     self._metrics.failed_jobs += 1
+                    # Decrement queue_size if job was PENDING (e.g., enqueueing failed)
+                    if old_status == BatchJobStatus.PENDING:
+                        self._metrics.queue_size -= 1
             elif status == BatchJobStatus.CANCELLED:
                 if old_status == BatchJobStatus.PENDING:
                     self._metrics.active_jobs -= 1

@@ -54,13 +54,13 @@ def create_app() -> FastAPI:
 
     # Create FastAPI app with lifespan management
     app = FastAPI(
-        title=settings.app_name,
+        title=settings.server.app_name,
         description="A production-ready microservice for sentiment analysis using transformer models.",
-        version=settings.app_version,
-        debug=settings.debug,
+        version=settings.server.app_version,
+        debug=settings.server.debug,
         lifespan=lifespan,
-        docs_url="/docs" if settings.debug else None,
-        redoc_url="/redoc" if settings.debug else None,
+        docs_url="/docs" if settings.server.debug else None,
+        redoc_url="/redoc" if settings.server.debug else None,
     )
 
     # Add correlation ID middleware (first to ensure all logs have correlation ID)
@@ -72,7 +72,7 @@ def create_app() -> FastAPI:
     # Add CORS middleware to allow cross-origin requests
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.allowed_origins,
+        allow_origins=settings.security.allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -219,10 +219,10 @@ def create_app() -> FastAPI:
         )
 
     # Include API router
-    app.include_router(router, prefix="/api/v1" if not settings.debug else "")
+    app.include_router(router, prefix="/api/v1" if not settings.server.debug else "")
     app.include_router(
         monitoring_router,
-        prefix="/api/v1" if not settings.debug else "",
+        prefix="/api/v1" if not settings.server.debug else "",
         tags=["Monitoring"],
     )
 
@@ -231,7 +231,7 @@ def create_app() -> FastAPI:
 
     app.include_router(
         advanced_monitoring_router,
-        prefix="/api/v1" if not settings.debug else "",
+        prefix="/api/v1" if not settings.server.debug else "",
         tags=["Advanced Monitoring"],
     )
 
@@ -248,11 +248,11 @@ def create_app() -> FastAPI:
             A dictionary containing service information.
         """
         return {
-            "service": settings.app_name,
-            "version": settings.app_version,
+            "service": settings.server.app_name,
+            "version": settings.server.app_version,
             "status": "operational",
-            "docs_url": "/docs" if settings.debug else "disabled",
-            "health_url": "/health" if settings.debug else "/api/v1/health",
+            "docs_url": "/docs" if settings.server.debug else "disabled",
+            "health_url": "/health" if settings.server.debug else "/api/v1/health",
         }
 
     return app
@@ -276,9 +276,9 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "app.main:app",
-        host=settings.host,
-        port=settings.port,
-        reload=settings.debug,
-        log_level=settings.log_level.lower(),
-        workers=1 if settings.debug else settings.workers,
+        host=settings.server.host,
+        port=settings.server.port,
+        reload=settings.server.debug,
+        log_level=settings.monitoring.log_level.lower(),
+        workers=1 if settings.server.debug else settings.server.workers,
     )
