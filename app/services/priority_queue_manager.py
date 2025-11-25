@@ -37,6 +37,11 @@ class PriorityQueueManager:
         self._shutdown_event: asyncio.Event | None = None
         self._running = False
 
+    async def ensure_initialized(self) -> None:
+        """Initialize queues only once; safe to call multiple times."""
+        if self._priority_queues is None:
+            await self.initialize_queues()
+
     async def initialize_queues(self) -> None:
         """Initialize priority queues for all priority levels."""
         if self._priority_queues is not None:
@@ -253,4 +258,3 @@ class PriorityQueueManager:
                 )
 
         logger.info(f"Stopped processing {priority.value} priority queue")
-

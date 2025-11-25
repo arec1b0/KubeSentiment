@@ -1,14 +1,19 @@
 """
 Asynchronous batch processing service for high-throughput sentiment analysis.
 
-This service orchestrates three focused managers to provide a robust and
-scalable solution for processing large volumes of text data asynchronously.
-It features a priority-based queueing system, intelligent batching for
-efficient model inference, and result caching to improve performance.
+The service coordinates four collaborators with clear responsibilities:
+- BatchJobManager: Creates jobs, tracks lifecycle/metrics, enforces timeouts.
+- PriorityQueueManager: Owns priority queues and worker lifecycle.
+- StreamProcessor: Executes model inference in batches.
+- ResultCacheManager: Caches completed job payloads for fast reads.
+
+Only interact with the AsyncBatchCoordinator interface exposed here; avoid
+reaching into managers directly to keep responsibilities decoupled.
 """
 
+import asyncio
 import time
-from typing import Any
+from typing import Any, Protocol
 
 from app.api.schemas.responses import (
     AsyncBatchMetricsResponse,
@@ -25,16 +30,45 @@ from app.services.priority_queue_manager import PriorityQueueManager
 from app.services.result_cache_manager import ResultCacheManager
 from app.services.stream_processor import StreamProcessor
 
+
+class AsyncBatchCoordinator(Protocol):
+    """Minimal surface area for orchestrating async batch work."""
+
+    async def start(self) -> None: ...
+
+    async def stop(self) -> None: ...
+
+    async def submit_batch_job(
+        self,
+        texts: list[str],
+        priority: str | Priority | None = None,
+        max_batch_size: int | None = None,
+        timeout_seconds: int | None = None,
+    ) -> BatchJob: ...
+
+    async def get_job_status(self, job_id: str) -> BatchJob | None: ...
+
+    async def get_job_results(
+        self, job_id: str, page: int = 1, page_size: int = 100
+    ) -> BatchPredictionResults | None: ...
+
+    async def cancel_job(self, job_id: str) -> bool: ...
+
+    async def get_batch_metrics(self) -> AsyncBatchMetricsResponse: ...
+
+    def get_job_queue_status(self) -> dict[str, int]: ...
+
 logger = get_logger(__name__)
 
 
 class AsyncBatchService(IAsyncBatchService):
     """A service for asynchronous, high-throughput batch processing.
 
-    This service orchestrates three focused managers:
-    - BatchJobManager: Job creation, status tracking, lifecycle
+    This service orchestrates focused collaborators:
+    - BatchJobManager: Job creation, status tracking, lifecycle, metrics
     - PriorityQueueManager: Queue coordination, task ordering
     - ResultCacheManager: Result caching and cleanup
+    - StreamProcessor: High-throughput inference for each batch
 
     It provides a unified interface for batch processing while maintaining
     clear separation of concerns.
@@ -71,7 +105,7 @@ class AsyncBatchService(IAsyncBatchService):
             return
 
         # Initialize queues
-        await self.queue_manager.initialize_queues()
+        await self.queue_manager.ensure_initialized()
 
         # Start job manager (includes cleanup task)
         await self.job_manager.start()
@@ -105,7 +139,7 @@ class AsyncBatchService(IAsyncBatchService):
     async def submit_batch_job(
         self,
         texts: list[str],
-        priority: str = "medium",
+        priority: str | Priority | None = "medium",
         max_batch_size: int | None = None,
         timeout_seconds: int | None = None,
     ) -> BatchJob:
@@ -123,24 +157,19 @@ class AsyncBatchService(IAsyncBatchService):
         Raises:
             ValueError: If texts list is empty or queue is full.
         """
-        # Validate and normalize priority
-        try:
-            priority_enum = Priority(priority.lower())
-        except ValueError:
-            priority_enum = Priority.MEDIUM
-            logger.warning(f"Invalid priority '{priority}', defaulting to medium")
+        normalized_texts = self._sanitize_texts(texts)
+        priority_enum = self._normalize_priority(priority)
 
         # Create job via job manager
         job = await self.job_manager.create_job(
-            texts=texts,
+            texts=normalized_texts,
             priority=priority_enum,
             max_batch_size=max_batch_size,
             timeout_seconds=timeout_seconds,
         )
 
         # Ensure queues are initialized
-        if self.queue_manager._priority_queues is None:
-            await self.queue_manager.initialize_queues()
+        await self.queue_manager.ensure_initialized()
 
         # Enqueue job
         try:
@@ -148,7 +177,7 @@ class AsyncBatchService(IAsyncBatchService):
             logger.info(
                 f"Submitted batch job {job.job_id}",
                 priority=priority_enum.value,
-                batch_size=len(texts),
+                batch_size=len(normalized_texts),
             )
         except ValueError as e:
             # Update job status to failed if queue is full
@@ -255,6 +284,11 @@ class AsyncBatchService(IAsyncBatchService):
         """
         return self.queue_manager.get_queue_status()
 
+    @property
+    def coordinator(self) -> AsyncBatchCoordinator:
+        """Minimal surface to share with collaborators instead of internals."""
+        return self
+
     async def _process_job(self, job: BatchJob) -> None:
         """Processes a single batch job.
 
@@ -271,29 +305,7 @@ class AsyncBatchService(IAsyncBatchService):
         )
 
         try:
-            # Split texts into batches, respecting job-specific max_batch_size
-            batch_size = min(len(job.texts), job.max_batch_size)
-            all_results = []
-
-            for i in range(0, len(job.texts), batch_size):
-                batch_texts = job.texts[i : i + batch_size]
-                batch_id = f"{job.job_id}_batch_{i // batch_size}"
-
-                # Process batch using stream processor
-                batch_results = await self.stream_processor.predict_async_batch(
-                    batch_texts, batch_id
-                )
-                all_results.extend(batch_results)
-
-                # Update progress
-                processed_count = len(all_results)
-                progress = processed_count / len(job.texts)
-                await self.job_manager.update_job_status(
-                    job.job_id,
-                    BatchJobStatus.PROCESSING,
-                    progress=progress,
-                    processed_count=processed_count,
-                )
+            all_results, failed_count = await self._process_job_batches(job)
 
             # Mark job as completed
             completed_at = time.time()
@@ -308,30 +320,46 @@ class AsyncBatchService(IAsyncBatchService):
                     results=all_results,
                     completed_at=completed_at,
                     progress=1.0,
-                    processed_count=len(job.texts),
+                    processed_count=len(all_results),
+                    failed_count=failed_count,
                 )
 
-                # Update metrics for processing time
-                metrics = self.job_manager.get_metrics()
-                metrics.total_processing_time_seconds += processing_time
-                metrics.total_texts_processed += len(job.texts)
-                if metrics.completed_jobs > 0:
-                    batch_size_avg = (
-                        metrics.average_batch_size * (metrics.completed_jobs - 1) + len(job.texts)
-                    ) / metrics.completed_jobs
-                    metrics.average_batch_size = batch_size_avg
+                # Update metrics and cache only for successfully completed jobs
+                await self.job_manager.record_processing_stats(
+                    job.job_id, len(all_results), processing_time
+                )
 
-                    # Cache results only for successfully completed jobs
+                refreshed_job = await self.job_manager.get_job(job.job_id)
+                if refreshed_job and refreshed_job.status == BatchJobStatus.COMPLETED:
                     await self.cache_manager.cache_result(
-                        job.job_id, current_job.to_dict(), all_results
+                        job.job_id, refreshed_job.to_dict(), all_results
                     )
 
             logger.info(
                 f"Completed batch job {job.job_id}",
                 processing_time_seconds=processing_time,
                 total_texts=len(job.texts),
+                failed_batches=failed_count,
             )
 
+        except asyncio.CancelledError:
+            logger.info(f"Processing cancelled for job {job.job_id}")
+            raise
+        except TimeoutError as e:
+            failed_at = time.time()
+            current_job = await self.job_manager.get_job(job.job_id)
+            if current_job and current_job.status != BatchJobStatus.CANCELLED:
+                await self.job_manager.update_job_status(
+                    job.job_id,
+                    BatchJobStatus.EXPIRED,
+                    error=str(e),
+                    completed_at=failed_at,
+                )
+            logger.error(
+                f"Timed out while processing batch job {job.job_id}",
+                error=str(e),
+                exc_info=True,
+            )
         except Exception as e:
             # Mark job as failed
             failed_at = time.time()
@@ -350,23 +378,92 @@ class AsyncBatchService(IAsyncBatchService):
                 exc_info=True,
             )
 
+    async def _process_job_batches(self, job: BatchJob) -> tuple[list[dict[str, Any]], int]:
+        """Processes a job in batches with cancellation and timeout checkpoints."""
+        all_results: list[dict[str, Any]] = []
+        failed_count = 0
+        total_texts = len(job.texts)
+
+        # Ensure batch_size is never zero
+        batch_size = max(1, min(total_texts or 1, job.max_batch_size or total_texts or 1))
+
+        for i in range(0, total_texts, batch_size):
+            current_job = await self.job_manager.get_job(job.job_id)
+            if current_job is None:
+                break
+
+            # Cancellation checkpoint
+            if current_job.status == BatchJobStatus.CANCELLED:
+                logger.info("Job cancelled mid-processing", job_id=job.job_id)
+                break
+
+            # Timeout enforcement
+            if self._has_job_timed_out(current_job):
+                raise TimeoutError("Job timed out during processing")
+
+            batch_texts = current_job.texts[i : i + batch_size]
+            batch_id = f"{job.job_id}_batch_{i // batch_size}"
+
+            try:
+                batch_results = await self.stream_processor.predict_async_batch(batch_texts, batch_id)
+            except Exception as batch_err:  # Continue processing remaining batches
+                logger.error(
+                    "Batch processing failed",
+                    job_id=job.job_id,
+                    batch_id=batch_id,
+                    error=str(batch_err),
+                    exc_info=True,
+                )
+                batch_results = [self._build_error_result(str(batch_err), text) for text in batch_texts]
+
+            failed_count += sum(1 for r in batch_results if self._is_error_result(r))
+            all_results.extend(batch_results)
+
+            # Update progress after each batch
+            processed_count = len(all_results)
+            progress = processed_count / total_texts if total_texts > 0 else 1.0
+            await self.job_manager.update_job_status(
+                job.job_id,
+                BatchJobStatus.PROCESSING,
+                progress=progress,
+                processed_count=processed_count,
+                failed_count=failed_count,
+            )
+
+        return all_results, failed_count
+
+    def _has_job_timed_out(self, job: BatchJob) -> bool:
+        """Determine if the job exceeded its timeout while processing."""
+        if not job.timeout_seconds or job.timeout_seconds <= 0:
+            return False
+        return (time.time() - job.created_at) >= job.timeout_seconds
+
+    def _build_error_result(self, error_message: str, text: str) -> dict[str, Any]:
+        """Create a standardized error result entry for failed predictions."""
+        return {
+            "label": "ERROR",
+            "score": 0.0,
+            "error": error_message,
+            "inference_time_ms": 0.0,
+            "model_name": "async_batch_service",
+            "text_length": len(text),
+            "backend": "async_batch",
+            "cached": False,
+        }
+
     def _paginate_results(
         self, job_id: str, results: list[dict[str, Any]], page: int, page_size: int
     ) -> BatchPredictionResults:
-        """Paginates job results.
-
-        Args:
-            job_id: The job ID.
-            results: List of all results.
-            page: Page number (1-based).
-            page_size: Number of results per page.
-
-        Returns:
-            A BatchPredictionResults object with paginated results.
-        """
+        """Paginates job results with bounds and summary safeguards."""
+        safe_page = max(1, page)
+        safe_page_size = max(1, page_size)
         total_results = len(results)
-        start_idx = (page - 1) * page_size
-        end_idx = start_idx + page_size
+        start_idx = (safe_page - 1) * safe_page_size
+
+        # Avoid out-of-range slicing for late pages
+        if start_idx >= total_results and total_results > 0:
+            start_idx = max(total_results - safe_page_size, 0)
+        end_idx = min(start_idx + safe_page_size, total_results)
         paginated_results = results[start_idx:end_idx]
 
         # Convert to PredictionResponse objects
@@ -375,17 +472,16 @@ class AsyncBatchService(IAsyncBatchService):
             for result in paginated_results
         ]
 
-        # Calculate summary statistics
+        labels = [self._extract_label(r) for r in results]
+        successful_predictions = sum(1 for label in labels if label not in ("ERROR", None))
+        failed_predictions = sum(1 for label in labels if label == "ERROR")
+
         summary = {
             "total_texts": total_results,
-            "successful_predictions": sum(
-                1 for r in results if r.get("label") not in ["ERROR", None]
-            ),
-            "failed_predictions": sum(1 for r in results if r.get("label") == "ERROR"),
+            "successful_predictions": successful_predictions,
+            "failed_predictions": failed_predictions,
             "success_rate": (
-                sum(1 for r in results if r.get("label") not in ["ERROR", None]) / total_results
-                if total_results > 0
-                else 0.0
+                successful_predictions / total_results if total_results > 0 else 0.0
             ),
         }
 
@@ -393,8 +489,42 @@ class AsyncBatchService(IAsyncBatchService):
             job_id=job_id,
             results=prediction_responses,
             total_results=total_results,
-            page=page,
-            page_size=page_size,
+            page=safe_page,
+            page_size=safe_page_size,
             has_more=end_idx < total_results,
             summary=summary,
         )
+
+    def _extract_label(self, result: Any) -> Any:
+        """Safely extract label from dicts or response objects."""
+        if isinstance(result, dict):
+            return result.get("label")
+        return getattr(result, "label", None)
+
+    def _is_error_result(self, result: Any) -> bool:
+        """Determine if a result represents an error."""
+        return self._extract_label(result) == "ERROR"
+
+    def _sanitize_texts(self, texts: list[str]) -> list[str]:
+        """Normalize and validate text payloads."""
+        if not isinstance(texts, list):
+            raise ValueError("texts must be provided as a list of strings")
+
+        cleaned = [t.strip() for t in texts if isinstance(t, str) and t.strip()]
+        if not cleaned:
+            raise ValueError("texts must contain at least one non-empty string")
+        return cleaned
+
+    def _normalize_priority(self, priority: str | Priority | None) -> Priority:
+        """Normalize priority input to enum with safe default."""
+        if isinstance(priority, Priority):
+            return priority
+        try:
+            return Priority((priority or "medium").lower())
+        except Exception:
+            logger.warning(f"Invalid priority '{priority}', defaulting to medium")
+            return Priority.MEDIUM
+
+    def _is_job_valid(self, job: BatchJob) -> bool:
+        """Public wrapper to avoid exposing the manager directly in tests."""
+        return self.job_manager.is_job_valid(job)

@@ -82,6 +82,10 @@ class ResultCacheManager:
             # Enforce cache size limit
             await self._enforce_cache_size_limit()
 
+            # Idempotent writes: keep existing cached payload if present
+            if job_id in self._result_cache:
+                return
+
             # Cache the result
             self._result_cache[job_id] = {
                 "job_info": job_info,
@@ -171,4 +175,3 @@ class ResultCacheManager:
         async with self._ensure_lock():
             self._result_cache.clear()
         logger.info("Cache cleared")
-

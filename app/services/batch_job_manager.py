@@ -117,13 +117,13 @@ class BatchJobManager:
             raise ValueError("Texts list cannot be empty")
 
         # Set defaults from settings
-        max_batch_size = (
-            max_batch_size or self.settings.performance.async_batch_max_batch_size
+        default_batch_size = self.settings.performance.async_batch_max_batch_size
+        max_batch_size = max(
+            1,
+            max_batch_size or default_batch_size,
         )
-        timeout_seconds = (
-            timeout_seconds
-            or self.settings.performance.async_batch_default_timeout_seconds
-        )
+        default_timeout = self.settings.performance.async_batch_default_timeout_seconds
+        timeout_seconds = max(1, timeout_seconds or default_timeout)
 
         # Generate unique job ID
         job_id = str(uuid.uuid4())
@@ -169,10 +169,14 @@ class BatchJobManager:
 
             # Check if job has expired
             if self.is_job_expired(job) and job.status != BatchJobStatus.EXPIRED:
+                previous_status = job.status
                 job.status = BatchJobStatus.EXPIRED
                 job.error = "Job expired due to timeout"
                 job.completed_at = time.time()
-                self._metrics.active_jobs -= 1
+                if previous_status == BatchJobStatus.PENDING:
+                    self._metrics.queue_size -= 1
+                if previous_status in (BatchJobStatus.PENDING, BatchJobStatus.PROCESSING):
+                    self._metrics.active_jobs -= 1
                 self._metrics.failed_jobs += 1
 
         return job
@@ -187,6 +191,7 @@ class BatchJobManager:
         completed_at: float | None = None,
         progress: float | None = None,
         processed_count: int | None = None,
+        failed_count: int | None = None,
     ) -> bool:
         """Update job status and related fields.
 
@@ -199,6 +204,7 @@ class BatchJobManager:
             completed_at: Timestamp when job completed.
             progress: Progress percentage (0.0-1.0).
             processed_count: Number of texts processed.
+            failed_count: Number of failed texts.
 
         Returns:
             True if job was updated, False if job not found.
@@ -225,6 +231,8 @@ class BatchJobManager:
                 job.progress = progress
             if processed_count is not None:
                 job.processed_count = processed_count
+            if failed_count is not None:
+                job.failed_count = failed_count
 
             # Update metrics based on status transitions
             if old_status == BatchJobStatus.PENDING and status == BatchJobStatus.PROCESSING:
@@ -272,8 +280,15 @@ class BatchJobManager:
             return False
 
         if self.is_job_expired(job):
+            previous_status = job.status
             job.status = BatchJobStatus.EXPIRED
             job.error = "Job expired due to timeout"
+            job.completed_at = time.time()
+            if previous_status == BatchJobStatus.PENDING:
+                self._metrics.queue_size -= 1
+            if previous_status in (BatchJobStatus.PENDING, BatchJobStatus.PROCESSING):
+                self._metrics.active_jobs -= 1
+            self._metrics.failed_jobs += 1
             return False
 
         return True
@@ -321,6 +336,29 @@ class BatchJobManager:
         """
         return self._metrics
 
+    async def record_processing_stats(
+        self, job_id: str, texts_processed: int, processing_time_seconds: float
+    ) -> BatchJob | None:
+        """Safely update processing metrics for a completed job."""
+        async with self._ensure_lock():
+            job = self._jobs.get(job_id)
+            if job is None or job.status != BatchJobStatus.COMPLETED:
+                return None
+
+            metrics = self._metrics
+            metrics.total_processing_time_seconds += processing_time_seconds
+            metrics.total_texts_processed += texts_processed
+
+            # Recompute average batch size across completed jobs
+            if metrics.completed_jobs > 0:
+                metrics.average_batch_size = (
+                    (metrics.average_batch_size * (metrics.completed_jobs - 1))
+                    + texts_processed
+                ) / metrics.completed_jobs
+
+            metrics.update_averages()
+            return job
+
     async def _cleanup_expired_jobs(self) -> None:
         """Background task to clean up expired jobs."""
         cleanup_interval = (
@@ -360,4 +398,3 @@ class BatchJobManager:
                 break
             except Exception as e:
                 logger.error(f"Error in cleanup task: {e}", exc_info=True)
-

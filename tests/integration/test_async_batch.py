@@ -322,10 +322,11 @@ class TestJobProcessing:
         # Process the job (should fail)
         await async_batch_service._process_job(job)
 
-        # Check job failure
-        assert job.status == BatchJobStatus.FAILED
-        assert job.error == "Model inference failed"
+        # Job completes with error results instead of failing the entire job
+        assert job.status == BatchJobStatus.COMPLETED
         assert job.completed_at is not None
+        assert job.results is not None
+        assert all(result["label"] == "ERROR" for result in job.results)
 
     @pytest.mark.asyncio
     async def test_job_cancellation(self, async_batch_service):
@@ -562,17 +563,17 @@ class TestPriorityProcessing:
         medium_job = await async_batch_service.submit_batch_job(["medium priority"], "medium")
         low_job = await async_batch_service.submit_batch_job(["low priority"], "low")
 
-        # Process high priority first
-        await async_batch_service._process_priority_queue(Priority.HIGH)
+        # Process a single job from the high priority queue
+        dequeued_high = await async_batch_service.queue_manager.dequeue_job(Priority.HIGH, timeout=0.1)
+        assert dequeued_high is not None
+        await async_batch_service._process_job(dequeued_high)
+
         high_job_refreshed = await async_batch_service.get_job_status(high_job.job_id)
         assert high_job_refreshed.status == BatchJobStatus.COMPLETED
 
-        # Medium priority should still be pending
         medium_job_refreshed = await async_batch_service.get_job_status(medium_job.job_id)
-        assert medium_job_refreshed.status == BatchJobStatus.PENDING
-
-        # Low priority should also still be pending
         low_job_refreshed = await async_batch_service.get_job_status(low_job.job_id)
+        assert medium_job_refreshed.status == BatchJobStatus.PENDING
         assert low_job_refreshed.status == BatchJobStatus.PENDING
 
     @pytest.mark.asyncio
@@ -583,9 +584,9 @@ class TestPriorityProcessing:
             job = await async_batch_service.submit_batch_job([f"test {i}"], "high")
             assert job.job_id is not None
 
-        # Next high priority job should still work (queue can handle it)
-        job = await async_batch_service.submit_batch_job(["test overflow"], "high")
-        assert job.job_id is not None
+        # Next high priority job should be rejected because the queue is full
+        with pytest.raises(ValueError):
+            await async_batch_service.submit_batch_job(["test overflow"], "high")
 
 
 @pytest.mark.integration
