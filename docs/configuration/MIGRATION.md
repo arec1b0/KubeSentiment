@@ -1,16 +1,10 @@
-# ⚠️ DEPRECATED - Configuration Migration Guide
+# Migration Guide
 
-> **This document has been moved.** See **[docs/configuration/MIGRATION.md](docs/configuration/MIGRATION.md)** for the current documentation.
->
-> This page is kept for historical reference only. Please update your bookmarks and links to point to the new consolidated configuration documentation at `docs/configuration/`.
+Upgrading to the new domain-driven configuration architecture.
 
-**👉 [Read the updated documentation](docs/configuration/MIGRATION.md)**
+## Quick Summary
 
-This guide helps developers migrate to the new domain-driven configuration architecture.
-
-## Quick Start: Nothing to Change!
-
-**Good news:** All existing code continues to work without any modifications. The refactored configuration system is 100% backward compatible.
+**Good news:** All existing code continues to work without modifications. The refactored configuration system is **100% backward compatible**.
 
 ```python
 # Your existing code still works
@@ -20,28 +14,30 @@ settings = get_settings()
 model_name = settings.model_name  # ✅ Still works!
 ```
 
+---
+
 ## What Changed?
 
-### Before: Monolithic Settings
+### Before: Monolithic Configuration
 
 ```python
 # app/core/config.py (917 lines)
 class Settings(BaseSettings):
     # Server settings
-    app_name: str = "ML Model Serving API"
-    port: int = 8000
+    app_name: str
+    port: int
 
     # Model settings
-    model_name: str = "distilbert..."
-    max_text_length: int = 512
+    model_name: str
+    max_text_length: int
 
     # Kafka settings (30+ fields)
-    kafka_enabled: bool = False
-    kafka_bootstrap_servers: List[str] = ["localhost:9092"]
+    kafka_enabled: bool
+    kafka_bootstrap_servers: List[str]
     # ... 30 more Kafka fields
 
     # Redis settings
-    redis_enabled: bool = False
+    redis_enabled: bool
     # ... more Redis fields
 
     # ... 90+ total fields
@@ -58,20 +54,20 @@ class Settings(BaseSettings):
 ```python
 # app/core/config/server.py
 class ServerConfig(BaseSettings):
-    app_name: str = "ML Model Serving API"
-    port: int = 8000
+    app_name: str
+    port: int
     # Only server-related settings
 
 # app/core/config/model.py
 class ModelConfig(BaseSettings):
-    model_name: str = "distilbert..."
-    max_text_length: int = 512
+    model_name: str
+    max_text_length: int
     # Only model-related settings
 
 # app/core/config/kafka.py
 class KafkaConfig(BaseSettings):
-    kafka_enabled: bool = False
-    kafka_bootstrap_servers: List[str] = ["localhost:9092"]
+    kafka_enabled: bool
+    kafka_bootstrap_servers: List[str]
     # All 30+ Kafka settings in one focused module
 
 # app/core/config/settings.py
@@ -96,9 +92,9 @@ class Settings(BaseSettings):
 
 ---
 
-## Migration Scenarios
+## Do You Need to Change Anything?
 
-### Scenario 1: Reading Configuration (No Changes Needed)
+### Scenario 1: Reading Configuration
 
 #### Your Existing Code
 ```python
@@ -144,7 +140,7 @@ redis_host = settings.redis.redis_host
 
 ---
 
-### Scenario 2: FastAPI Dependency Injection (No Changes Needed)
+### Scenario 2: FastAPI Dependency Injection
 
 #### Your Existing Code
 ```python
@@ -189,7 +185,7 @@ async def predict(
 
 ---
 
-### Scenario 3: Testing with Mocks (Improved!)
+### Scenario 3: Testing with Mocks
 
 #### Your Old Test Code
 ```python
@@ -237,7 +233,7 @@ def test_prediction_service():
 
 ---
 
-### Scenario 4: Environment Variables (No Changes)
+### Scenario 4: Environment Variables
 
 #### Your Existing Environment Variables
 ```bash
@@ -262,7 +258,7 @@ MLOPS_REDIS_HOST      → settings.redis.redis_host
 
 ---
 
-### Scenario 5: Validators and Cross-Field Checks (No Changes)
+### Scenario 5: Validators and Cross-Field Checks
 
 #### Existing Validators Still Work
 ```python
@@ -515,6 +511,8 @@ def test_prediction_endpoint(client):
 - Kafka related → `KafkaConfig`
 - etc.
 
+See **[Architecture](ARCHITECTURE.md)** for complete list of domains.
+
 ### Q: Do environment variables need to change?
 **A:** No, all `MLOPS_*` environment variables work exactly the same.
 
@@ -528,7 +526,7 @@ def test_prediction_endpoint(client):
 **A:** Optional but recommended. Domain-specific mocks make tests cleaner and more focused.
 
 ### Q: What if I import from app.core.config.py?
-**A:** Still works! The file now re-exports everything from the `app.core.config` package.
+**A:** Still works! The package exports everything for backward compatibility.
 
 ---
 
@@ -548,6 +546,8 @@ from app.core.config import Settings, get_settings
 from app.core.config.settings import Settings, get_settings
 ```
 
+---
+
 ### Issue: Attribute Error
 ```python
 AttributeError: 'Settings' object has no attribute 'model_name'
@@ -556,6 +556,8 @@ AttributeError: 'Settings' object has no attribute 'model_name'
 **Solution:** The backward compatibility properties should work. If you see this, check:
 1. Are you using the latest Settings class?
 2. Try accessing via domain: `settings.model.model_name`
+
+---
 
 ### Issue: Validator Failure
 ```python
@@ -592,23 +594,21 @@ ValueError: Model 'my-model' must be in allowed_models list
 
 ### Next Steps
 
-1. Read the [Configuration Architecture Documentation](./CONFIGURATION_ARCHITECTURE.md)
+1. Read the **[Configuration Architecture](ARCHITECTURE.md)**
 2. Review examples in this guide
 3. Try domain-specific access in new code
 4. Gradually update tests to use domain mocks (optional)
 
 ---
 
-## Getting Help
-
-If you have questions:
-1. Check [Configuration Architecture Documentation](./CONFIGURATION_ARCHITECTURE.md)
-2. Look at the examples in this migration guide
-3. Review the docstrings in each config module
-4. Ask the development team
-
 ## Related Documentation
 
-- [Configuration Architecture](./CONFIGURATION_ARCHITECTURE.md) - Full documentation
-- [Environment Configuration](./ENVIRONMENT_CONFIGURATIONS.md) - Deployment guide
-- [Contributing Guide](../CONTRIBUTING.md) - Development guidelines
+- **[Configuration Architecture](ARCHITECTURE.md)** - Full documentation
+- **[Environment Variables](ENVIRONMENT_VARIABLES.md)** - Complete settings reference
+- **[Deployment](DEPLOYMENT.md)** - Deployment configurations
+- **[CONTRIBUTING.md](/CONTRIBUTING.md)** - Development guidelines
+
+---
+
+**Last Updated:** 2025-11-25
+**Maintained By:** KubeSentiment Team

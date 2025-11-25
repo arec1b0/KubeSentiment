@@ -416,6 +416,17 @@ pytest tests/unit/test_api.py::TestPredictEndpoint::test_predict_success
 
 ## Configuration Management
 
+**📚 See [docs/configuration/](docs/configuration/) for comprehensive configuration documentation.**
+
+### Quick Links
+
+- **[Quick Start](docs/configuration/QUICK_START.md)** - Get running in 5 minutes
+- **[Architecture](docs/configuration/ARCHITECTURE.md)** - Understand the design
+- **[Profiles](docs/configuration/PROFILES.md)** - Profile-based defaults
+- **[Environment Variables](docs/configuration/ENVIRONMENT_VARIABLES.md)** - Complete reference
+- **[Deployment](docs/configuration/DEPLOYMENT.md)** - Environment-specific configurations
+- **[Examples](docs/configuration/examples/)** - Copy-paste ready configurations
+
 ### Profile-Based Configuration System
 
 KubeSentiment uses a **profile-based configuration system** (ADR-009) with modular domain-specific settings.
@@ -425,9 +436,9 @@ KubeSentiment uses a **profile-based configuration system** (ADR-009) with modul
 | Profile | Use Case | Defaults |
 |---------|----------|----------|
 | `local` | Developer laptop | Mock model, no Redis/Kafka, hot-reload |
-| `development` | Shared dev env | ONNX model, Redis/Kafka enabled |
-| `staging` | Pre-production | Production settings, lower resources |
-| `production` | Production | ONNX model, all features enabled |
+| `development` | Shared dev env | PyTorch model, Redis/Kafka optional |
+| `staging` | Pre-production | ONNX model, Redis/Vault enabled |
+| `production` | Production | ONNX model, all services enabled |
 
 #### Configuration Hierarchy (Priority)
 
@@ -436,32 +447,23 @@ KubeSentiment uses a **profile-based configuration system** (ADR-009) with modul
 3. **Environment Variables**
 4. **Vault Secrets** (highest priority)
 
-#### Environment Variables
-
-All settings use the `MLOPS_` prefix:
+#### Quick Setup
 
 ```bash
-# Profile selection
-PROFILE=production
+# Set profile
+export MLOPS_PROFILE=development
 
-# Server settings
-MLOPS_SERVER_HOST=0.0.0.0
-MLOPS_SERVER_PORT=8000
-MLOPS_SERVER_WORKERS=4
-
-# Model settings
-MLOPS_MODEL_NAME=distilbert-base-uncased-finetuned-sst-2-english
-MLOPS_MODEL_BACKEND=onnx
-MLOPS_MODEL_CACHE_DIR=/app/models
-
-# Redis settings
-MLOPS_REDIS_HOST=localhost
-MLOPS_REDIS_PORT=6379
+# Or create .env file
+cat > .env << EOF
+MLOPS_PROFILE=development
 MLOPS_REDIS_ENABLED=true
+EOF
 
-# Kafka settings
-MLOPS_KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-MLOPS_KAFKA_ENABLED=true
+# Load it
+export $(cat .env | xargs)
+
+# Run app
+python -m uvicorn app.main:app --reload
 ```
 
 #### Accessing Configuration
@@ -471,18 +473,27 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-# Access nested settings
+# New style: domain-specific access (recommended)
 print(settings.server.host)
-print(settings.model.backend)
-print(settings.redis.url)
+print(settings.model.model_name)
+print(settings.redis.redis_host)
+
+# Old style: backward compatible
+print(settings.host)
+print(settings.model_name)
+print(settings.redis_host)
 ```
 
-### Environment Templates
+### Configuration Files & Locations
 
-- `.env.local.template` - Local development
-- `.env.development.template` - Development environment
-- `.env.staging.template` - Staging environment
-- `.env.production.template` - Production environment
+| File | Purpose |
+|------|---------|
+| `app/core/config/` | Configuration modules |
+| `.env.local.template` | Local development template |
+| `.env.development.template` | Development template |
+| `.env.staging.template` | Staging template |
+| `.env.production.template` | Production template |
+| `docs/configuration/` | Complete documentation |
 
 ---
 

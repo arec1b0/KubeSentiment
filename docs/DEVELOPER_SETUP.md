@@ -1,4 +1,8 @@
-# KubeSentiment Developer Setup Guide
+# ⚠️ DEPRECATED - KubeSentiment Developer Setup Guide
+
+> **This document has been partially superseded.** For configuration setup, see **[docs/configuration/QUICK_START.md](docs/configuration/QUICK_START.md)**.
+>
+> For complete developer setup (IDE, pre-commit hooks, etc.), see **[docs/setup/DEVELOPMENT.md](docs/setup/DEVELOPMENT.md)**.
 
 > **Last Updated:** 2025-11-19
 > **Target Audience:** Contributors and developers

@@ -1,4 +1,10 @@
-# Environment-Specific Configurations
+# ⚠️ DEPRECATED - Environment-Specific Configurations
+
+> **This document has been moved.** See **[docs/configuration/DEPLOYMENT.md](docs/configuration/DEPLOYMENT.md)** for the current documentation.
+>
+> This page is kept for historical reference only. Please update your bookmarks and links to point to the new consolidated configuration documentation at `docs/configuration/`.
+
+**👉 [Read the updated documentation](docs/configuration/DEPLOYMENT.md)**
 
 This document describes the configuration differences between development, staging, and production environments.
 
