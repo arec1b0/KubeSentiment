@@ -1,0 +1,90 @@
+# Development Docker Compose Configuration
+# Usage: docker-compose -f docker-compose-dev.yml up
+# Then: curl http://localhost:8000/api/v1/health
+
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ../../..
+      dockerfile: Dockerfile
+    container_name: mlops-sentiment-dev
+    environment:
+      - MLOPS_PROFILE=development
+      - MLOPS_HOST=0.0.0.0
+      - MLOPS_PORT=8000
+      - MLOPS_LOG_LEVEL=DEBUG
+      - MLOPS_REDIS_ENABLED=true
+      - MLOPS_REDIS_HOST=redis
+      - MLOPS_REDIS_PORT=6379
+      - MLOPS_KAFKA_ENABLED=true
+      - MLOPS_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - kafka
+    volumes:
+      - ../../..:/app
+    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  redis:
+    image: redis:7-alpine
+    container_name: mlops-redis-dev
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: mlops-kafka-dev
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: mlops-zookeeper-dev
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_INIT_LIMIT: 5
+    ports:
+      - "2181:2181"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mlops-prometheus-dev
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus-dev.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mlops-grafana-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+    depends_on:
+      - prometheus

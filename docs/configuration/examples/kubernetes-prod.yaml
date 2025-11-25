@@ -1,0 +1,270 @@
+# Production Kubernetes Configuration
+# Usage: kubectl apply -f kubernetes-prod.yaml
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlops-prod
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mlops-sentiment-config
+  namespace: mlops-prod
+data:
+  MLOPS_PROFILE: "production"
+  MLOPS_DEBUG: "false"
+  MLOPS_LOG_LEVEL: "WARNING"
+  MLOPS_ENVIRONMENT: "production"
+  MLOPS_WORKERS: "4"
+  MLOPS_ENABLE_METRICS: "true"
+  MLOPS_ENABLE_TRACING: "true"
+  MLOPS_TRACING_BACKEND: "otlp"
+  MLOPS_SERVICE_NAME: "mlops-sentiment-prod"
+  MLOPS_MODEL_BACKEND: "onnx"
+  MLOPS_REDIS_ENABLED: "true"
+  MLOPS_REDIS_HOST: "redis-prod.mlops-prod.svc.cluster.local"
+  MLOPS_REDIS_PORT: "6379"
+  MLOPS_KAFKA_ENABLED: "true"
+  MLOPS_KAFKA_BOOTSTRAP_SERVERS: "kafka-prod.mlops-prod.svc.cluster.local:9092"
+  MLOPS_VAULT_ENABLED: "true"
+  MLOPS_VAULT_ADDR: "https://vault.example.com"
+  MLOPS_MLFLOW_ENABLED: "true"
+  MLOPS_MLFLOW_TRACKING_URI: "https://mlflow.example.com"
+  MLOPS_DRIFT_DETECTION_ENABLED: "true"
+  MLOPS_EXPLAINABILITY_ENABLED: "true"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mlops-sentiment-secrets
+  namespace: mlops-prod
+type: Opaque
+stringData:
+  MLOPS_API_KEY: "change-me-to-real-key"
+  MLOPS_VAULT_TOKEN: "change-me-to-real-token"
+  MLOPS_REDIS_PASSWORD: "change-me-to-real-password"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlops-sentiment
+  namespace: mlops-prod
+  labels:
+    app: mlops-sentiment
+    environment: production
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: mlops-sentiment
+  template:
+    metadata:
+      labels:
+        app: mlops-sentiment
+        environment: production
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - mlops-sentiment
+              topologyKey: kubernetes.io/hostname
+
+      containers:
+      - name: api
+        image: gcr.io/my-project/mlops-sentiment:v1.0.0
+        imagePullPolicy: IfNotPresent
+
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+
+        envFrom:
+        - configMapRef:
+            name: mlops-sentiment-config
+        - secretRef:
+            name: mlops-sentiment-secrets
+
+        resources:
+          requests:
+            cpu: 2000m
+            memory: 4Gi
+          limits:
+            cpu: 4000m
+            memory: 8Gi
+
+        livenessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          httpGet:
+            path: /api/v1/health
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: true
+
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+
+      volumes:
+      - name: tmp
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlops-sentiment
+  namespace: mlops-prod
+  labels:
+    app: mlops-sentiment
+spec:
+  type: ClusterIP
+  selector:
+    app: mlops-sentiment
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mlops-sentiment-hpa
+  namespace: mlops-prod
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: mlops-sentiment
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mlops-sentiment-pdb
+  namespace: mlops-prod
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: mlops-sentiment
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mlops-sentiment-network-policy
+  namespace: mlops-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: mlops-sentiment
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 53    # DNS
+    - protocol: UDP
+      port: 53    # DNS
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          app: kafka
+    ports:
+    - protocol: TCP
+      port: 9092

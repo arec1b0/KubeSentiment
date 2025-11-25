@@ -1,4 +1,8 @@
-# KubeSentiment Quick Reference Guide
+# ⚠️ DEPRECATED - KubeSentiment Quick Reference Guide
+
+> **Configuration content has been moved.** See **[docs/configuration/QUICK_START.md](docs/configuration/QUICK_START.md)** for configuration quick start.
+>
+> This page may contain other useful quick reference information. For a consolidated quick reference, see the navigation in **[docs/configuration/README.md](docs/configuration/README.md)**.
 
 > **Last Updated:** 2025-11-19
 > **Purpose:** Quick lookup for common development tasks

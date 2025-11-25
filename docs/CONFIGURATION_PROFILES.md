@@ -1,4 +1,10 @@
-# Configuration Profiles Guide
+# ⚠️ DEPRECATED - Configuration Profiles Guide
+
+> **This document has been moved.** See **[docs/configuration/PROFILES.md](docs/configuration/PROFILES.md)** for the current documentation.
+>
+> This page is kept for historical reference only. Please update your bookmarks and links to point to the new consolidated configuration documentation at `docs/configuration/`.
+
+**👉 [Read the updated documentation](docs/configuration/PROFILES.md)**
 
 ## Overview
 

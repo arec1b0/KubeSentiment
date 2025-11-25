@@ -1,21 +1,39 @@
-# ⚠️ DEPRECATED - Configuration Architecture Documentation
+# Configuration Architecture
 
-> **This document has been moved.** See **[docs/configuration/ARCHITECTURE.md](docs/configuration/ARCHITECTURE.md)** for the current documentation.
->
-> This page is kept for historical reference only. Please update your bookmarks and links to point to the new consolidated configuration documentation at `docs/configuration/`.
+Deep dive into KubeSentiment's domain-driven configuration system.
+
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Evolution: Before vs After](#evolution-before-vs-after)
+3. [Architecture Principles](#architecture-principles)
+4. [Configuration Domains](#configuration-domains)
+5. [Root Settings Class](#root-settings-class)
+6. [Usage Patterns](#usage-patterns)
+7. [Testing Strategy](#testing-strategy)
+8. [Best Practices](#best-practices)
+
+---
 
 ## Overview
 
-The KubeSentiment configuration system has been refactored from a monolithic 917-line Settings class into a modular, domain-driven architecture. This document describes the new structure, benefits, and usage patterns.
+KubeSentiment uses a **domain-driven configuration architecture** that:
 
-**👉 [Read the updated documentation](docs/configuration/ARCHITECTURE.md)**
+- **Separates concerns** - Each domain (Kafka, Redis, Model, etc.) has its own config class
+- **Maintains compatibility** - 100% backward compatible with existing code via delegation properties
+- **Improves testability** - Mock only the specific domain you need to test
+- **Scales better** - Adding new settings doesn't impact existing code
+- **Clarifies intent** - It's obvious which configuration domain a component depends on
 
-## Architecture
+---
 
-### Before: Monolithic Configuration
+## Evolution: Before vs After
+
+### Before: Monolithic Settings
+
 ```
-app/core/config.py (917 lines)
-└── Settings class (90+ fields)
+app/core/config.py
+└── Settings class (917 lines, 90+ fields)
     ├── Server settings
     ├── Model settings
     ├── Kafka settings (30+ fields)
@@ -28,41 +46,113 @@ app/core/config.py (917 lines)
 
 **Problems:**
 - ❌ God Object anti-pattern
-- ❌ Difficult to test (must mock entire Settings)
-- ❌ High cognitive load (917 lines)
+- ❌ Hard to navigate (917 lines to search through)
+- ❌ Difficult to test (mock entire Settings for one field)
 - ❌ Violates Single Responsibility Principle
-- ❌ Hard to maintain and extend
+- ❌ High cognitive load for new developers
+- ❌ Hard to add new settings (where do they go?)
 
 ### After: Domain-Driven Configuration
+
 ```
 app/core/config/
-├── __init__.py              (33 lines)   - Package exports
-├── settings.py              (412 lines)  - Root Settings (composition)
-├── server.py                (62 lines)   - Server & app config
-├── model.py                 (118 lines)  - ML model config
-├── security.py              (99 lines)   - Auth & CORS
-├── performance.py           (116 lines)  - Async & performance
-├── kafka.py                 (191 lines)  - Kafka streaming
-├── redis.py                 (94 lines)   - Redis caching
-├── vault.py                 (57 lines)   - Secrets management
-├── data_lake.py             (132 lines)  - Cloud storage
-├── monitoring.py            (116 lines)  - Metrics & tracing
-└── mlops.py                 (99 lines)   - Model lifecycle
+├── __init__.py              (exports)
+├── settings.py              (Root Settings - composition)
+├── server.py                (ServerConfig - 62 lines)
+├── model.py                 (ModelConfig - 118 lines)
+├── security.py              (SecurityConfig - 99 lines)
+├── performance.py           (PerformanceConfig - 116 lines)
+├── kafka.py                 (KafkaConfig - 191 lines)
+├── redis.py                 (RedisConfig - 94 lines)
+├── vault.py                 (VaultConfig - 57 lines)
+├── data_lake.py             (DataLakeConfig - 132 lines)
+├── monitoring.py            (MonitoringConfig - 116 lines)
+└── mlops.py                 (MLOpsConfig - 99 lines)
 ```
 
 **Benefits:**
 - ✅ Single Responsibility (one domain per config)
-- ✅ Easier testing (mock only needed domains)
-- ✅ Better documentation (focused docstrings)
-- ✅ Maintainability (find settings faster)
+- ✅ Easier navigation (find settings in focused 100-line files)
+- ✅ Better testing (mock only needed domains)
+- ✅ Clearer dependencies (obvious which config a component needs)
 - ✅ Type safety (explicit types per domain)
 - ✅ 100% backward compatible
 
 ---
 
-## Configuration Modules
+## Architecture Principles
 
-### 1. ServerConfig (`server.py`)
+### 1. Domain-Driven Design
+
+Each configuration domain represents a functional area:
+
+```
+ServerConfig      → Application metadata and server settings
+ModelConfig       → Machine learning model configuration
+SecurityConfig    → Authentication and CORS
+PerformanceConfig → Async processing, caching, batching
+KafkaConfig       → Message streaming (30+ settings)
+RedisConfig       → Distributed caching
+VaultConfig       → Secrets management
+DataLakeConfig    → Cloud storage (S3/GCS/Azure)
+MonitoringConfig  → Metrics, logging, tracing
+MLOpsConfig       → Model lifecycle (MLflow, drift detection)
+```
+
+### 2. Composition Over Inheritance
+
+The root Settings class **composes** all domains:
+
+```python
+class Settings(BaseSettings):
+    server: ServerConfig = ServerConfig()
+    model: ModelConfig = ModelConfig()
+    kafka: KafkaConfig = KafkaConfig()
+    redis: RedisConfig = RedisConfig()
+    # ... other domains
+```
+
+**Why composition?**
+- Clear separation of concerns
+- Easy to mock individual domains
+- No inheritance complexity
+- Easy to understand dependencies
+
+### 3. Backward Compatibility Layer
+
+Properties delegate to domain objects for old code:
+
+```python
+@property
+def model_name(self) -> str:
+    """Model name (backward compatibility)."""
+    return self.model.model_name
+
+@property
+def kafka_enabled(self) -> bool:
+    """Kafka enabled (backward compatibility)."""
+    return self.kafka.kafka_enabled
+```
+
+**Result:** All existing code works without changes!
+
+### 4. Validation at Multiple Levels
+
+**Domain-level validation:**
+- Each config validates its own fields
+- Example: API key must be 8+ characters
+
+**Root-level validation:**
+- Cross-domain constraints
+- Example: Debug mode incompatible with multiple workers
+- Example: Model must be in allowed_models list
+
+---
+
+## Configuration Domains
+
+### 1. ServerConfig
+
 **Purpose:** Application metadata and server settings
 
 **Settings:**
@@ -76,48 +166,47 @@ app/core/config/
 
 **Example:**
 ```python
-from app.core.config import ServerConfig
+from app.core.config import get_settings
 
-server = ServerConfig()
-print(f"{server.app_name} v{server.app_version}")
-print(f"Running on {server.host}:{server.port}")
+settings = get_settings()
+print(f"{settings.server.app_name} v{settings.server.app_version}")
+print(f"Running on {settings.server.host}:{settings.server.port}")
 ```
 
 **Environment Variables:**
 ```bash
-export MLOPS_APP_NAME="My ML Service"
-export MLOPS_APP_VERSION="2.0.0"
-export MLOPS_DEBUG=true
-export MLOPS_HOST="0.0.0.0"
-export MLOPS_PORT=8080
-export MLOPS_WORKERS=4
+MLOPS_APP_NAME="My Service"
+MLOPS_PORT=8080
+MLOPS_WORKERS=4
+MLOPS_DEBUG=true
 ```
 
 ---
 
-### 2. ModelConfig (`model.py`)
+### 2. ModelConfig
+
 **Purpose:** Machine learning model configuration
 
 **Settings:**
 - `model_name` - HuggingFace model identifier
-- `allowed_models` - Whitelist of permitted models (security)
+- `allowed_models` - Whitelist of permitted models
 - `model_cache_dir` - Model cache directory path
-- `onnx_model_path` - ONNX model directory (optional)
-- `onnx_model_path_default` - Default ONNX path fallback
+- `onnx_model_path` - ONNX model directory
 - `max_text_length` - Maximum input length (1-10000)
 - `prediction_cache_max_size` - LRU cache size (10-100000)
 - `enable_feature_engineering` - Advanced features flag
 
 **Validators:**
-- Model name format validation (alphanumeric, /, -, _)
+- Model name format validation
 - Model name in allowed list check
-- Cache directory absolute path validation
+- Cache directory path validation
 
 **Example:**
 ```python
-from app.core.config import ModelConfig
+from app.core.config import get_settings
 
-model = ModelConfig()
+settings = get_settings()
+model = settings.model
 print(f"Model: {model.model_name}")
 print(f"Allowed: {model.allowed_models}")
 print(f"Cache size: {model.prediction_cache_max_size}")
@@ -125,35 +214,34 @@ print(f"Cache size: {model.prediction_cache_max_size}")
 
 ---
 
-### 3. SecurityConfig (`security.py`)
+### 3. SecurityConfig
+
 **Purpose:** Authentication and CORS configuration
 
 **Settings:**
-- `api_key` - API key for authentication (min 8 chars, alphanumeric)
+- `api_key` - API key for authentication (min 8 chars)
 - `allowed_origins` - CORS whitelist (no wildcards)
 - `max_request_timeout` - Request timeout in seconds (1-300)
 
 **Validators:**
 - API key strength (min 8 chars, letters + numbers)
-- CORS URL format validation (https?://...)
+- CORS URL format validation
 - Wildcard origin blocked for security
-
-**Properties:**
-- `cors_origins` - Alias for allowed_origins
 
 **Example:**
 ```python
-from app.core.config import SecurityConfig
+from app.core.config import get_settings
 
-security = SecurityConfig()
-if security.api_key:
+settings = get_settings()
+if settings.security.api_key:
     print("API key authentication enabled")
-print(f"CORS origins: {security.cors_origins}")
+print(f"CORS origins: {settings.security.allowed_origins}")
 ```
 
 ---
 
-### 4. PerformanceConfig (`performance.py`)
+### 4. PerformanceConfig
+
 **Purpose:** Async processing and performance tuning
 
 **Async Batch Settings:**
@@ -161,22 +249,21 @@ print(f"CORS origins: {security.cors_origins}")
 - `async_batch_max_jobs` - Max concurrent jobs (10-10000)
 - `async_batch_max_batch_size` - Max batch size (10-10000)
 - `async_batch_default_timeout_seconds` - Job timeout (30-3600)
-- `async_batch_priority_high_limit` - High priority queue limit
-- `async_batch_priority_medium_limit` - Medium priority queue limit
-- `async_batch_priority_low_limit` - Low priority queue limit
-- `async_batch_cleanup_interval_seconds` - Cleanup interval (10-3600)
-- `async_batch_cache_ttl_seconds` - Result cache TTL (300-86400)
-- `async_batch_result_cache_max_size` - Result cache size (100-10000)
+- `async_batch_priority_*_limit` - Priority queue limits
+- `async_batch_cleanup_interval_seconds` - Cleanup interval
+- `async_batch_cache_ttl_seconds` - Result cache TTL
+- `async_batch_result_cache_max_size` - Result cache size
 
 **Anomaly Buffer Settings:**
-- `anomaly_buffer_enabled` - Enable anomaly detection buffer
-- `anomaly_buffer_max_size` - Max anomalies to store (100-100000)
-- `anomaly_buffer_default_ttl` - TTL for anomalies (300-86400)
-- `anomaly_buffer_cleanup_interval` - Cleanup interval (60-3600)
+- `anomaly_buffer_enabled` - Enable anomaly detection
+- `anomaly_buffer_max_size` - Max anomalies to store
+- `anomaly_buffer_default_ttl` - TTL for anomalies
+- `anomaly_buffer_cleanup_interval` - Cleanup interval
 
 ---
 
-### 5. KafkaConfig (`kafka.py`)
+### 5. KafkaConfig
+
 **Purpose:** Kafka streaming and messaging (30+ settings)
 
 **Basic Settings:**
@@ -188,37 +275,33 @@ print(f"CORS origins: {security.cors_origins}")
 **Consumer Settings:**
 - `kafka_auto_offset_reset` - earliest/latest/none
 - `kafka_max_poll_records` - Records per poll (1-10000)
-- `kafka_session_timeout_ms` - Session timeout (1000-300000)
-- `kafka_heartbeat_interval_ms` - Heartbeat interval (1000-30000)
-- `kafka_max_poll_interval_ms` - Max poll interval (10000-2147483647)
+- `kafka_session_timeout_ms` - Session timeout
+- `kafka_heartbeat_interval_ms` - Heartbeat interval
+- `kafka_max_poll_interval_ms` - Max poll interval
 - `kafka_enable_auto_commit` - Auto commit flag
-- `kafka_auto_commit_interval_ms` - Auto commit interval (1000-60000)
+- `kafka_auto_commit_interval_ms` - Auto commit interval
 
 **High-Throughput Settings:**
-- `kafka_consumer_threads` - Parallel consumer threads (1-32)
-- `kafka_batch_size` - Batch processing size (1-1000)
-- `kafka_processing_timeout_ms` - Batch timeout (1000-300000)
-- `kafka_buffer_size` - Message queue buffer (1000-100000)
+- `kafka_consumer_threads` - Parallel threads (1-32)
+- `kafka_batch_size` - Batch processing size
+- `kafka_processing_timeout_ms` - Batch timeout
+- `kafka_buffer_size` - Message queue buffer
 
 **Dead Letter Queue:**
 - `kafka_dlq_topic` - DLQ topic name
 - `kafka_dlq_enabled` - Enable DLQ
-- `kafka_max_retries` - Max retries before DLQ (1-10)
+- `kafka_max_retries` - Max retries before DLQ
 
 **Producer Settings:**
-- `kafka_producer_bootstrap_servers` - Producer brokers
 - `kafka_producer_acks` - Acknowledgment level (0/1/all)
-- `kafka_producer_retries` - Producer retry count (0-10)
-- `kafka_producer_batch_size` - Batch size in bytes (0-1048576)
-- `kafka_producer_linger_ms` - Linger time (0-100)
-- `kafka_producer_compression_type` - none/gzip/snappy/lz4/zstd
-
-**Advanced:**
-- `kafka_partition_assignment_strategy` - range/roundrobin/sticky
+- `kafka_producer_retries` - Retry count
+- `kafka_producer_batch_size` - Batch size in bytes
+- `kafka_producer_compression_type` - Compression type
 
 ---
 
-### 6. RedisConfig (`redis.py`)
+### 6. RedisConfig
+
 **Purpose:** Redis distributed caching
 
 **Settings:**
@@ -226,31 +309,33 @@ print(f"CORS origins: {security.cors_origins}")
 - `redis_host` - Redis server host
 - `redis_port` - Redis server port (1-65535)
 - `redis_db` - Database number (0-15)
-- `redis_password` - Authentication password (excluded from API)
+- `redis_password` - Authentication password
 - `redis_max_connections` - Connection pool size (10-1000)
 - `redis_socket_timeout` - Socket timeout (1-60)
-- `redis_socket_connect_timeout` - Connection timeout (1-60)
+- `redis_socket_connect_timeout` - Connection timeout
 - `redis_namespace` - Key prefix namespace
-- `redis_prediction_cache_ttl` - Prediction cache TTL (60-86400)
-- `redis_feature_cache_ttl` - Feature cache TTL (60-86400)
+- `redis_prediction_cache_ttl` - Prediction cache TTL
+- `redis_feature_cache_ttl` - Feature cache TTL
 
 ---
 
-### 7. VaultConfig (`vault.py`)
+### 7. VaultConfig
+
 **Purpose:** HashiCorp Vault secrets management
 
 **Settings:**
 - `vault_enabled` - Enable Vault integration
-- `vault_addr` - Vault server address (e.g., http://vault:8200)
+- `vault_addr` - Vault server address
 - `vault_namespace` - Vault namespace (Enterprise)
 - `vault_role` - Kubernetes service account role
 - `vault_mount_point` - KV v2 secrets engine mount
 - `vault_secrets_path` - Base secrets path
-- `vault_token` - Direct auth token (excluded from API, not for prod)
+- `vault_token` - Direct auth token
 
 ---
 
-### 8. DataLakeConfig (`data_lake.py`)
+### 8. DataLakeConfig
+
 **Purpose:** Cloud storage integration (AWS/GCP/Azure)
 
 **Core Settings:**
@@ -258,23 +343,15 @@ print(f"CORS origins: {security.cors_origins}")
 - `data_lake_provider` - s3/gcs/azure
 - `data_lake_bucket` - Bucket/container name
 - `data_lake_prefix` - Path prefix
-- `data_lake_batch_size` - Predictions per batch (1-1000)
-- `data_lake_batch_timeout_seconds` - Flush timeout (5-300)
-- `data_lake_compression` - snappy/gzip/lz4/zstd/none
-- `data_lake_partition_by` - date/hour/model
+- `data_lake_batch_size` - Predictions per batch
+- `data_lake_batch_timeout_seconds` - Flush timeout
+- `data_lake_compression` - Compression format
+- `data_lake_partition_by` - Partition strategy (date/hour/model)
 
-**AWS S3:**
-- `data_lake_s3_region` - AWS region
-- `data_lake_s3_endpoint_url` - Custom S3 endpoint (S3-compatible)
-
-**GCP:**
-- `data_lake_gcs_project` - GCP project ID
-- `data_lake_gcs_credentials_path` - Service account JSON path
-
-**Azure:**
-- `data_lake_azure_account_name` - Storage account name
-- `data_lake_azure_account_key` - Account key (excluded from API)
-- `data_lake_azure_connection_string` - Connection string (excluded)
+**Cloud-Specific Settings:**
+- **AWS S3:** `data_lake_s3_region`, `data_lake_s3_endpoint_url`
+- **GCP:** `data_lake_gcs_project`, `data_lake_gcs_credentials_path`
+- **Azure:** `data_lake_azure_account_name`, `data_lake_azure_account_key`
 
 **Query Engines:**
 - `data_lake_enable_athena` - AWS Athena compatibility
@@ -283,7 +360,8 @@ print(f"CORS origins: {security.cors_origins}")
 
 ---
 
-### 9. MonitoringConfig (`monitoring.py`)
+### 9. MonitoringConfig
+
 **Purpose:** Metrics, logging, and distributed tracing
 
 **Metrics:**
@@ -294,7 +372,7 @@ print(f"CORS origins: {security.cors_origins}")
 **Advanced Metrics:**
 - `advanced_metrics_enabled` - Enable advanced KPIs
 - `advanced_metrics_detailed_tracking` - Per-prediction tracking
-- `advanced_metrics_history_hours` - History retention (1-168)
+- `advanced_metrics_history_hours` - History retention
 - `advanced_metrics_cost_per_1k` - Cost per 1k predictions
 
 **Distributed Tracing:**
@@ -302,37 +380,33 @@ print(f"CORS origins: {security.cors_origins}")
 - `tracing_backend` - jaeger/zipkin/otlp/console
 - `service_name` - Service name for traces
 
-**Jaeger:**
-- `jaeger_agent_host` - Agent hostname
-- `jaeger_agent_port` - Agent port (1024-65535)
-
-**Zipkin:**
-- `zipkin_endpoint` - Collector endpoint
-
-**OTLP:**
-- `otlp_endpoint` - gRPC endpoint
+**Tracing Backends:**
+- **Jaeger:** `jaeger_agent_host`, `jaeger_agent_port`
+- **Zipkin:** `zipkin_endpoint`
+- **OTLP:** `otlp_endpoint`
 
 **Exclusions:**
-- `tracing_excluded_urls` - Comma-separated URL list
+- `tracing_excluded_urls` - Comma-separated URL list to skip
 
 ---
 
-### 10. MLOpsConfig (`mlops.py`)
+### 10. MLOpsConfig
+
 **Purpose:** Model lifecycle management
 
 **MLflow:**
 - `mlflow_enabled` - Enable MLflow registry
 - `mlflow_tracking_uri` - Tracking server URI
-- `mlflow_registry_uri` - Registry URI (defaults to tracking)
+- `mlflow_registry_uri` - Registry URI
 - `mlflow_experiment_name` - Experiment name
 - `mlflow_model_name` - Registered model name
 
 **Drift Detection:**
 - `drift_detection_enabled` - Enable drift detection
 - `drift_window_size` - Sample window size (100-10000)
-- `drift_psi_threshold` - PSI threshold (0.0-1.0, 0.1=minor, 0.25=major)
-- `drift_ks_threshold` - KS test p-value (0.0-1.0)
-- `drift_min_samples` - Min samples before check (10-1000)
+- `drift_psi_threshold` - PSI threshold (0.0-1.0)
+- `drift_ks_threshold` - KS test p-value
+- `drift_min_samples` - Min samples before check
 
 **Explainability:**
 - `explainability_enabled` - Enable explainability
@@ -343,9 +417,7 @@ print(f"CORS origins: {security.cors_origins}")
 
 ## Root Settings Class
 
-### Composition Architecture
-
-The root `Settings` class in `settings.py` composes all domain configurations:
+The root `Settings` class in `settings.py` composes all domains:
 
 ```python
 class Settings(BaseSettings):
@@ -362,22 +434,24 @@ class Settings(BaseSettings):
     data_lake: DataLakeConfig = DataLakeConfig()
     monitoring: MonitoringConfig = MonitoringConfig()
     mlops: MLOpsConfig = MLOpsConfig()
+
+    # 50+ backward compatibility properties
+    @property
+    def model_name(self) -> str:
+        """Model name (backward compatibility)."""
+        return self.model.model_name
 ```
 
 ### Backward Compatibility
 
-The Settings class provides **50+ @property methods** for backward compatibility:
+The Settings class provides **50+ @property methods** for backward compatibility with existing code:
 
 ```python
-@property
-def model_name(self) -> str:
-    """Model name (backward compatibility)."""
-    return self.model.model_name
-
-@property
-def kafka_enabled(self) -> bool:
-    """Kafka enabled (backward compatibility)."""
-    return self.kafka.kafka_enabled
+# These all work (backward compatible):
+settings.model_name           → settings.model.model_name
+settings.kafka_enabled        → settings.kafka.kafka_enabled
+settings.redis_host           → settings.redis.redis_host
+settings.port                 → settings.server.port
 ```
 
 **Result:** All existing code continues to work without modifications!
@@ -404,14 +478,14 @@ def validate_configuration_consistency(self):
 
 ## Usage Patterns
 
-### Pattern 1: Accessing Domain Configs (Recommended for New Code)
+### Pattern 1: Domain-Specific Access (Recommended for New Code)
 
 ```python
 from app.core.config import Settings, get_settings
 
 settings = get_settings()
 
-# Access through domain objects
+# Access through domain objects - clear and explicit
 print(f"Server: {settings.server.host}:{settings.server.port}")
 print(f"Model: {settings.model.model_name}")
 print(f"Kafka: {settings.kafka.kafka_bootstrap_servers}")
@@ -422,6 +496,9 @@ print(f"Redis: {settings.redis.redis_enabled}")
 - ✅ Clear domain separation
 - ✅ IDE autocomplete works better
 - ✅ Easy to mock specific domains in tests
+- ✅ Obvious which configuration domain is used
+
+---
 
 ### Pattern 2: Backward-Compatible Access (Existing Code)
 
@@ -442,13 +519,15 @@ print(f"Redis: {settings.redis_enabled}")
 - ✅ Existing imports work
 - ✅ Seamless transition
 
+---
+
 ### Pattern 3: Domain-Specific Dependency Injection
 
 ```python
 from fastapi import Depends
-from app.core.config import get_settings, Settings
+from app.core.config import get_settings, Settings, KafkaConfig
 
-def get_kafka_config(settings: Settings = Depends(get_settings)):
+def get_kafka_config(settings: Settings = Depends(get_settings)) -> KafkaConfig:
     """Get Kafka configuration."""
     return settings.kafka
 
@@ -458,6 +537,13 @@ async def ingest_kafka(kafka_config = Depends(get_kafka_config)):
         raise HTTPException(status_code=503, detail="Kafka not enabled")
     # Use kafka_config...
 ```
+
+**Benefits:**
+- ✅ Clear what configuration the endpoint needs
+- ✅ Easier to mock in tests (just mock KafkaConfig)
+- ✅ Better separation of concerns
+
+---
 
 ### Pattern 4: Testing with Mocks
 
@@ -479,98 +565,14 @@ def test_prediction_service():
     assert service.settings.model.model_name == "test-model"
 ```
 
----
-
-## Migration Guide
-
-### For Existing Code
-
-**Good news:** No changes required! All existing code continues to work.
-
-```python
-# This still works
-from app.core.config import Settings, get_settings
-
-settings = get_settings()
-model_name = settings.model_name  # ✅ Works via @property
-```
-
-### For New Code
-
-**Recommended:** Use domain-specific access for clarity:
-
-```python
-# New style (recommended)
-from app.core.config import get_settings
-
-settings = get_settings()
-model_name = settings.model.model_name  # ✅ Clear domain separation
-```
-
-### Updating Imports
-
-No import changes needed, but you can be more specific:
-
-```python
-# Before (still works)
-from app.core.config import Settings, get_settings
-
-# After (optional, more specific)
-from app.core.config import Settings, get_settings, ModelConfig, KafkaConfig
-```
+**Benefits:**
+- ✅ Only mock what you test
+- ✅ Clearer test intent
+- ✅ Less boilerplate
 
 ---
 
-## Environment Variables
-
-All configuration values can be set via environment variables with the `MLOPS_` prefix:
-
-```bash
-# Server
-export MLOPS_APP_NAME="My Service"
-export MLOPS_PORT=8080
-export MLOPS_WORKERS=4
-
-# Model
-export MLOPS_MODEL_NAME="distilbert-base-uncased-finetuned-sst-2-english"
-export MLOPS_MAX_TEXT_LENGTH=512
-
-# Kafka
-export MLOPS_KAFKA_ENABLED=true
-export MLOPS_KAFKA_BOOTSTRAP_SERVERS="kafka1:9092,kafka2:9092"
-export MLOPS_KAFKA_TOPIC="sentiment_requests"
-
-# Redis
-export MLOPS_REDIS_ENABLED=true
-export MLOPS_REDIS_HOST="redis"
-export MLOPS_REDIS_PORT=6379
-
-# Monitoring
-export MLOPS_LOG_LEVEL="INFO"
-export MLOPS_ENABLE_TRACING=true
-export MLOPS_TRACING_BACKEND="jaeger"
-```
-
-### .env File Support
-
-Create a `.env` file in the project root:
-
-```ini
-# .env
-MLOPS_APP_NAME=KubeSentiment
-MLOPS_APP_VERSION=1.0.0
-MLOPS_DEBUG=false
-MLOPS_PORT=8000
-MLOPS_MODEL_NAME=distilbert-base-uncased-finetuned-sst-2-english
-MLOPS_KAFKA_ENABLED=true
-MLOPS_REDIS_ENABLED=true
-```
-
-The configuration system automatically loads from `.env` files.
-
----
-
-## Testing
+## Testing Strategy
 
 ### Unit Testing Individual Domains
 
@@ -602,7 +604,7 @@ def test_settings_from_env(monkeypatch):
     assert settings.server.port == 9000
 ```
 
-### Mocking for Tests
+### Testing with Mocks
 
 ```python
 from unittest.mock import Mock, patch
@@ -674,7 +676,7 @@ def test_with_mock():
 
 ---
 
-## Architecture Benefits
+## Architecture Benefits Summary
 
 ### 1. Single Responsibility Principle
 Each configuration module has one clear purpose:
@@ -722,57 +724,34 @@ Adding new settings is isolated:
 
 ---
 
-## File Structure Reference
+## Migration Path
 
-```
-app/core/config/
-├── __init__.py           # Package exports
-├── settings.py           # Root Settings (composition + compatibility)
-├── server.py             # ServerConfig
-├── model.py              # ModelConfig
-├── security.py           # SecurityConfig
-├── performance.py        # PerformanceConfig
-├── kafka.py              # KafkaConfig
-├── redis.py              # RedisConfig
-├── vault.py              # VaultConfig
-├── data_lake.py          # DataLakeConfig
-├── monitoring.py         # MonitoringConfig
-└── mlops.py              # MLOpsConfig
+**For existing code:** No changes needed! All old property names still work.
+
+**For new code:** Use domain-specific access for clarity:
+
+```python
+# Before (still works)
+model_name = settings.model_name
+
+# After (recommended for new code)
+model_name = settings.model.model_name
 ```
 
-**Backup Files:**
-- `app/core/config_original.py.bak` - Original monolithic config
-- `app/core/config_replaced.py.bak` - Replaced monolithic config
+See **[Migration Guide](MIGRATION.md)** for detailed upgrade instructions.
 
 ---
-
-## Version History
-
-### v1.0.0 (Original)
-- Monolithic Settings class (917 lines)
-- 90+ configuration fields in one class
-- God Object anti-pattern
-
-### v2.0.0 (Refactored - Current)
-- Domain-driven configuration (12 modules)
-- Composition-based Settings class
-- 100% backward compatible
-- Single Responsibility Principle
-- Better testability and maintainability
-
----
-
-## Support & Questions
-
-For questions about the configuration system:
-1. Check this documentation
-2. Review the docstrings in each config module
-3. See migration examples above
-4. Contact the development team
 
 ## Related Documentation
 
-- [Model Implementation Guide](../models/README.md)
-- [Deployment Configuration Guide](../../docs/ENVIRONMENT_CONFIGURATIONS.md)
-- [API Documentation](../../docs/API_VERSIONING.md)
-- [Contributing Guide](../../CONTRIBUTING.md)
+- **[Profiles](PROFILES.md)** - Profile-based configuration defaults
+- **[Environment Variables](ENVIRONMENT_VARIABLES.md)** - Complete settings reference
+- **[Deployment](DEPLOYMENT.md)** - Environment-specific configurations
+- **[Migration Guide](MIGRATION.md)** - Upgrade from old system
+- **[CLAUDE.md](/CLAUDE.md)** - Project-level configuration instructions
+- **ADR-009** - Architecture decision for profile-based configuration
+
+---
+
+**Last Updated:** 2025-11-25
+**Maintained By:** KubeSentiment Team
