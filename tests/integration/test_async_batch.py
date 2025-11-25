@@ -197,9 +197,9 @@ class TestAsyncBatchServiceInitialization:
         # Initialize service to create priority queues
         await async_batch_service.start()
 
-        assert async_batch_service._priority_queues is not None
-        assert len(async_batch_service._priority_queues) == 3  # High, medium, low
-        assert async_batch_service._metrics is not None
+        assert async_batch_service.queue_manager._priority_queues is not None
+        assert len(async_batch_service.queue_manager._priority_queues) == 3  # High, medium, low
+        assert async_batch_service.job_manager.get_metrics() is not None
 
         # Clean up
         await async_batch_service.stop()
@@ -211,10 +211,10 @@ class TestAsyncBatchServiceInitialization:
         await async_batch_service.start()
 
         # Check queue sizes from settings
-        assert async_batch_service._priority_queues is not None
-        high_queue = async_batch_service._priority_queues[Priority.HIGH]
-        medium_queue = async_batch_service._priority_queues[Priority.MEDIUM]
-        low_queue = async_batch_service._priority_queues[Priority.LOW]
+        assert async_batch_service.queue_manager._priority_queues is not None
+        high_queue = async_batch_service.queue_manager._priority_queues[Priority.HIGH]
+        medium_queue = async_batch_service.queue_manager._priority_queues[Priority.MEDIUM]
+        low_queue = async_batch_service.queue_manager._priority_queues[Priority.LOW]
 
         assert high_queue.maxsize == 100
         assert medium_queue.maxsize == 500
@@ -226,14 +226,16 @@ class TestAsyncBatchServiceInitialization:
     @pytest.mark.asyncio
     async def test_optimal_batch_size_calculation(self, async_batch_service):
         """Test optimal batch size calculation."""
-        # Small batch
-        assert async_batch_service._get_optimal_batch_size(5) == 5
+        # This method was removed as it's now handled by job creation
+        # Test that job creation respects max_batch_size
+        job = await async_batch_service.submit_batch_job(["test"] * 5, "medium", 10, 300)
+        assert job.max_batch_size == 10
 
-        # Medium batch
-        assert async_batch_service._get_optimal_batch_size(50) == 50
+        job = await async_batch_service.submit_batch_job(["test"] * 50, "medium", 50, 300)
+        assert job.max_batch_size == 50
 
-        # Large batch
-        assert async_batch_service._get_optimal_batch_size(2000) == 1000  # Capped at max_batch_size
+        job = await async_batch_service.submit_batch_job(["test"] * 2000, "medium", 1000, 300)
+        assert job.max_batch_size == 1000  # Capped at max_batch_size
 
 
 @pytest.mark.integration
@@ -254,8 +256,10 @@ class TestBatchJobSubmission:
         assert job.timeout_seconds == 300
         assert job.status == BatchJobStatus.PENDING
 
-        # Check job is in queue
-        assert job.job_id in async_batch_service._jobs
+        # Check job exists (via job manager)
+        retrieved_job = await async_batch_service.get_job_status(job.job_id)
+        assert retrieved_job is not None
+        assert retrieved_job.job_id == job.job_id
 
         # Check metrics updated
         metrics = await async_batch_service.get_batch_metrics()
@@ -479,35 +483,36 @@ class TestCaching:
         job = await async_batch_service.submit_batch_job(texts, "medium", 10, 300)
         await async_batch_service._process_job(job)
 
-        # Check cache
-        assert job.job_id in async_batch_service._result_cache
-
-        # Get cached results
-        cached_results = await async_batch_service.get_job_results(job.job_id, 1, 10)
+        # Check cache via cache manager
+        cached_results = await async_batch_service.cache_manager.get_cached_result(job.job_id)
         assert cached_results is not None
 
+        # Get cached results via service
+        results = await async_batch_service.get_job_results(job.job_id, 1, 10)
+        assert results is not None
+
         # Results should match original
-        assert len(cached_results.results) == len(job.results)
+        assert len(results.results) == len(job.results)
 
     @pytest.mark.asyncio
     async def test_cache_cleanup(self, async_batch_service):
         """Test cache cleanup."""
         # Fill cache beyond limit
         for i in range(async_batch_service.settings.async_batch_result_cache_max_size + 10):
-            async_batch_service._result_cache[f"job_{i}"] = {
+            async_batch_service.cache_manager._result_cache[f"job_{i}"] = {
                 "job_info": {"job_id": f"job_{i}"},
                 "results": [{"label": "POSITIVE"}],
-                "cached_at": time.time() - async_batch_service._cache_ttl - 100,
+                "cached_at": time.time() - async_batch_service.cache_manager._cache_ttl - 100,
             }
 
-        # Trigger cleanup by calling _cache_result which includes cleanup logic
+        # Trigger cleanup by calling cache_result which includes cleanup logic
         job_info = {"job_id": "test_cleanup_job"}
         results = [{"label": "POSITIVE"}]
-        await async_batch_service._cache_result("test_cleanup_job", job_info, results)
+        await async_batch_service.cache_manager.cache_result("test_cleanup_job", job_info, results)
 
         # Cache should be within limits after cleanup
         assert (
-            len(async_batch_service._result_cache)
+            async_batch_service.cache_manager.get_cache_size()
             <= async_batch_service.settings.async_batch_result_cache_max_size
         )
 
