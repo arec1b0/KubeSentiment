@@ -353,7 +353,7 @@ Key metrics to track:
 - [Confluent Kafka Python Client](https://docs.confluent.io/kafka-clients/python/current/overview.html)
 - [Kafka Consumer Implementation](../../app/services/kafka_consumer.py)
 - [Kafka Producer Implementation](../../app/services/kafka_producer.py)
-- [Async Batch Processing Guide](../../README_ASYNC_BATCH.md)
+- [Kafka High Throughput Consumer Guide](../../docs/kafka-high-throughput.md)
 - [Docker Compose Kafka Setup](../../docker-compose.kafka.yml)
 
 ## Related ADRs
