@@ -232,7 +232,7 @@ def test_documentation():
 
     doc_files = [
         'docs/CONFIGURATION_PROFILES.md',
-        'CONFIG_PROFILES_README.md',
+        'docs/CONFIGURATION_ARCHITECTURE.md',
     ]
 
     all_exist = True

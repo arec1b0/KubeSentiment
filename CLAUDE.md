@@ -846,7 +846,6 @@ make chaos-cleanup
 | `CONTRIBUTING.md` | Contribution guidelines |
 | `docs/architecture/decisions/README.md` | ADR index |
 | `.github/copilot-instructions.md` | GitHub Copilot instructions |
-| `IMPLEMENTATION_SUMMARY.md` | Implementation overview |
 
 ### Infrastructure Files
 
