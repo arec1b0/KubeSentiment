@@ -499,71 +499,14 @@ curl -X POST http://localhost:8000/api/v1/batch/predict \
 
 ## Code & Configuration Issues
 
-### Wrong Profile Applied
+> **Configuration-specific troubleshooting has been moved.** For profile issues, environment variables, validation errors, and service connection problems, see **[docs/configuration/TROUBLESHOOTING.md](configuration/TROUBLESHOOTING.md)**.
 
-**Symptom:** App running with wrong configuration (e.g., using mock model instead of real)
+### Quick Reference
 
-**Diagnosis:**
-
-```bash
-# Check which profile is active
-echo $PROFILE
-
-# Check configuration loaded
-curl http://localhost:8000/api/v1/model-info | jq .backend
-
-# Check all config values
-python -c "
-from app.core.config import get_settings
-s = get_settings()
-print(f'Profile: {s.profile}')
-print(f'Backend: {s.model.backend}')
-print(f'Debug: {s.debug}')
-"
-```
-
-**Solutions:**
-
-```bash
-# Set profile explicitly
-export PROFILE=development
-docker-compose restart app
-
-# Or pass to uvicorn
-PROFILE=production uvicorn app.main:app
-
-# Verify applied
-curl http://localhost:8000/api/v1/health
-```
-
-### Configuration Not Updating
-
-**Symptom:** Changed env var but app still using old value
-
-**Solutions:**
-
-```bash
-# 1. Restart application
-docker-compose restart app
-# or
-# Kill uvicorn (Ctrl+C) and restart
-
-# 2. Clear environment cache
-# Unset and re-export
-unset MLOPS_REDIS_ENABLED
-export MLOPS_REDIS_ENABLED=true
-
-# 3. Check .env file
-cat .env
-
-# 4. Remove .env if conflicting
-rm .env
-export MLOPS_REDIS_ENABLED=true
-
-# 5. Restart everything
-docker-compose down -v
-docker-compose up -d
-```
+- **Profile not loading?** → [Configuration Troubleshooting: Profile Issues](configuration/TROUBLESHOOTING.md#profile-issues)
+- **Environment variable not working?** → [Configuration Troubleshooting: Environment Variables](configuration/TROUBLESHOOTING.md#environment-variables)
+- **Validation errors?** → [Configuration Troubleshooting: Validation Errors](configuration/TROUBLESHOOTING.md#validation-errors)
+- **Redis/Kafka/Vault connection issues?** → [Configuration Troubleshooting: Service Connection Issues](configuration/TROUBLESHOOTING.md#service-connection-issues)
 
 ### Import/Module Errors
 

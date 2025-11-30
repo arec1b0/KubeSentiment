@@ -617,46 +617,23 @@ docker-compose restart app
 
 ## Environment Variables
 
-### Common Variables
+> **Configuration quick reference has been moved.** For complete environment variable reference, see **[docs/configuration/ENVIRONMENT_VARIABLES.md](configuration/ENVIRONMENT_VARIABLES.md)**.
+
+### Quick Reference
 
 ```bash
-# Profile
-PROFILE=local|development|staging|production
+# Set profile (applies 50+ defaults automatically)
+export MLOPS_PROFILE=local  # or development, staging, production
 
-# Server
-MLOPS_SERVER_HOST=0.0.0.0
-MLOPS_SERVER_PORT=8000
-
-# Model
-MLOPS_MODEL_BACKEND=onnx|pytorch
-MLOPS_MODEL_NAME=distilbert-base-uncased-finetuned-sst-2-english
-
-# Redis
-MLOPS_REDIS_ENABLED=true|false
-MLOPS_REDIS_HOST=localhost
-MLOPS_REDIS_PORT=6379
-
-# Kafka
-MLOPS_KAFKA_ENABLED=true|false
-MLOPS_KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-
-# Debug
-MLOPS_DEBUG=true|false
-MLOPS_LOG_LEVEL=DEBUG|INFO|WARNING|ERROR
+# Override specific settings as needed
+export MLOPS_REDIS_HOST=my-redis-server
+export MLOPS_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
 ```
 
-### Set Variables
-
-```bash
-# In terminal
-export MLOPS_DEBUG=true
-
-# In .env file
-echo "MLOPS_DEBUG=true" >> .env
-
-# Run-time only
-PROFILE=local uvicorn app.main:app --reload
-```
+**See also:**
+- **[Environment Variables Reference](configuration/ENVIRONMENT_VARIABLES.md)** - Complete list of all settings
+- **[Configuration Profiles](configuration/PROFILES.md)** - Profile defaults
+- **[Quick Start](configuration/QUICK_START.md)** - Setup guide
 
 ---
 

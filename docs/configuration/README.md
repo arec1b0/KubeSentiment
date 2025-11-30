@@ -231,19 +231,33 @@ settings.kafka_enabled   # → settings.kafka.kafka_enabled
 
 ## Configuration Files
 
-### In This Directory
+### Complete File Inventory
+
+#### Core Documentation (This Directory)
+
+| File | Purpose | Read Time | Audience |
+|------|---------|-----------|----------|
+| `README.md` (this file) | Navigation and overview | 5 min | Everyone |
+| `QUICK_START.md` | 5-minute setup guide | 5 min | Developers |
+| `ARCHITECTURE.md` | Detailed architecture and design | 15 min | Architects, Developers |
+| `PROFILES.md` | Profile defaults and overrides | 10 min | DevOps, Developers |
+| `DEPLOYMENT.md` | Environment-specific configurations | 20 min | DevOps, SREs |
+| `ENVIRONMENT_VARIABLES.md` | Complete settings reference | 10 min | Everyone |
+| `MIGRATION.md` | Upgrade guide from old system | 15 min | Upgrading users |
+| `TROUBLESHOOTING.md` | Common issues and solutions | varies | Everyone |
+| `examples/` | Copy-paste ready configuration files | 2 min | Developers |
+
+#### Example Files (`examples/`)
 
 | File | Purpose |
 |------|---------|
-| `README.md` (this file) | Navigation and overview |
-| `QUICK_START.md` | 5-minute setup guide |
-| `ARCHITECTURE.md` | Detailed architecture and design |
-| `PROFILES.md` | Profile defaults and overrides |
-| `DEPLOYMENT.md` | Environment-specific configurations |
-| `ENVIRONMENT_VARIABLES.md` | Complete settings reference |
-| `MIGRATION.md` | Upgrade guide from old system |
-| `TROUBLESHOOTING.md` | Common issues and solutions |
-| `examples/` | Copy-paste ready configuration files |
+| `.env.local` | Local development environment template |
+| `.env.development` | Development environment template |
+| `docker-compose-dev.yml` | Docker Compose for development |
+| `kubernetes-dev.yaml` | Kubernetes manifests for dev |
+| `kubernetes-staging.yaml` | Kubernetes manifests for staging |
+| `kubernetes-prod.yaml` | Kubernetes manifests for production |
+| `README.md` | Examples documentation |
 
 ### In Application Code
 
@@ -434,11 +448,44 @@ See **[Environment Variables](ENVIRONMENT_VARIABLES.md)** for complete reference
 
 ---
 
+## Documentation Consolidation Status
+
+### Consolidated Files (Single Source of Truth)
+
+All configuration documentation is now consolidated in `docs/configuration/`:
+
+- ✅ **Architecture** - `ARCHITECTURE.md` (consolidated from `CONFIGURATION_ARCHITECTURE.md`)
+- ✅ **Profiles** - `PROFILES.md` (consolidated from `CONFIGURATION_PROFILES.md`)
+- ✅ **Deployment** - `DEPLOYMENT.md` (consolidated from `ENVIRONMENT_CONFIGURATIONS.md`)
+- ✅ **Migration** - `MIGRATION.md` (consolidated from `CONFIGURATION_MIGRATION.md`)
+- ✅ **Troubleshooting** - `TROUBLESHOOTING.md` (merged config troubleshooting from root `TROUBLESHOOTING.md`)
+
+### Deprecated Files (Removed)
+
+The following deprecated files have been removed and replaced with references to consolidated docs:
+
+- ❌ `docs/CONFIGURATION_ARCHITECTURE.md` → See `docs/configuration/ARCHITECTURE.md`
+- ❌ `docs/CONFIGURATION_PROFILES.md` → See `docs/configuration/PROFILES.md`
+- ❌ `docs/ENVIRONMENT_CONFIGURATIONS.md` → See `docs/configuration/DEPLOYMENT.md`
+- ❌ `docs/CONFIGURATION_MIGRATION.md` → See `docs/configuration/MIGRATION.md`
+
+### Updated References
+
+The following files have been updated to reference consolidated configuration docs:
+
+- ✅ `README.md` - Updated configuration section
+- ✅ `CLAUDE.md` - Already references `docs/configuration/`
+- ✅ `docs/DEVELOPER_SETUP.md` - References consolidated config docs
+- ✅ `docs/QUICK_REFERENCE.md` - References consolidated config docs
+- ✅ `docs/TROUBLESHOOTING.md` - References config troubleshooting
+- ✅ `docs/setup/deployment-guide.md` - References consolidated deployment docs
+
 ## Version History
 
 | Date | Changes |
 |------|---------|
 | 2025-11-25 | Consolidated configuration documentation into unified `docs/configuration/` directory |
+| 2025-11-25 | Removed deprecated root-level configuration docs and updated all cross-references |
 | Previous | Individual configuration docs spread across docs/ directory |
 
 ---

@@ -300,67 +300,24 @@ docker-compose up --build -d
 
 ## Environment Configuration
 
-### Profile-Based Configuration
+> **Configuration documentation has been consolidated.** For complete configuration setup, profiles, environment variables, and troubleshooting, see **[docs/configuration/QUICK_START.md](configuration/QUICK_START.md)** and **[docs/configuration/README.md](configuration/README.md)**.
 
-KubeSentiment uses profile-based configuration (see ADR-009):
-
-```bash
-# Local development (no external services)
-PROFILE=local MLOPS_DEBUG=true uvicorn app.main:app --reload
-
-# Development (with services)
-PROFILE=development uvicorn app.main:app --reload
-
-# Staging
-PROFILE=staging uvicorn app.main:app --reload
-
-# Production
-PROFILE=production uvicorn app.main:app --workers 4
-```
-
-### Common Environment Variables
+### Quick Start
 
 ```bash
-# Debugging
-MLOPS_DEBUG=true
-MLOPS_LOG_LEVEL=DEBUG
+# Set profile (handles most configuration automatically)
+export MLOPS_PROFILE=local  # or development, staging, production
 
-# Server
-MLOPS_SERVER_HOST=0.0.0.0
-MLOPS_SERVER_PORT=8000
-
-# Model
-MLOPS_MODEL_BACKEND=onnx  # or pytorch
-MLOPS_MODEL_CACHE_DIR=./models
-
-# Redis (caching)
-MLOPS_REDIS_ENABLED=true
-MLOPS_REDIS_HOST=localhost
-MLOPS_REDIS_PORT=6379
-
-# Kafka (async processing)
-MLOPS_KAFKA_ENABLED=true
-MLOPS_KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-
-# Observability
-MLOPS_OBSERVABILITY_ENABLED=true
-MLOPS_PROMETHEUS_ENABLED=true
+# Run the app
+uvicorn app.main:app --reload
 ```
 
-### .env File
+### Configuration Resources
 
-Create a `.env` file in project root:
-
-```bash
-# Copy template
-cp .env.local.template .env
-
-# Edit values
-nano .env
-
-# Source in shell (optional - uvicorn reads from environment)
-source .env
-```
+- **Quick setup:** [Configuration Quick Start](configuration/QUICK_START.md) - 5-minute setup guide
+- **All settings:** [Environment Variables Reference](configuration/ENVIRONMENT_VARIABLES.md) - Complete reference
+- **Profiles:** [Configuration Profiles](configuration/PROFILES.md) - Profile defaults
+- **Troubleshooting:** [Configuration Troubleshooting](configuration/TROUBLESHOOTING.md) - Common issues
 
 ---
 

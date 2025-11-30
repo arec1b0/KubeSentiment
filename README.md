@@ -183,9 +183,25 @@ The service exposes several key endpoints:
 
 ### Configuration
 
-The application is configured via environment variables, which are documented in our **[Deployment Guide](docs/setup/deployment-guide.md)**. For Kubernetes deployments, these are managed via `ConfigMap` and `Secret` objects, which are defined in the Helm chart.
+The application uses a **profile-based configuration system** (see ADR-009) with comprehensive documentation. For complete configuration setup, see **[docs/configuration/](docs/configuration/)**.
+
+**Quick Links:**
+- **[Quick Start](docs/configuration/QUICK_START.md)** - Get running in 5 minutes
+- **[Environment Variables](docs/configuration/ENVIRONMENT_VARIABLES.md)** - Complete reference
+- **[Deployment Guide](docs/configuration/DEPLOYMENT.md)** - Environment-specific configurations
+- **[Profiles](docs/configuration/PROFILES.md)** - Profile-based defaults
 
 > **Note:** `.env` files are intentionally _not_ baked into the container image. Provide any sensitive or environment-specific settings at runtime using the mechanisms supported by your orchestrator.
+
+#### Quick Configuration
+
+```bash
+# Set profile (applies 50+ defaults automatically)
+export MLOPS_PROFILE=development  # or local, staging, production
+
+# Override specific settings as needed
+export MLOPS_REDIS_HOST=my-redis-server
+```
 
 #### Supplying configuration at runtime
 

@@ -1,6 +1,8 @@
 # Deployment Guide
 
-This guide provides comprehensive instructions for deploying the Sentiment Analysis Microservice in various environments.
+> **Note:** This guide provides basic deployment instructions. For comprehensive environment-specific configurations, Helm values, and deployment procedures, see **[docs/configuration/DEPLOYMENT.md](../configuration/DEPLOYMENT.md)**.
+
+This guide provides basic instructions for deploying the Sentiment Analysis Microservice in various environments.
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
@@ -149,23 +151,14 @@ kubectl apply -f k8s/scalability-config.yaml
 
 ## Configuration
 
-### Environment Variables
+> **For complete configuration documentation**, including all environment variables, profile-based defaults, and deployment configurations, see **[docs/configuration/DEPLOYMENT.md](../configuration/DEPLOYMENT.md)** and **[docs/configuration/ENVIRONMENT_VARIABLES.md](../configuration/ENVIRONMENT_VARIABLES.md)**.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MAX_TEXT_LENGTH` | `10000` | Maximum allowed text length for analysis |
-| `LOG_LEVEL` | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
-| `MODEL_NAME` | `distilbert-base-uncased-finetuned-sst-2-english` | Hugging Face model name |
-| `MODEL_CACHE_DIR` | `/app/model_cache` | Directory to cache the model |
+### Quick Reference
 
-### Updating Configuration
-
-1. Update the ConfigMap in `k8s/configmap.yaml`
-2. Apply the changes:
-   ```bash
-   kubectl apply -f k8s/configmap.yaml
-   kubectl rollout restart deployment/sentiment-service -n mlops
-   ```
+- **Environment-specific configs:** [Deployment Guide](../configuration/DEPLOYMENT.md)
+- **All environment variables:** [Environment Variables Reference](../configuration/ENVIRONMENT_VARIABLES.md)
+- **Profile-based defaults:** [Configuration Profiles](../configuration/PROFILES.md)
+- **Configuration troubleshooting:** [Configuration Troubleshooting](../configuration/TROUBLESHOOTING.md)
 
 ## Scaling
 
