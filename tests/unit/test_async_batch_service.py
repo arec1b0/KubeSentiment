@@ -349,8 +349,10 @@ async def test_pagination_edge_cases(make_service: Callable[..., AsyncBatchServi
 
     # Test page beyond results (should return last page)
     paginated = service._paginate_results("job1", results, page=100, page_size=5)
-    assert paginated.page == 100  # Page number preserved
-    assert len(paginated.results) <= 5
+    assert (
+        paginated.page == 2
+    )  # Should return last available page (10 results / 5 per page = 2 pages)
+    assert len(paginated.results) == 5  # Last page should have 5 results
 
     # Test empty results
     paginated = service._paginate_results("job1", [], page=1, page_size=10)

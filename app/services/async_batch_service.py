@@ -58,6 +58,7 @@ class AsyncBatchCoordinator(Protocol):
 
     def get_job_queue_status(self) -> dict[str, int]: ...
 
+
 logger = get_logger(__name__)
 
 
@@ -405,7 +406,9 @@ class AsyncBatchService(IAsyncBatchService):
             batch_id = f"{job.job_id}_batch_{i // batch_size}"
 
             try:
-                batch_results = await self.stream_processor.predict_async_batch(batch_texts, batch_id)
+                batch_results = await self.stream_processor.predict_async_batch(
+                    batch_texts, batch_id
+                )
             except Exception as batch_err:  # Continue processing remaining batches
                 logger.error(
                     "Batch processing failed",
@@ -414,7 +417,9 @@ class AsyncBatchService(IAsyncBatchService):
                     error=str(batch_err),
                     exc_info=True,
                 )
-                batch_results = [self._build_error_result(str(batch_err), text) for text in batch_texts]
+                batch_results = [
+                    self._build_error_result(str(batch_err), text) for text in batch_texts
+                ]
 
             failed_count += sum(1 for r in batch_results if self._is_error_result(r))
             all_results.extend(batch_results)
@@ -460,9 +465,12 @@ class AsyncBatchService(IAsyncBatchService):
         total_results = len(results)
         start_idx = (safe_page - 1) * safe_page_size
 
-        # Avoid out-of-range slicing for late pages
+        # Calculate actual page number when requested page is beyond available pages
+        actual_page = safe_page
         if start_idx >= total_results and total_results > 0:
+            # Adjust to show last page and calculate actual page number
             start_idx = max(total_results - safe_page_size, 0)
+            actual_page = (total_results + safe_page_size - 1) // safe_page_size  # Ceiling division
         end_idx = min(start_idx + safe_page_size, total_results)
         paginated_results = results[start_idx:end_idx]
 
@@ -480,16 +488,14 @@ class AsyncBatchService(IAsyncBatchService):
             "total_texts": total_results,
             "successful_predictions": successful_predictions,
             "failed_predictions": failed_predictions,
-            "success_rate": (
-                successful_predictions / total_results if total_results > 0 else 0.0
-            ),
+            "success_rate": (successful_predictions / total_results if total_results > 0 else 0.0),
         }
 
         return BatchPredictionResults(
             job_id=job_id,
             results=prediction_responses,
             total_results=total_results,
-            page=safe_page,
+            page=actual_page,
             page_size=safe_page_size,
             has_more=end_idx < total_results,
             summary=summary,
