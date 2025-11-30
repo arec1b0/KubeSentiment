@@ -469,8 +469,9 @@ class AsyncBatchService(IAsyncBatchService):
         actual_page = safe_page
         if start_idx >= total_results and total_results > 0:
             # Adjust to show last page and calculate actual page number
-            start_idx = max(total_results - safe_page_size, 0)
+            # Calculate the true start index of the last page
             actual_page = (total_results + safe_page_size - 1) // safe_page_size  # Ceiling division
+            start_idx = ((total_results - 1) // safe_page_size) * safe_page_size
         end_idx = min(start_idx + safe_page_size, total_results)
         paginated_results = results[start_idx:end_idx]
 

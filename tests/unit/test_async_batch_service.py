@@ -354,6 +354,15 @@ async def test_pagination_edge_cases(make_service: Callable[..., AsyncBatchServi
     )  # Should return last available page (10 results / 5 per page = 2 pages)
     assert len(paginated.results) == 5  # Last page should have 5 results
 
+    # Test page beyond results with uneven division (11 results, page_size=5 = 3 pages)
+    # Last page should show items 10-10 (1 item), not items 6-10 (page 2)
+    results_uneven = [{"label": "POSITIVE", "score": 0.9} for _ in range(11)]
+    paginated = service._paginate_results("job2", results_uneven, page=100, page_size=5)
+    assert (
+        paginated.page == 3
+    )  # Should return last available page (11 results / 5 per page = 3 pages)
+    assert len(paginated.results) == 1  # Last page should have 1 result (item at index 10)
+
     # Test empty results
     paginated = service._paginate_results("job1", [], page=1, page_size=10)
     assert paginated.total_results == 0
