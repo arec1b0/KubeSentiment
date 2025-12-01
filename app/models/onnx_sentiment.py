@@ -67,6 +67,7 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
         self._tokenizer = None
         self._is_loaded = False
         self._providers = self._determine_providers()
+        self._loaded_model_file: Path | None = None
 
         # Initialize the model
         self._load_model()
@@ -97,23 +98,66 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
 
         return providers
 
+    def _find_best_model_file(self) -> Path | None:
+        """Find the best available ONNX model file.
+
+        Prioritizes quantized models for better CPU performance:
+        1. model_quantized.onnx (INT8 quantized - ~4x smaller, 2-3x faster on CPU)
+        2. model_optimized.onnx (graph optimized)
+        3. model.onnx (base model)
+        4. Any other .onnx file
+
+        Returns:
+            Path to the best available model file, or None if no model found.
+        """
+        # Priority order for model files
+        priority_files = [
+            "model_quantized.onnx",
+            "model_optimized.onnx",
+            "model.onnx",
+        ]
+
+        for filename in priority_files:
+            model_file = self.model_path / filename
+            if model_file.exists():
+                logger.debug(
+                    "Found prioritized model file",
+                    filename=filename,
+                    is_quantized="quantized" in filename,
+                )
+                return model_file
+
+        # Fallback: find any .onnx file
+        onnx_files = list(self.model_path.glob("*.onnx"))
+        if onnx_files:
+            logger.debug("Using fallback ONNX file", filename=onnx_files[0].name)
+            return onnx_files[0]
+
+        return None
+
     def _load_model(self) -> None:
         """Load the ONNX model and tokenizer.
+
+        Prioritizes quantized models for better performance:
+        1. model_quantized.onnx (INT8 quantized - fastest on CPU)
+        2. model_optimized.onnx (graph optimized)
+        3. model.onnx (base model)
+        4. Any other .onnx file
 
         Raises:
             RuntimeError: If model loading fails.
         """
         try:
-            logger.info(f"Loading ONNX model from: {self.model_path}")
+            logger.info("Loading ONNX model", model_path=str(self.model_path))
             start_time = time.time()
 
-            # Find the ONNX model file
-            onnx_files = list(self.model_path.glob("*.onnx"))
-            if not onnx_files:
+            # Find the ONNX model file - prefer quantized > optimized > base
+            model_file = self._find_best_model_file()
+            if model_file is None:
                 raise FileNotFoundError(f"No ONNX model file found in {self.model_path}")
 
-            model_file = onnx_files[0]
-            logger.info(f"Using ONNX model file: {model_file}")
+            self._loaded_model_file = model_file
+            logger.info("Using ONNX model file", model_file=str(model_file))
 
             # Create ONNX Runtime session
             sess_options = ort.SessionOptions()
@@ -339,7 +383,8 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
 
         # Clean and truncate texts
         cleaned_texts = [
-            t.strip()[: self.settings.model.max_text_length] if t and t.strip() else "" for t in texts
+            t.strip()[: self.settings.model.max_text_length] if t and t.strip() else ""
+            for t in texts
         ]
 
         # Filter out empty texts and track their indices
@@ -435,16 +480,26 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
         """Get information about the model.
 
         Returns:
-            A dictionary containing model metadata.
+            A dictionary containing model metadata including quantization status.
         """
         cache_info = self._cached_predict.cache_info()
+
+        # Determine model optimization level from loaded file
+        model_file_name = self._loaded_model_file.name if self._loaded_model_file else None
+        is_quantized = model_file_name is not None and "quantized" in model_file_name
+        is_optimized = model_file_name is not None and (
+            "optimized" in model_file_name or is_quantized
+        )
 
         return {
             "model_name": self.settings.model.model_name,
             "backend": "onnx",
             "model_path": str(self.model_path),
+            "model_file": model_file_name,
             "execution_providers": self._session.get_providers() if self._session else [],
             "is_loaded": self._is_loaded,
+            "is_quantized": is_quantized,
+            "is_optimized": is_optimized,
             "max_text_length": self.settings.model.max_text_length,
             "cache_size": cache_info.currsize,
             "cache_maxsize": cache_info.maxsize,
@@ -493,7 +548,7 @@ class ONNXModelOptimizer:
     """Utility class for converting PyTorch models to ONNX format.
 
     This class provides methods to export trained PyTorch models to ONNX
-    format for optimized inference.
+    format for optimized inference, with optional INT8 quantization.
     """
 
     @staticmethod
@@ -501,13 +556,20 @@ class ONNXModelOptimizer:
         model_name: str,
         output_path: str,
         opset_version: int = 14,
-    ) -> None:
+        quantize: bool = False,
+        optimize_graph: bool = True,
+    ) -> str:
         """Export a Hugging Face model to ONNX format.
 
         Args:
             model_name: The Hugging Face model identifier.
             output_path: Directory path where the ONNX model will be saved.
             opset_version: ONNX opset version to use (default: 14).
+            quantize: Whether to apply INT8 dynamic quantization (default: False).
+            optimize_graph: Whether to apply graph optimizations (default: True).
+
+        Returns:
+            Path to the final ONNX model file.
 
         Raises:
             RuntimeError: If export fails.
@@ -516,7 +578,12 @@ class ONNXModelOptimizer:
             import torch
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-            logger.info(f"Exporting model {model_name} to ONNX format")
+            logger.info(
+                "Exporting model to ONNX format",
+                model_name=model_name,
+                quantize=quantize,
+                optimize_graph=optimize_graph,
+            )
 
             # Load model and tokenizer
             model = AutoModelForSequenceClassification.from_pretrained(model_name)
@@ -555,8 +622,138 @@ class ONNXModelOptimizer:
                 opset_version=opset_version,
             )
 
-            logger.info(f"Model exported successfully to {onnx_path}")
+            logger.info("Base ONNX model exported", path=str(onnx_path))
+            final_model_path = onnx_path
+
+            # Apply graph optimizations
+            if optimize_graph:
+                optimized_path = output_dir / "model_optimized.onnx"
+                ONNXModelOptimizer.optimize_graph(str(onnx_path), str(optimized_path))
+                final_model_path = optimized_path
+
+            # Apply INT8 quantization
+            if quantize:
+                input_path = final_model_path
+                quantized_path = output_dir / "model_quantized.onnx"
+                ONNXModelOptimizer.quantize_model(str(input_path), str(quantized_path))
+                final_model_path = quantized_path
+
+            logger.info("Model export completed", final_path=str(final_model_path))
+            return str(final_model_path)
 
         except Exception as e:
-            logger.error(f"Failed to export model to ONNX: {e}")
+            logger.error("Failed to export model to ONNX", error=str(e))
             raise RuntimeError(f"ONNX export failed: {e}") from e
+
+    @staticmethod
+    def optimize_graph(input_path: str, output_path: str) -> None:
+        """Apply ONNX Runtime graph optimizations.
+
+        Args:
+            input_path: Path to the input ONNX model.
+            output_path: Path to save the optimized model.
+
+        Raises:
+            RuntimeError: If optimization fails.
+        """
+        try:
+            logger.info("Applying graph optimizations", input_path=input_path)
+
+            sess_options = ort.SessionOptions()
+            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            sess_options.optimized_model_filepath = output_path
+
+            # Create session to trigger optimization and save
+            ort.InferenceSession(input_path, sess_options, providers=["CPUExecutionProvider"])
+
+            logger.info("Graph optimization completed", output_path=output_path)
+
+        except Exception as e:
+            logger.error("Graph optimization failed", error=str(e))
+            raise RuntimeError(f"Graph optimization failed: {e}") from e
+
+    @staticmethod
+    def quantize_model(
+        input_path: str,
+        output_path: str,
+        weight_type: str = "QInt8",
+    ) -> dict[str, Any]:
+        """Apply INT8 dynamic quantization to an ONNX model.
+
+        Dynamic quantization converts FP32 weights to INT8, reducing model size
+        by ~4x and improving CPU inference speed by 2-3x with negligible
+        accuracy loss.
+
+        Args:
+            input_path: Path to the input ONNX model.
+            output_path: Path to save the quantized model.
+            weight_type: Quantization type - "QInt8" or "QUInt8" (default: "QInt8").
+
+        Returns:
+            Dictionary containing quantization metrics:
+                - original_size_mb: Size of original model in MB
+                - quantized_size_mb: Size of quantized model in MB
+                - size_reduction_pct: Percentage size reduction
+
+        Raises:
+            RuntimeError: If quantization fails.
+        """
+        try:
+            import os
+
+            from onnxruntime.quantization import QuantType, quantize_dynamic
+
+            logger.info(
+                "Applying INT8 dynamic quantization",
+                input_path=input_path,
+                weight_type=weight_type,
+            )
+
+            # Map string to QuantType enum
+            quant_type_map = {
+                "QInt8": QuantType.QInt8,
+                "QUInt8": QuantType.QUInt8,
+            }
+            quant_type = quant_type_map.get(weight_type, QuantType.QInt8)
+
+            # Apply dynamic quantization
+            quantize_dynamic(
+                input_path,
+                output_path,
+                weight_type=quant_type,
+                extra_options={"MatMulConstBOnly": True},
+            )
+
+            # Calculate size metrics
+            original_size = os.path.getsize(input_path)
+            quantized_size = os.path.getsize(output_path)
+            size_reduction = (1 - quantized_size / original_size) * 100
+
+            metrics = {
+                "original_size_mb": original_size / 1024 / 1024,
+                "quantized_size_mb": quantized_size / 1024 / 1024,
+                "size_reduction_pct": size_reduction,
+            }
+
+            logger.info(
+                "INT8 quantization completed",
+                original_size_mb=f"{metrics['original_size_mb']:.2f}",
+                quantized_size_mb=f"{metrics['quantized_size_mb']:.2f}",
+                size_reduction_pct=f"{metrics['size_reduction_pct']:.1f}%",
+            )
+
+            return metrics
+
+        except ImportError as e:
+            logger.error(
+                "onnxruntime.quantization not available",
+                error=str(e),
+                hint="Install with: pip install onnxruntime",
+            )
+            raise RuntimeError(
+                "onnxruntime.quantization module not available. "
+                "Install onnxruntime with: pip install onnxruntime"
+            ) from e
+        except Exception as e:
+            logger.error("INT8 quantization failed", error=str(e))
+            raise RuntimeError(f"INT8 quantization failed: {e}") from e

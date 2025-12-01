@@ -23,6 +23,8 @@ RUN python3 -c "from transformers import AutoTokenizer, AutoModelForSequenceClas
     tokenizer.save_pretrained('/models/pytorch')"
 
 # Convert to ONNX for faster inference
+ARG ENABLE_INT8_QUANTIZATION=true
+
 RUN if [ "$ONNX_OPTIMIZATION" = "true" ]; then \
     python3 -c "from optimum.onnxruntime import ORTModelForSequenceClassification; \
     from transformers import AutoTokenizer; \
@@ -35,6 +37,26 @@ RUN if [ "$ONNX_OPTIMIZATION" = "true" ]; then \
     sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL; \
     sess_options.optimized_model_filepath = '/models/onnx/model_optimized.onnx'; \
     session = ort.InferenceSession('/models/onnx/model.onnx', sess_options, providers=['CPUExecutionProvider'])"; \
+    fi
+
+# Apply INT8 dynamic quantization for ~4x smaller model and 2-3x faster CPU inference
+RUN if [ "$ONNX_OPTIMIZATION" = "true" ] && [ "$ENABLE_INT8_QUANTIZATION" = "true" ]; then \
+    python3 -c "from onnxruntime.quantization import quantize_dynamic, QuantType; \
+    import os; \
+    input_model = '/models/onnx/model_optimized.onnx' if os.path.exists('/models/onnx/model_optimized.onnx') else '/models/onnx/model.onnx'; \
+    print(f'Applying INT8 dynamic quantization to {input_model}'); \
+    quantize_dynamic( \
+    input_model, \
+    '/models/onnx/model_quantized.onnx', \
+    weight_type=QuantType.QInt8, \
+    extra_options={'MatMulConstBOnly': True} \
+    ); \
+    import os; \
+    orig_size = os.path.getsize(input_model); \
+    quant_size = os.path.getsize('/models/onnx/model_quantized.onnx'); \
+    print(f'Original model size: {orig_size / 1024 / 1024:.2f} MB'); \
+    print(f'Quantized model size: {quant_size / 1024 / 1024:.2f} MB'); \
+    print(f'Size reduction: {(1 - quant_size / orig_size) * 100:.1f}%')"; \
     fi
 
 # ==================== Stage 2: Application Build ====================
