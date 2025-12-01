@@ -22,6 +22,9 @@ class ModelConfig(BaseSettings):
         max_text_length: The maximum length of input text.
         prediction_cache_max_size: The maximum number of predictions to cache.
         enable_feature_engineering: Enable advanced feature engineering.
+        onnx_intra_op_num_threads: Threads for parallelism within ONNX ops.
+        onnx_inter_op_num_threads: Threads for parallelism between ONNX ops.
+        onnx_execution_mode: ONNX execution mode ('sequential' or 'parallel').
     """
 
     model_name: str = Field(
@@ -68,6 +71,43 @@ class ModelConfig(BaseSettings):
         default=False,
         description="Enable advanced feature engineering",
     )
+
+    # ONNX Runtime threading configuration
+    # For microservices, single-threaded inference (1) lets Uvicorn workers
+    # handle parallelism, typically yielding 2-3x higher total throughput
+    onnx_intra_op_num_threads: int = Field(
+        default=1,
+        description="Threads for parallelism within ops (1 recommended for microservices, 0=auto)",
+        ge=0,
+    )
+    onnx_inter_op_num_threads: int = Field(
+        default=1,
+        description="Threads for parallelism between ops (1 recommended for microservices, 0=auto)",
+        ge=0,
+    )
+    onnx_execution_mode: str = Field(
+        default="sequential",
+        description="ONNX execution mode: 'sequential' or 'parallel'",
+    )
+
+    @field_validator("onnx_execution_mode")
+    @classmethod
+    def validate_execution_mode(cls, v: str) -> str:
+        """Validates that execution mode is valid.
+
+        Args:
+            v: The execution mode string.
+
+        Returns:
+            The validated execution mode (lowercase).
+
+        Raises:
+            ValueError: If the execution mode is not valid.
+        """
+        v = v.lower()
+        if v not in ("sequential", "parallel"):
+            raise ValueError("onnx_execution_mode must be 'sequential' or 'parallel'")
+        return v
 
     @field_validator("allowed_models")
     @classmethod

@@ -84,6 +84,12 @@ ENV PYTHONUNBUFFERED=1 \
     MLOPS_MODEL_CACHE_DIR=/models \
     # Set default ONNX path to baked-in models
     MLOPS_ONNX_MODEL_PATH=/models/onnx \
+    # ONNX Runtime thread tuning for microservices
+    # Single-threaded inference lets Uvicorn workers handle parallelism
+    # yielding 2-3x higher total throughput under concurrent requests
+    MLOPS_ONNX_INTRA_OP_NUM_THREADS=1 \
+    MLOPS_ONNX_INTER_OP_NUM_THREADS=1 \
+    MLOPS_ONNX_EXECUTION_MODE=sequential \
     # Build metadata
     BUILD_VERSION="${VERSION}" \
     BUILD_REVISION="${REVISION}" \

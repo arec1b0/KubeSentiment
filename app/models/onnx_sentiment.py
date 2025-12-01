@@ -159,9 +159,27 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
             self._loaded_model_file = model_file
             logger.info("Using ONNX model file", model_file=str(model_file))
 
-            # Create ONNX Runtime session
+            # Create ONNX Runtime session with tuned thread settings
             sess_options = ort.SessionOptions()
             sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+            # Apply thread settings from config
+            # For microservices, single-threaded (1) lets Uvicorn handle parallelism
+            sess_options.intra_op_num_threads = self.settings.model.onnx_intra_op_num_threads
+            sess_options.inter_op_num_threads = self.settings.model.onnx_inter_op_num_threads
+
+            # Set execution mode
+            if self.settings.model.onnx_execution_mode == "parallel":
+                sess_options.execution_mode = ort.ExecutionMode.ORT_PARALLEL
+            else:
+                sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+
+            logger.info(
+                "ONNX session options configured",
+                intra_op_threads=self.settings.model.onnx_intra_op_num_threads,
+                inter_op_threads=self.settings.model.onnx_inter_op_num_threads,
+                execution_mode=self.settings.model.onnx_execution_mode,
+            )
 
             self._session = ort.InferenceSession(
                 str(model_file),
@@ -503,6 +521,10 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
             "max_text_length": self.settings.model.max_text_length,
             "cache_size": cache_info.currsize,
             "cache_maxsize": cache_info.maxsize,
+            # ONNX Runtime thread settings
+            "onnx_intra_op_threads": self.settings.model.onnx_intra_op_num_threads,
+            "onnx_inter_op_threads": self.settings.model.onnx_inter_op_num_threads,
+            "onnx_execution_mode": self.settings.model.onnx_execution_mode,
         }
 
     def clear_cache(self) -> None:
