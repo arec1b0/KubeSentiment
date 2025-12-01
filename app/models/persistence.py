@@ -8,9 +8,9 @@ file access. It's designed to work with persistent volumes in Kubernetes environ
 
 import hashlib
 import json
+from pathlib import Path
 import shutil
 import time
-from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import onnxruntime as ort
@@ -282,8 +282,8 @@ class ModelPersistenceManager:
                 providers=providers,
             )
 
-            # Load tokenizer
-            tokenizer = AutoTokenizer.from_pretrained(str(cache_path))
+            # Load tokenizer with FastTokenizer preference
+            tokenizer = AutoTokenizer.from_pretrained(str(cache_path), use_fast=True)
 
             elapsed = time.time() - start_time
             elapsed_ms = elapsed * 1000

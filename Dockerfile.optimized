@@ -15,10 +15,12 @@ WORKDIR /models
 ARG MODEL_NAME="distilbert-base-uncased-finetuned-sst-2-english"
 ARG ONNX_OPTIMIZATION=true
 
-# Download the model
+# Download the model with FastTokenizer (Rust-based, 3-10x faster)
 RUN python3 -c "from transformers import AutoTokenizer, AutoModelForSequenceClassification; \
     model = AutoModelForSequenceClassification.from_pretrained('${MODEL_NAME}'); \
-    tokenizer = AutoTokenizer.from_pretrained('${MODEL_NAME}'); \
+    tokenizer = AutoTokenizer.from_pretrained('${MODEL_NAME}', use_fast=True); \
+    assert tokenizer.is_fast, 'FastTokenizer not available - tokenizer.json missing'; \
+    print('FastTokenizer verified: tokenizer.json will be saved'); \
     model.save_pretrained('/models/pytorch'); \
     tokenizer.save_pretrained('/models/pytorch')"
 
@@ -29,9 +31,11 @@ RUN if [ "$ONNX_OPTIMIZATION" = "true" ]; then \
     python3 -c "from optimum.onnxruntime import ORTModelForSequenceClassification; \
     from transformers import AutoTokenizer; \
     model = ORTModelForSequenceClassification.from_pretrained('/models/pytorch', export=True); \
-    tokenizer = AutoTokenizer.from_pretrained('/models/pytorch'); \
+    tokenizer = AutoTokenizer.from_pretrained('/models/pytorch', use_fast=True); \
+    assert tokenizer.is_fast, 'FastTokenizer not available for ONNX model'; \
     model.save_pretrained('/models/onnx'); \
     tokenizer.save_pretrained('/models/onnx'); \
+    print('FastTokenizer saved to ONNX model directory'); \
     import onnxruntime as ort; \
     sess_options = ort.SessionOptions(); \
     sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL; \

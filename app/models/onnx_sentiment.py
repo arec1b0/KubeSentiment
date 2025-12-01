@@ -187,18 +187,31 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
                 providers=self._providers,
             )
 
-            # Load tokenizer
-            # Try to load from model directory first, fall back to model name
+            # Load tokenizer with explicit FastTokenizer (Rust-based) preference
+            # FastTokenizer is 3-10x faster than Python-based tokenizers
             if (self.model_path / "tokenizer_config.json").exists():
-                self._tokenizer = AutoTokenizer.from_pretrained(str(self.model_path))
+                self._tokenizer = AutoTokenizer.from_pretrained(
+                    str(self.model_path),
+                    use_fast=True,
+                )
                 logger.info("Loaded tokenizer from model directory")
             else:
                 # Fall back to downloading tokenizer for the model
                 self._tokenizer = AutoTokenizer.from_pretrained(
                     self.settings.model.model_name,
                     cache_dir=self.settings.model.model_cache_dir,
+                    use_fast=True,
                 )
-                logger.info(f"Loaded tokenizer for {self.settings.model.model_name}")
+                logger.info("Loaded tokenizer for model", model_name=self.settings.model.model_name)
+
+            # Log FastTokenizer status
+            if self._tokenizer.is_fast:
+                logger.info("Using FastTokenizer (Rust-based)")
+            else:
+                logger.warning(
+                    "FastTokenizer not available, using slow Python tokenizer",
+                    hint="Ensure tokenizer.json is present in model directory",
+                )
 
             load_time = time.time() - start_time
             self._is_loaded = True
@@ -525,6 +538,8 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
             "onnx_intra_op_threads": self.settings.model.onnx_intra_op_num_threads,
             "onnx_inter_op_threads": self.settings.model.onnx_inter_op_num_threads,
             "onnx_execution_mode": self.settings.model.onnx_execution_mode,
+            # Tokenizer info
+            "tokenizer_is_fast": self._tokenizer.is_fast if self._tokenizer else None,
         }
 
     def clear_cache(self) -> None:
@@ -607,9 +622,9 @@ class ONNXModelOptimizer:
                 optimize_graph=optimize_graph,
             )
 
-            # Load model and tokenizer
+            # Load model and tokenizer (use FastTokenizer for better performance)
             model = AutoModelForSequenceClassification.from_pretrained(model_name)
-            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
 
             # Create output directory
             output_dir = Path(output_path)
