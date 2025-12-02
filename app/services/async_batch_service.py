@@ -135,6 +135,15 @@ class AsyncBatchService(IAsyncBatchService):
         # Stop job manager (includes cleanup task)
         await self.job_manager.stop()
 
+        try:
+            await self.stream_processor.shutdown()
+        except Exception as e:
+            logger.error(
+                "Error shutting down stream processor during AsyncBatchService stop",
+                error=str(e),
+                exc_info=True,
+            )
+
         logger.info("AsyncBatchService stopped successfully")
 
     async def submit_batch_job(

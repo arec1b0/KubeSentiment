@@ -402,6 +402,18 @@ class StreamProcessor(IStreamProcessor):
                 await self._batch_task
             except asyncio.CancelledError:
                 pass
+            self._batch_task = None
+
+        try:
+            self.online_scaler.save_state(str(self.scaler_state_path))
+        except Exception as e:
+            logger.error(
+                "Failed to persist scaler state during shutdown",
+                error=str(e),
+                exc_info=True,
+            )
+
+        self._processing = False
         logger.info("Stream processor shutdown complete")
 
     async def predict_async_batch(self, texts: List[str], batch_id: str) -> List[Dict[str, Any]]:
