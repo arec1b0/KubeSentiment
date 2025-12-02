@@ -25,14 +25,18 @@ gpu:
       memoryAware: true
 
   # Resources for multi-GPU pod
+  # Optimized for multi-GPU workloads:
+  # - CPU requests: Average usage for bin-packing
+  # - CPU limits: Higher for model loading/preprocessing across GPUs
+  # - Memory requests = limits to avoid OOM kills
   resources:
     requests:
-      cpu: 4000m
-      memory: 16Gi
+      cpu: 4000m      # Average usage (~50% of limit) for bin-packing
+      memory: 32Gi    # Equal to limits for stable scheduling
       # nvidia.com/gpu will be set to gpusPerPod automatically
     limits:
-      cpu: 8000m
-      memory: 32Gi
+      cpu: 8000m      # Higher for model loading/preprocessing bursts
+      memory: 32Gi    # Equal to requests to avoid OOM kills
       # nvidia.com/gpu will be set to gpusPerPod automatically
 
   # Multi-GPU environment variables

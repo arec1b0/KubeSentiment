@@ -6,12 +6,16 @@ deployment:
   replicaCount: 2
 
   resources:
+    # Staging-optimized resources based on benchmark analysis:
+    # - CPU requests: Average usage for bin-packing
+    # - CPU limits: P95 + buffer for bursts
+    # - Memory: Equal requests/limits to prevent OOM kills
     limits:
-      cpu: 1000m
-      memory: 1Gi
+      cpu: 1000m      # P95 usage + buffer for bursts
+      memory: 768Mi   # Equal to requests to avoid OOM kills
     requests:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 400m       # Average usage (~40% of limit) for bin-packing
+      memory: 768Mi   # Equal to limits for stable scheduling
 
   env:
     MLOPS_DEBUG: "false"

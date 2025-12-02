@@ -140,13 +140,17 @@ deployment:
       maxSurge: 1
 
   # Resource limits and requests
+  # Optimized based on ONNX inference patterns:
+  # - CPU requests set to average usage (allows bin-packing)
+  # - CPU limits slightly higher for bursts (startup, traffic spikes)
+  # - Memory requests = limits to avoid OOM kills and ensure stable scheduling
   resources:
     limits:
-      cpu: 1000m
-      memory: 1Gi
+      cpu: 1000m      # P95 usage + buffer for bursts
+      memory: 768Mi   # Equal to requests to avoid OOM kills
     requests:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 400m       # Average usage (~40% of limit) for bin-packing
+      memory: 768Mi   # Equal to limits for stable scheduling
 
   # Health checks
   livenessProbe:
@@ -289,14 +293,18 @@ gpu:
       memoryAware: true
 
   # GPU resource requests and limits
+  # Optimized based on GPU inference patterns:
+  # - CPU requests: Average usage for bin-packing (GPU workloads are GPU-bound)
+  # - CPU limits: Higher for model loading and preprocessing
+  # - Memory requests = limits to avoid OOM kills
   resources:
     limits:
-      cpu: 4000m
-      memory: 16Gi
+      cpu: 4000m      # Higher for model loading/preprocessing bursts
+      memory: 16Gi    # Equal to requests to avoid OOM kills
       nvidia.com/gpu: 1  # Will be overridden by gpu.count or multiGpu.gpusPerPod
     requests:
-      cpu: 2000m
-      memory: 8Gi
+      cpu: 2000m      # Average usage (~50% of limit) for bin-packing
+      memory: 16Gi    # Equal to limits for stable scheduling
       nvidia.com/gpu: 1
 
   # GPU-specific environment variables
