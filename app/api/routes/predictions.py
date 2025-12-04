@@ -77,7 +77,7 @@ async def predict_sentiment(
     try:
         # Perform sentiment analysis through service
         result = prediction_service.predict(payload.text)
-        
+
         # Generate unique prediction ID
         prediction_id = str(uuid.uuid4())
         result["prediction_id"] = prediction_id
@@ -112,6 +112,20 @@ async def predict_sentiment(
             }
             # Fire and forget - don't await to keep response fast
             asyncio.create_task(data_writer.write_prediction(prediction_data))
+
+        # Dispatch to shadow model if shadow mode is enabled and sampled
+        if settings.mlops.shadow_mode_enabled:
+            from app.services.shadow_mode import get_shadow_mode_service
+
+            shadow_service = get_shadow_mode_service()
+            if shadow_service and shadow_service.should_shadow():
+                asyncio.create_task(
+                    shadow_service.dispatch_shadow_prediction(
+                        text=payload.text,
+                        primary_result=result,
+                        prediction_id=prediction_id,
+                    )
+                )
 
         return PredictionResponse(**result)
 

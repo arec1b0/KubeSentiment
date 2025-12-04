@@ -91,6 +91,34 @@ class MLOpsConfig(BaseSettings):
         description="Use gradient-based explanations (slower)",
     )
 
+    # Shadow Mode (Dark Launch)
+    shadow_mode_enabled: bool = Field(
+        default=False,
+        description="Enable shadow mode to run a candidate model alongside production",
+    )
+    shadow_model_name: Optional[str] = Field(
+        default=None,
+        description="Model name/path for the shadow (candidate) model",
+    )
+    shadow_model_backend: str = Field(
+        default="pytorch",
+        description="Backend for the shadow model (pytorch or onnx)",
+    )
+    shadow_traffic_percentage: float = Field(
+        default=10.0,
+        description="Percentage of traffic to sample for shadow predictions (0-100)",
+        ge=0.0,
+        le=100.0,
+    )
+    shadow_async_dispatch: bool = Field(
+        default=True,
+        description="Dispatch shadow predictions asynchronously (fire-and-forget)",
+    )
+    shadow_log_comparisons: bool = Field(
+        default=True,
+        description="Log comparison results between primary and shadow predictions",
+    )
+
     class Config:
         """Pydantic configuration."""
 

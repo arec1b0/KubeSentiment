@@ -7,8 +7,8 @@ batch processing services are properly initialized and gracefully terminated.
 """
 
 import asyncio
-import signal
 from contextlib import asynccontextmanager
+import signal
 from typing import AsyncGenerator
 
 from fastapi import FastAPI
@@ -105,6 +105,13 @@ async def _shutdown_services(app: FastAPI, reason: str) -> None:
         except Exception as e:
             logger.error("Error stopping feedback service", error=str(e), exc_info=True)
 
+    if hasattr(app.state, "shadow_mode_service") and app.state.shadow_mode_service:
+        try:
+            await app.state.shadow_mode_service.stop()
+            logger.info("Shadow mode service stopped successfully")
+        except Exception as e:
+            logger.error("Error stopping shadow mode service", error=str(e), exc_info=True)
+
     logger.info("Application shutdown complete", reason=reason)
 
 
@@ -170,7 +177,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             from app.services.mlflow_registry import initialize_model_registry
 
             registry = initialize_model_registry(
-                tracking_uri=settings.mlops.mlflow_tracking_uri, enabled=settings.mlops.mlflow_enabled
+                tracking_uri=settings.mlops.mlflow_tracking_uri,
+                enabled=settings.mlops.mlflow_enabled,
             )
             logger.info("MLflow Model Registry initialized")
             app.state.model_registry = registry
@@ -206,6 +214,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             app.state.explainability_engine = explainer
         except Exception as e:
             logger.error("Explainability engine initialization failed", error=str(e), exc_info=True)
+
+    # Initialize Shadow Mode Service
+    if settings.mlops.shadow_mode_enabled:
+        try:
+            from app.services.shadow_mode import initialize_shadow_mode_service
+
+            shadow_service = initialize_shadow_mode_service(
+                settings=settings,
+                primary_model=model if "model" in locals() else None,
+            )
+            await shadow_service.start()
+            app.state.shadow_mode_service = shadow_service
+            logger.info(
+                "Shadow Mode Service initialized",
+                shadow_model=settings.mlops.shadow_model_name,
+                traffic_percentage=settings.mlops.shadow_traffic_percentage,
+            )
+        except Exception as e:
+            logger.error("Shadow mode service initialization failed", error=str(e), exc_info=True)
 
     # Initialize Advanced Metrics Collector
     if settings.advanced_metrics_enabled:

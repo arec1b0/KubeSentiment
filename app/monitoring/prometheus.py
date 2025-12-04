@@ -10,8 +10,8 @@ various metric types, including counters, gauges, and histograms.
 import time
 from typing import Optional
 
-import torch
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, Info, generate_latest
+import torch
 
 from app.core.config import get_settings
 
@@ -42,6 +42,24 @@ CUDA_AVAILABLE = Gauge("sentiment_cuda_available", "Indicates if CUDA is availab
 CUDA_DEVICE_COUNT = Gauge("sentiment_cuda_device_count", "Number of available CUDA devices")
 CUDA_MEMORY_ALLOCATED = Gauge("sentiment_cuda_memory_allocated_bytes", "CUDA memory allocated")
 CUDA_MEMORY_RESERVED = Gauge("sentiment_cuda_memory_reserved_bytes", "CUDA memory reserved")
+
+# Shadow Mode metrics
+SHADOW_PREDICTIONS_TOTAL = Counter(
+    "sentiment_shadow_predictions_total",
+    "Total number of shadow (dark launch) predictions",
+)
+SHADOW_PREDICTION_DURATION = Histogram(
+    "sentiment_shadow_prediction_duration_seconds",
+    "Shadow model inference duration",
+)
+SHADOW_PREDICTION_MATCHES = Counter(
+    "sentiment_shadow_prediction_matches_total",
+    "Number of shadow predictions matching primary model",
+)
+SHADOW_PREDICTION_MISMATCHES = Counter(
+    "sentiment_shadow_prediction_mismatches_total",
+    "Number of shadow predictions differing from primary model",
+)
 
 
 class PrometheusMetrics:
