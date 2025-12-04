@@ -186,7 +186,9 @@ class TestModelWarmupManager:
         call_count = 0
 
         class PartialFailModel:
+            """Mock model that fails partially."""
             async def predict(self, text):
+                """Predict method that fails initially."""
                 nonlocal call_count
                 call_count += 1
                 if call_count <= 2:
@@ -217,7 +219,9 @@ class TestModelWarmupManager:
         texts_used = []
 
         class TextCapturingModel:
+            """Mock model that captures input text."""
             def predict(self, text):
+                """Predict method capturing text."""
                 texts_used.append(text)
                 return {"label": "positive"}
 

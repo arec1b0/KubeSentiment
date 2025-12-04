@@ -24,14 +24,28 @@ logger = logging.getLogger(__name__)
 
 
 def parse_cpu(cpu_str: str) -> float:
-    """Parse CPU string (e.g., '1000m', '1.5') to cores."""
+    """Parse CPU string (e.g., '1000m', '1.5') to cores.
+
+    Args:
+        cpu_str: CPU string representation.
+
+    Returns:
+        Number of CPU cores as float.
+    """
     if cpu_str.endswith("m"):
         return float(cpu_str[:-1]) / 1000
     return float(cpu_str)
 
 
 def parse_memory(mem_str: str) -> float:
-    """Parse memory string (e.g., '1Gi', '512Mi') to GB."""
+    """Parse memory string (e.g., '1Gi', '512Mi') to GB.
+
+    Args:
+        mem_str: Memory string representation.
+
+    Returns:
+        Memory size in Gigabytes (GB).
+    """
     if mem_str.endswith("Gi"):
         return float(mem_str[:-2])
     elif mem_str.endswith("Mi"):
@@ -42,13 +56,27 @@ def parse_memory(mem_str: str) -> float:
 
 
 def format_cpu(cores: float) -> str:
-    """Format CPU cores to Kubernetes format (millicores)."""
+    """Format CPU cores to Kubernetes format (millicores).
+
+    Args:
+        cores: Number of CPU cores.
+
+    Returns:
+        String representation in millicores (e.g., '500m').
+    """
     millicores = int(cores * 1000)
     return f"{millicores}m"
 
 
 def format_memory(gb: float) -> str:
-    """Format memory GB to Kubernetes format."""
+    """Format memory GB to Kubernetes format.
+
+    Args:
+        gb: Memory size in GB.
+
+    Returns:
+        String representation (e.g., '1Gi' or '512Mi').
+    """
     if gb < 1:
         return f"{int(gb * 1024)}Mi"
     return f"{gb:.1f}Gi"
@@ -198,7 +226,15 @@ def analyze_resource_metrics(
 
 
 def generate_helm_values_recommendation(analysis: Dict, environment: str = "production") -> str:
-    """Generate Helm values snippet with recommended resources."""
+    """Generate Helm values snippet with recommended resources.
+
+    Args:
+        analysis: Analysis result dictionary.
+        environment: Target environment name.
+
+    Returns:
+        YAML snippet for Helm values.
+    """
     rec = analysis["recommendations"]
 
     return f"""# Resource recommendations for {environment} environment
@@ -215,6 +251,7 @@ deployment:
 
 
 def main():
+    """Main entry point for the analysis script."""
     parser = argparse.ArgumentParser(
         description="Analyze benchmark results for resource right-sizing"
     )

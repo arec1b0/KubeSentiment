@@ -24,6 +24,7 @@ class MockModel:
     """Mock model for testing."""
 
     def __init__(self):
+        """Initialize the mock model."""
         self.predictions = [
             {"label": "POSITIVE", "score": 0.9, "inference_time_ms": 10.0},
             {"label": "NEGATIVE", "score": 0.8, "inference_time_ms": 12.0},
@@ -46,9 +47,11 @@ class MockModel:
         return results
 
     def is_ready(self):
+        """Mock check for model readiness."""
         return True
 
     def get_model_info(self):
+        """Get mock model info."""
         return {"name": "test_model", "version": "1.0.0"}
 
 
@@ -56,6 +59,7 @@ class MockPerformanceConfig:
     """Mock performance config for testing."""
 
     def __init__(self):
+        """Initialize mock performance config."""
         self.async_batch_enabled = True
         self.async_batch_max_jobs = 1000
         self.async_batch_max_batch_size = 1000
@@ -72,6 +76,7 @@ class MockSettings:
     """Mock settings for testing."""
 
     def __init__(self):
+        """Initialize mock settings."""
         self.performance = MockPerformanceConfig()
         # Backward compatibility
         self.async_batch_enabled = True

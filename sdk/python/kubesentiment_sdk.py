@@ -92,6 +92,12 @@ class KubeSentimentError(Exception):
 class APIError(KubeSentimentError):
     """API request failed."""
     def __init__(self, status_code: int, message: str):
+        """Initialize the APIError.
+
+        Args:
+            status_code: The HTTP status code returned by the API.
+            message: The error message returned by the API.
+        """
         self.status_code = status_code
         self.message = message
         super().__init__(f"API Error {status_code}: {message}")
@@ -119,6 +125,14 @@ class KubeSentimentClient:
         timeout: int = 30,
         verify_ssl: bool = True
     ):
+        """Initializes the KubeSentiment client.
+
+        Args:
+            base_url: Base URL of the KubeSentiment API (e.g., "http://localhost:8000").
+            api_key: Optional API key for authentication.
+            timeout: Request timeout in seconds (default: 30).
+            verify_ssl: Whether to verify SSL certificates (default: True).
+        """
         self.base_url = base_url.rstrip('/')
         self.api_key = api_key
         self.timeout = timeout
@@ -137,7 +151,21 @@ class KubeSentimentClient:
         json: Optional[Dict] = None,
         params: Optional[Dict] = None
     ) -> Dict[str, Any]:
-        """Make HTTP request to API."""
+        """Make HTTP request to API.
+
+        Args:
+            method: HTTP method (GET, POST, etc.).
+            endpoint: API endpoint path.
+            json: JSON body for the request.
+            params: Query parameters.
+
+        Returns:
+            The parsed JSON response.
+
+        Raises:
+            APIError: If the API returns an error status code.
+            KubeSentimentError: If the request fails due to network issues.
+        """
         url = f"{self.base_url}{endpoint}"
 
         try:

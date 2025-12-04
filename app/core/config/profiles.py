@@ -65,10 +65,12 @@ class DevelopmentProfile(ConfigProfile):
 
     @property
     def name(self) -> str:
+        """The name of the profile ('development')."""
         return "development"
 
     @property
     def description(self) -> str:
+        """A brief description of the profile."""
         return "Development environment with debug features enabled"
 
     def get_overrides(self) -> Dict[str, Any]:
@@ -116,10 +118,12 @@ class StagingProfile(ConfigProfile):
 
     @property
     def name(self) -> str:
+        """The name of the profile ('staging')."""
         return "staging"
 
     @property
     def description(self) -> str:
+        """A brief description of the profile."""
         return "Staging environment for pre-production testing"
 
     def get_overrides(self) -> Dict[str, Any]:
@@ -174,10 +178,12 @@ class ProductionProfile(ConfigProfile):
 
     @property
     def name(self) -> str:
+        """The name of the profile ('production')."""
         return "production"
 
     @property
     def description(self) -> str:
+        """A brief description of the profile."""
         return "Production environment with maximum reliability and performance"
 
     def get_overrides(self) -> Dict[str, Any]:
@@ -238,10 +244,12 @@ class LocalProfile(ConfigProfile):
 
     @property
     def name(self) -> str:
+        """The name of the profile ('local')."""
         return "local"
 
     @property
     def description(self) -> str:
+        """A brief description of the profile."""
         return "Local development without external dependencies"
 
     def get_overrides(self) -> Dict[str, Any]:

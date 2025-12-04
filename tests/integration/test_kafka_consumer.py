@@ -26,6 +26,7 @@ class MockModel:
     """Mock model for testing."""
 
     def __init__(self):
+        """Initialize the mock model."""
         self.predictions = [
             {"label": "POSITIVE", "score": 0.9, "inference_time_ms": 10.0},
             {"label": "NEGATIVE", "score": 0.8, "inference_time_ms": 12.0},
@@ -48,9 +49,11 @@ class MockModel:
         return results
 
     def is_ready(self):
+        """Mock check for model readiness."""
         return True
 
     def get_model_info(self):
+        """Get mock model info."""
         return {"name": "test_model", "version": "1.0.0"}
 
 
@@ -58,6 +61,7 @@ class MockSettings:
     """Mock settings for testing."""
 
     def __init__(self):
+        """Initialize mock settings."""
         self.kafka_enabled = True
         self.kafka_bootstrap_servers = ["localhost:9092"]
         self.kafka_consumer_group = "test_consumer"

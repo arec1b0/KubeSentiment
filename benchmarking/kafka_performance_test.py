@@ -80,7 +80,13 @@ class KafkaPerformanceTester:
         """Create settings object from configuration."""
         # Create a mock settings object with Kafka configuration
         class MockSettings:
+            """Mock settings object for testing."""
             def __init__(self, config):
+                """Initialize the mock settings.
+
+                Args:
+                    config: Configuration dictionary.
+                """
                 kafka_config = config.get('kafka', {})
                 producer_config = config.get('producer', {})
 
@@ -154,6 +160,7 @@ class KafkaPerformanceTester:
         """Setup mock model and stream processor for testing."""
         # Create a mock model for testing
         class MockModel:
+            """Mock model for testing."""
             def predict_batch(self, texts: List[str]) -> List[Dict[str, Any]]:
                 """Mock batch prediction."""
                 results = []
@@ -178,9 +185,11 @@ class KafkaPerformanceTester:
                 return results
 
             def is_ready(self) -> bool:
+                """Mock check for model readiness."""
                 return True
 
             def get_model_info(self) -> Dict[str, Any]:
+                """Get mock model info."""
                 return {'name': 'mock_model', 'type': 'test'}
 
         # Create stream processor with mock model
@@ -248,7 +257,7 @@ class KafkaPerformanceTester:
         total_messages = target_tps * self.duration_seconds
 
         print(f"🎯 Target throughput: {target_tps} TPS")
-        print(f"📊 Total messages to send: {total_messages","}")
+        print(f"📊 Total messages to send: {total_messages:,}")
 
         # Start performance test
         self.start_time = time.time()
@@ -318,7 +327,7 @@ class KafkaPerformanceTester:
                 THROUGHPUT_GAUGE.set(current_tps)
 
                 if current_time - last_update >= 10:  # Print every 10 seconds
-                    print(f"⏱️  {elapsed".1f"}s | 📈 {current_tps".1f"} TPS | "
+                    print(f"⏱️  {elapsed:.1f}s | 📈 {current_tps:.1f} TPS | "
                           f"📦 {metrics.get('messages_processed', 0)} processed | "
                           f"❌ {metrics.get('messages_failed', 0)} failed")
 
@@ -334,14 +343,14 @@ class KafkaPerformanceTester:
         """Print comprehensive test results."""
         print("\n🎉 Performance Test Results")
         print("=" * 50)
-        print(f"⏱️  Test Duration: {results['test_duration_seconds']".2f"} seconds")
-        print(f"📤 Messages Sent: {results['messages_sent']","}")
-        print(f"📥 Messages Processed: {results['messages_processed']","}")
-        print(f"📈 Achieved TPS: {results['achieved_tps']".1f"}")
-        print(f"🎯 Target TPS: {results['target_tps']","}")
-        print(f"🚀 Throughput Improvement: {results['throughput_improvement']".1f"}x")
-        print(f"⚡ Avg Processing Time: {results['avg_processing_time_ms']".2f"} ms")
-        print(f"✅ Success Rate: {results['success_rate']".1f"}%")
+        print(f"⏱️  Test Duration: {results['test_duration_seconds']:.2f} seconds")
+        print(f"📤 Messages Sent: {results['messages_sent']:,}")
+        print(f"📥 Messages Processed: {results['messages_processed']:,}")
+        print(f"📈 Achieved TPS: {results['achieved_tps']:.1f}")
+        print(f"🎯 Target TPS: {results['target_tps']:,}")
+        print(f"🚀 Throughput Improvement: {results['throughput_improvement']:.1f}x")
+        print(f"⚡ Avg Processing Time: {results['avg_processing_time_ms']:.2f} ms")
+        print(f"✅ Success Rate: {results['success_rate']:.1f}%")
         print(f"🔄 Retries: {results['messages_retried']}")
         print(f"💀 Dead Letter Queue: {results['messages_dlq']}")
         print(f"🧵 Consumer Threads: {results['consumer_threads']}")
@@ -432,7 +441,7 @@ if __name__ == "__main__":
                 print("🎉 SUCCESS: 10x throughput improvement achieved!")
                 sys.exit(0)
             else:
-                print(f"⚠️  WARNING: Only {improvement".1f"}x improvement achieved")
+                print(f"⚠️  WARNING: Only {improvement:.1f}x improvement achieved")
                 sys.exit(1)
         else:
             print("❌ FAILURE: Test completed with errors")
