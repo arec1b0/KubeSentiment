@@ -1,0 +1,166 @@
+# Distroless Multi-stage Dockerfile for Enhanced Security
+# Uses Google's distroless Python image to minimize attack surface
+#
+# Benefits:
+#   - No shell access (improved security)
+#   - Minimal CVE surface
+#   - ~30-50% smaller runtime image
+#   - CIS/NIST compliance friendly
+#
+# Trade-offs:
+#   - No shell for debugging (use DEBUG_IMAGE=true or K8s ephemeral containers)
+#   - No curl/wget in container
+#   - Kubernetes probes required for health checks
+#
+# Usage:
+#   docker build -f Dockerfile.distroless -t sentiment-service:distroless .
+#   docker build -f Dockerfile.distroless --target runtime-debug -t sentiment-service:distroless-debug .
+
+# ==================== Stage 1: Builder ====================
+FROM python:3.11-slim AS builder
+
+# Build arguments
+ARG BUILDTIME
+ARG VERSION
+ARG REVISION
+
+# Environment for build
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+
+# Install dependencies to a specific location for copying
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# Copy application code
+COPY app/ ./app/
+COPY scripts/healthcheck.py ./scripts/healthcheck.py
+
+# Create necessary directories with correct permissions for distroless nonroot user (UID 65532)
+RUN mkdir -p /build/logs /build/tmp && \
+    chown -R 65532:65532 /build
+
+# Create build info
+RUN echo '{"version":"'${VERSION}'","revision":"'${REVISION}'","build_time":"'${BUILDTIME}'","image":"distroless"}' > /build/build-info.json
+
+# ==================== Stage 2: Runtime (Production) ====================
+# Production distroless image (default target)
+FROM gcr.io/distroless/python3-debian12 AS runtime
+
+# Set labels
+ARG BUILDTIME
+ARG VERSION
+ARG REVISION
+LABEL org.opencontainers.image.created="${BUILDTIME}"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.revision="${REVISION}"
+LABEL org.opencontainers.image.title="MLOps Sentiment Analysis - Distroless"
+LABEL org.opencontainers.image.description="Hardened sentiment analysis service with minimal attack surface"
+LABEL org.opencontainers.image.source="https://github.com/arec1b0/KubeSentiment"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.base.name="gcr.io/distroless/python3-debian12"
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/usr/local/lib/python3.11/site-packages \
+    BUILD_VERSION="${VERSION}" \
+    BUILD_REVISION="${REVISION}" \
+    BUILD_TIME="${BUILDTIME}" \
+    MLOPS_PROFILE=production \
+    HEALTHCHECK_HOST=localhost \
+    HEALTHCHECK_PORT=8000 \
+    HEALTHCHECK_PATH=/api/v1/health
+
+WORKDIR /app
+
+# Copy installed Python packages from builder
+COPY --from=builder /install/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+
+# Copy application code
+COPY --from=builder --chown=65532:65532 /build/app ./app
+COPY --from=builder --chown=65532:65532 /build/scripts/healthcheck.py ./healthcheck.py
+COPY --from=builder --chown=65532:65532 /build/build-info.json ./build-info.json
+COPY --from=builder --chown=65532:65532 /build/logs ./logs
+COPY --from=builder --chown=65532:65532 /build/tmp ./tmp
+
+# Expose port
+EXPOSE 8000
+
+# Note: HEALTHCHECK directive removed - use Kubernetes probes instead
+# The healthcheck.py script is available for manual testing or Docker Compose
+
+# Distroless runs as nonroot (UID 65532) by default
+# No USER directive needed
+
+# Run the application
+# Note: Must use exec form (JSON array) as there's no shell in distroless
+ENTRYPOINT ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+
+# ==================== Stage 3: Runtime (Debug) ====================
+# Debug distroless image (use with --target runtime-debug)
+# Includes shell and debugging tools - NOT for production use
+FROM gcr.io/distroless/python3-debian12:debug AS runtime-debug
+
+# Set labels
+ARG BUILDTIME
+ARG VERSION
+ARG REVISION
+LABEL org.opencontainers.image.created="${BUILDTIME}"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.revision="${REVISION}"
+LABEL org.opencontainers.image.title="MLOps Sentiment Analysis - Distroless (Debug)"
+LABEL org.opencontainers.image.description="Distroless image with debugging tools - NOT for production"
+LABEL org.opencontainers.image.source="https://github.com/arec1b0/KubeSentiment"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.base.name="gcr.io/distroless/python3-debian12:debug"
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/usr/local/lib/python3.11/site-packages \
+    BUILD_VERSION="${VERSION}" \
+    BUILD_REVISION="${REVISION}" \
+    BUILD_TIME="${BUILDTIME}" \
+    MLOPS_PROFILE=production \
+    HEALTHCHECK_HOST=localhost \
+    HEALTHCHECK_PORT=8000 \
+    HEALTHCHECK_PATH=/api/v1/health
+
+WORKDIR /app
+
+# Copy installed Python packages from builder
+COPY --from=builder /install/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+
+# Copy application code
+COPY --from=builder --chown=65532:65532 /build/app ./app
+COPY --from=builder --chown=65532:65532 /build/scripts/healthcheck.py ./healthcheck.py
+COPY --from=builder --chown=65532:65532 /build/build-info.json ./build-info.json
+COPY --from=builder --chown=65532:65532 /build/logs ./logs
+COPY --from=builder --chown=65532:65532 /build/tmp ./tmp
+
+# Expose port
+EXPOSE 8000
+
+# Debug variant includes shell, so HEALTHCHECK can use shell commands
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python healthcheck.py || exit 1
+
+# Distroless debug runs as nonroot (UID 65532) by default
+# No USER directive needed
+
+# Run the application
+ENTRYPOINT ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

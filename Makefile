@@ -81,6 +81,30 @@ clean: ## Clean up cache files and build artifacts
 build: ## Build Docker image
 	docker build -t sentiment-service:latest .
 
+build-distroless: ## Build distroless Docker image
+	@echo "🔒 Building distroless Docker image..."
+	docker build -f Dockerfile.distroless \
+		--build-arg VERSION=$$(git describe --tags --always 2>/dev/null || echo "latest") \
+		--build-arg REVISION=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+		--build-arg BUILDTIME=$$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		-t sentiment-service:distroless \
+		-t sentiment-service:distroless-$$(git rev-parse --short HEAD 2>/dev/null || echo "latest") \
+		.
+	@echo "✅ Distroless image built successfully"
+
+build-distroless-debug: ## Build distroless Docker image with debug tools
+	@echo "🔧 Building distroless debug Docker image..."
+	docker build -f Dockerfile.distroless \
+		--target runtime-debug \
+		--build-arg VERSION=$$(git describe --tags --always 2>/dev/null || echo "latest") \
+		--build-arg REVISION=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+		--build-arg BUILDTIME=$$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+		-t sentiment-service:distroless-debug \
+		-t sentiment-service:distroless-debug-$$(git rev-parse --short HEAD 2>/dev/null || echo "latest") \
+		.
+	@echo "✅ Distroless debug image built successfully"
+	@echo "⚠️  Note: Debug images include shell and debugging tools - not for production use"
+
 dev: ## Start development server with docker-compose
 	docker-compose up --build
 
