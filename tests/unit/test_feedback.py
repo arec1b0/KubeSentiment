@@ -49,9 +49,10 @@ def test_submit_feedback_success(client, mock_feedback_service):
     # Verify service was called
     mock_feedback_service.submit_feedback.assert_called_once()
     # Verify arguments match
-    call_args = mock_feedback_service.submit_feedback.call_args[0][0]
-    assert call_args.prediction_id == payload["prediction_id"]
-    assert call_args.corrected_label == payload["corrected_label"]
+    call_args = mock_feedback_service.submit_feedback.call_args
+    feedback_obj = call_args[0][0]
+    assert str(feedback_obj.prediction_id) == payload["prediction_id"]
+    assert feedback_obj.corrected_label == payload["corrected_label"]
 
 @pytest.mark.unit
 def test_submit_feedback_invalid_uuid(client):

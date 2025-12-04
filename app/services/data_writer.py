@@ -175,7 +175,7 @@ class DataLakeWriter(IDataWriter):
 
         enriched = {
             "timestamp": now.isoformat(),
-            "prediction_id": prediction_data.get("prediction_id", ""),
+            "prediction_id": prediction_data.get("prediction_id") or "unknown",
             "year": now.year,
             "month": now.month,
             "day": now.day,

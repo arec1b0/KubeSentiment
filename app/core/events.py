@@ -98,6 +98,13 @@ async def _shutdown_services(app: FastAPI, reason: str) -> None:
         except Exception as e:
             logger.error("Error stopping data lake writer", error=str(e), exc_info=True)
 
+    if hasattr(app.state, "feedback_service") and app.state.feedback_service:
+        try:
+            await app.state.feedback_service.stop()
+            logger.info("Feedback service stopped successfully")
+        except Exception as e:
+            logger.error("Error stopping feedback service", error=str(e), exc_info=True)
+
     logger.info("Application shutdown complete", reason=reason)
 
 
@@ -261,6 +268,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         except Exception as e:
             logger.error("Data lake writer initialization failed", error=str(e), exc_info=True)
+
+    # Initialize and start the feedback service
+    try:
+        from app.services.feedback_service import get_feedback_service
+
+        feedback_service = get_feedback_service(settings)
+        await feedback_service.start()
+        app.state.feedback_service = feedback_service
+        logger.info("Feedback service started successfully")
+
+    except Exception as e:
+        logger.error("Feedback service initialization failed", error=str(e), exc_info=True)
 
     logger.info("Application startup complete")
 

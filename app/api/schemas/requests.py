@@ -8,6 +8,7 @@ for better separation of concerns and testability.
 """
 
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -197,11 +198,9 @@ class FeedbackRequest(BaseModel):
         comments: Additional comments or context (optional).
     """
 
-    prediction_id: str = Field(
+    prediction_id: UUID = Field(
         ...,
         description="Unique identifier of the prediction being corrected (UUID format).",
-        min_length=36,
-        max_length=36,
         examples=["550e8400-e29b-41d4-a716-446655440000"]
     )
     text: Optional[str] = Field(

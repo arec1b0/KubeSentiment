@@ -6,6 +6,7 @@ by publishing feedback events to a Kafka topic for asynchronous processing
 by downstream systems (active learning, dashboarding, etc.).
 """
 
+import asyncio
 import json
 import time
 from typing import Optional
@@ -31,32 +32,57 @@ class FeedbackService:
         """
         self.settings = settings
         self.producer: Optional[KafkaProducer] = None
-        
-        if self.settings.kafka.kafka_enabled:
-            self._init_producer()
-        else:
-            logger.info("Kafka disabled, feedback service will only log locally")
+        self._started = False
 
-    def _init_producer(self):
-        """Initialize the Kafka producer."""
-        try:
-            self.producer = KafkaProducer(
-                bootstrap_servers=self.settings.kafka.kafka_bootstrap_servers,
-                value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-                acks=self.settings.kafka.kafka_producer_acks,
-                retries=self.settings.kafka.kafka_producer_retries,
-                batch_size=self.settings.kafka.kafka_producer_batch_size,
-                linger_ms=self.settings.kafka.kafka_producer_linger_ms,
-                compression_type=self.settings.kafka.kafka_producer_compression_type,
-            )
-            logger.info("Feedback Kafka producer initialized successfully")
-        except Exception as e:
-            logger.error(
-                "Failed to initialize Feedback Kafka producer",
-                error=str(e),
-                exc_info=True
-            )
+    async def start(self):
+        """Initialize the Kafka producer asynchronously."""
+        if self.settings.kafka.kafka_enabled and not self._started:
+            await self._init_producer_with_retry()
+            self._started = True
+        elif not self.settings.kafka.kafka_enabled:
+             logger.info("Kafka disabled, feedback service will only log locally")
+             self._started = True
+
+    async def stop(self):
+        """Close the Kafka producer."""
+        if self.producer:
+            self.producer.close()
             self.producer = None
+            self._started = False
+            logger.info("Feedback service stopped")
+
+    async def _init_producer_with_retry(self):
+        """Initialize the Kafka producer with retry logic."""
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                # Run blocking init in thread
+                loop = asyncio.get_running_loop()
+                self.producer = await loop.run_in_executor(
+                    None,
+                    lambda: KafkaProducer(
+                        bootstrap_servers=self.settings.kafka.kafka_bootstrap_servers,
+                        value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+                        acks=self.settings.kafka.kafka_producer_acks,
+                        retries=self.settings.kafka.kafka_producer_retries,
+                        batch_size=self.settings.kafka.kafka_producer_batch_size,
+                        linger_ms=self.settings.kafka.kafka_producer_linger_ms,
+                        compression_type=self.settings.kafka.kafka_producer_compression_type,
+                    )
+                )
+                logger.info("Feedback Kafka producer initialized successfully")
+                return
+            except Exception as e:
+                logger.warning(
+                    f"Failed to initialize Feedback Kafka producer (attempt {attempt+1}/{max_retries})",
+                    error=str(e)
+                )
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+        
+        logger.error("Failed to initialize Feedback Kafka producer after all retries")
+        self.producer = None
+
 
     async def submit_feedback(self, feedback: FeedbackRequest) -> bool:
         """Submit feedback for a prediction.
@@ -67,14 +93,20 @@ class FeedbackService:
             feedback: The feedback request object.
 
         Returns:
-            True if submitted successfully (or queued), False otherwise.
+            True if submitted successfully, False otherwise.
         """
+        # Ensure start was called (lazy start fallback if not called in lifespan)
+        if not self._started:
+             await self.start()
+
         feedback_data = feedback.model_dump()
+        # Convert UUID to string for serialization
+        feedback_data["prediction_id"] = str(feedback_data["prediction_id"])
         feedback_data["timestamp"] = time.time()
         
         logger.info(
             "Received feedback",
-            prediction_id=feedback.prediction_id,
+            prediction_id=feedback_data["prediction_id"],
             corrected_label=feedback.corrected_label
         )
 
@@ -87,20 +119,24 @@ class FeedbackService:
             return True
 
         try:
-            # Send to Kafka asynchronously
-            future = self.producer.send(
-                self.settings.kafka.kafka_feedback_topic,
-                value=feedback_data
-            )
+            # Send to Kafka asynchronously but wait for confirmation
+            loop = asyncio.get_running_loop()
             
-            # We can optionally wait for acknowledgment or let it be async
-            # For high throughput, we usually don't await future.get() in the request path
-            # unless strict consistency is required.
+            # Ensure serialization is safe
+            def _send_and_wait():
+                future = self.producer.send(
+                    self.settings.kafka.kafka_feedback_topic,
+                    value=feedback_data
+                )
+                # Wait for acknowledgment to ensure delivery
+                return future.get(timeout=10.0)
+
+            await loop.run_in_executor(None, _send_and_wait)
             
-            logger.debug(
+            logger.info(
                 "Feedback sent to Kafka",
                 topic=self.settings.kafka.kafka_feedback_topic,
-                prediction_id=feedback.prediction_id
+                prediction_id=feedback_data["prediction_id"]
             )
             return True
 
@@ -108,7 +144,7 @@ class FeedbackService:
             logger.error(
                 "Failed to publish feedback to Kafka",
                 error=str(e),
-                prediction_id=feedback.prediction_id,
+                prediction_id=feedback_data["prediction_id"],
                 exc_info=True
             )
             return False
@@ -116,13 +152,13 @@ class FeedbackService:
             logger.error(
                 "Unexpected error submitting feedback",
                 error=str(e),
-                prediction_id=feedback.prediction_id,
+                prediction_id=feedback_data["prediction_id"],
                 exc_info=True
             )
             return False
 
     def close(self):
-        """Close the Kafka producer."""
+        """Close the Kafka producer (sync wrapper for backward compatibility if needed)."""
         if self.producer:
             self.producer.close()
 

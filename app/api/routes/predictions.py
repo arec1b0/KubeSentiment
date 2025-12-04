@@ -6,6 +6,9 @@ predictions. It includes synchronous and asynchronous endpoints for
 single predictions and batch processing.
 """
 
+import asyncio
+import uuid
+
 from fastapi import APIRouter, Depends, Response
 
 from app.api.schemas.requests import TextInput
@@ -76,7 +79,6 @@ async def predict_sentiment(
         result = prediction_service.predict(payload.text)
         
         # Generate unique prediction ID
-        import uuid
         prediction_id = str(uuid.uuid4())
         result["prediction_id"] = prediction_id
 
@@ -109,8 +111,6 @@ async def predict_sentiment(
                 "features": result.get("features"),
             }
             # Fire and forget - don't await to keep response fast
-            import asyncio
-
             asyncio.create_task(data_writer.write_prediction(prediction_data))
 
         return PredictionResponse(**result)
