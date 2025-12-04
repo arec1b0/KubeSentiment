@@ -326,15 +326,15 @@ class AsyncBatchPerformanceTester:
         """Print comprehensive test results."""
         print("\n🎉 Async Batch Performance Test Results")
         print("=" * 60)
-        print(f"⏱️  Test Duration: {results['test_duration_seconds']".2f"} seconds")
-        print(f"📤 Requests Submitted: {results['requests_submitted']","}")
-        print(f"📥 Requests Completed: {results['requests_completed']","}")
-        print(f"✅ Success Rate: {results['success_rate']".1f"}%")
-        print(f"⚡ Avg Response Time: {results['avg_response_time_seconds']".2f"} seconds")
-        print(f"🔄 Avg End-to-End Time: {results['avg_end_to_end_time_seconds']".2f"} seconds")
-        print(f"📊 Baseline Sync Time: {results['baseline_sync_time_seconds']".1f"} seconds")
-        print(f"🚀 Improvement: {results['improvement_percentage']".1f"}%")
-        print(f"📈 Throughput Ratio: {results['throughput_improvement_ratio']".1f"}x")
+        print(f"⏱️  Test Duration: {results['test_duration_seconds']:.2f} seconds")
+        print(f"📤 Requests Submitted: {results['requests_submitted']:,}")
+        print(f"📥 Requests Completed: {results['requests_completed']:,}")
+        print(f"✅ Success Rate: {results['success_rate']:.1f}%")
+        print(f"⚡ Avg Response Time: {results['avg_response_time_seconds']:.2f} seconds")
+        print(f"🔄 Avg End-to-End Time: {results['avg_end_to_end_time_seconds']:.2f} seconds")
+        print(f"📊 Baseline Sync Time: {results['baseline_sync_time_seconds']:.1f} seconds")
+        print(f"🚀 Improvement: {results['improvement_percentage']:.1f}%")
+        print(f"📈 Throughput Ratio: {results['throughput_improvement_ratio']:.1f}x")
 
         # Performance assessment
         improvement = results['improvement_percentage']
@@ -371,7 +371,7 @@ class AsyncBatchPerformanceTester:
 
                 print(f"   {config_result['batch_size']} texts × {config_result['concurrency']} concurrent")
                 print(f"   → Success: {successful}/{len(matching_results)}")
-                print(f"   → Avg Response: {avg_time".2f"}s")
+                print(f"   → Avg Response: {avg_time:.2f}s")
 
 
 async def main():
@@ -493,9 +493,9 @@ async def load_test_scenario(scenario: str = "standard"):
     total = len(all_results)
     avg_time = sum(r["wait_time"] for r in all_results if r["success"]) / max(successful, 1)
 
-    print("
-📊 Scenario Results:"    print(f"   Success Rate: {successful}/{total} ({successful/total*100".1f"}%)")
-    print(f"   Avg Response Time: {avg_time".2f"}s")
+    print("\n📊 Scenario Results:")
+    print(f"   Success Rate: {successful}/{total} ({successful/total*100:.1f}%)")
+    print(f"   Avg Response Time: {avg_time:.2f}s")
 
     return {
         "scenario": scenario,
@@ -542,7 +542,7 @@ if __name__ == "__main__":
                 print("🎉 SUCCESS: 85% performance improvement achieved!")
                 sys.exit(0)
             else:
-                print(f"⚠️  WARNING: Only {improvement".1f"}% improvement achieved")
+                print(f"⚠️  WARNING: Only {improvement:.1f}% improvement achieved")
                 sys.exit(1)
         else:
             print("❌ FAILURE: Test completed with errors")

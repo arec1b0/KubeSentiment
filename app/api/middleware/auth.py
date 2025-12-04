@@ -1,3 +1,10 @@
+"""
+Authentication middleware for the API.
+
+This module provides the `APIKeyAuthMiddleware`, which implements API key-based
+authentication to secure the application's endpoints.
+"""
+
 import secrets
 
 from fastapi import Request

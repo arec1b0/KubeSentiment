@@ -7,7 +7,7 @@ domain-specific configuration classes into a single, cohesive settings object.
 
 import os
 from functools import cached_property
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings

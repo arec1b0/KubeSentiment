@@ -34,9 +34,13 @@ from app.services.stream_processor import StreamProcessor
 class AsyncBatchCoordinator(Protocol):
     """Minimal surface area for orchestrating async batch work."""
 
-    async def start(self) -> None: ...
+    async def start(self) -> None:
+        """Starts the coordinator."""
+        ...
 
-    async def stop(self) -> None: ...
+    async def stop(self) -> None:
+        """Stops the coordinator."""
+        ...
 
     async def submit_batch_job(
         self,
@@ -44,19 +48,31 @@ class AsyncBatchCoordinator(Protocol):
         priority: str | Priority | None = None,
         max_batch_size: int | None = None,
         timeout_seconds: int | None = None,
-    ) -> BatchJob: ...
+    ) -> BatchJob:
+        """Submits a batch job."""
+        ...
 
-    async def get_job_status(self, job_id: str) -> BatchJob | None: ...
+    async def get_job_status(self, job_id: str) -> BatchJob | None:
+        """Gets the status of a job."""
+        ...
 
     async def get_job_results(
         self, job_id: str, page: int = 1, page_size: int = 100
-    ) -> BatchPredictionResults | None: ...
+    ) -> BatchPredictionResults | None:
+        """Gets the results of a job."""
+        ...
 
-    async def cancel_job(self, job_id: str) -> bool: ...
+    async def cancel_job(self, job_id: str) -> bool:
+        """Cancels a job."""
+        ...
 
-    async def get_batch_metrics(self) -> AsyncBatchMetricsResponse: ...
+    async def get_batch_metrics(self) -> AsyncBatchMetricsResponse:
+        """Gets batch metrics."""
+        ...
 
-    def get_job_queue_status(self) -> dict[str, int]: ...
+    def get_job_queue_status(self) -> dict[str, int]:
+        """Gets queue status."""
+        ...
 
 
 logger = get_logger(__name__)
@@ -296,7 +312,11 @@ class AsyncBatchService(IAsyncBatchService):
 
     @property
     def coordinator(self) -> AsyncBatchCoordinator:
-        """Minimal surface to share with collaborators instead of internals."""
+        """Minimal surface to share with collaborators instead of internals.
+
+        Returns:
+            The coordinator protocol view of this service.
+        """
         return self
 
     async def _process_job(self, job: BatchJob) -> None:

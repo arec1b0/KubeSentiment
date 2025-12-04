@@ -83,6 +83,12 @@ class ChaosMiddleware(BaseHTTPMiddleware):
     """
 
     def __init__(self, app: ASGIApp, config: ChaosConfig = None):
+        """Initializes the ChaosMiddleware.
+
+        Args:
+            app: The ASGI application.
+            config: Configuration for chaos injection.
+        """
         super().__init__(app)
         self.config = config or ChaosConfig()
         self.request_count = 0
@@ -281,6 +287,13 @@ class TargetedChaosMiddleware(BaseHTTPMiddleware):
         chaos_config: ChaosConfig = None,
         target_conditions: Optional[Dict[str, Any]] = None,
     ):
+        """Initializes the TargetedChaosMiddleware.
+
+        Args:
+            app: The ASGI application.
+            chaos_config: Chaos configuration.
+            target_conditions: Dictionary of conditions to match.
+        """
         super().__init__(app)
         self.chaos_config = chaos_config or ChaosConfig()
         self.target_conditions = target_conditions or {}

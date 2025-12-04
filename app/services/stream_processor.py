@@ -56,7 +56,9 @@ try:  # pragma: no cover
 except Exception:  # pragma: no cover
 
     class OnlineStandardScaler:  # type: ignore[override]
+        """Mock implementation of OnlineStandardScaler for testing/fallback environments."""
         def __init__(self) -> None:
+            """Initialize the mock scaler."""
             self.n_samples_seen_ = 0
 
         def load_state(self, *_: Any, **__: Any) -> None:  # noqa: D401 - simple stub
@@ -66,10 +68,19 @@ except Exception:  # pragma: no cover
             """No-op save implementation for tests."""
 
         def partial_fit(self, features: Any) -> None:
+            """Mock implementation of partial_fit."""
             length = len(getattr(features, "index", features))
             self.n_samples_seen_ += int(length)
 
         def transform(self, features: Any) -> Any:
+            """Mock implementation of transform.
+
+            Args:
+                features: Input features.
+
+            Returns:
+                The input features unmodified.
+            """
             return features
 
 

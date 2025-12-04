@@ -31,6 +31,7 @@ class TracingConfig:
     """Configuration for OpenTelemetry distributed tracing."""
 
     def __init__(self):
+        """Initializes the tracing configuration."""
         self.settings = get_settings()
         self.tracer_provider: Optional[TracerProvider] = None
         self.tracer: Optional[trace.Tracer] = None
@@ -296,11 +297,18 @@ class traced_operation:
     """
 
     def __init__(self, operation_name: str, **attributes):
+        """Initializes the traced operation context manager.
+
+        Args:
+            operation_name: The name of the operation.
+            **attributes: Additional key-value attributes for the span.
+        """
         self.operation_name = operation_name
         self.attributes = attributes
         self.span = None
 
     def __enter__(self):
+        """Starts a new span for the operation."""
         tracer = get_tracing_config().get_tracer()
         self.span = tracer.start_span(self.operation_name)
         if self.attributes:
@@ -309,6 +317,7 @@ class traced_operation:
         return self.span
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Ends the span and records any exceptions."""
         if exc_type is not None:
             self.span.record_exception(exc_val)
             self.span.set_status(Status(StatusCode.ERROR, str(exc_val)))

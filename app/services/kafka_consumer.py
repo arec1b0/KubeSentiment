@@ -61,17 +61,39 @@ class KafkaConsumerPrometheusMetrics:
     """Lightweight Prometheus adapter for Kafka consumer metrics."""
 
     def __init__(self) -> None:
+        """Initializes the Prometheus metrics tracker."""
         self._consumed: Dict[Tuple[str, str], int] = defaultdict(int)
         self._processed: Dict[Tuple[str, str], int] = defaultdict(int)
         self._failed: Dict[Tuple[str, str], int] = defaultdict(int)
 
     def record_kafka_message_consumed(self, topic: str, group: str, count: int) -> None:
+        """Increments the counter for consumed messages.
+
+        Args:
+            topic: The Kafka topic name.
+            group: The consumer group name.
+            count: The number of messages consumed.
+        """
         self._consumed[(topic, group)] += count
 
     def record_kafka_message_processed(self, topic: str, group: str, count: int) -> None:
+        """Increments the counter for processed messages.
+
+        Args:
+            topic: The Kafka topic name.
+            group: The consumer group name.
+            count: The number of messages successfully processed.
+        """
         self._processed[(topic, group)] += count
 
     def record_kafka_message_failed(self, topic: str, group: str, count: int) -> None:
+        """Increments the counter for failed messages.
+
+        Args:
+            topic: The Kafka topic name.
+            group: The consumer group name.
+            count: The number of messages failed.
+        """
         self._failed[(topic, group)] += count
 
 
@@ -79,29 +101,49 @@ class AsyncBatchHandle:
     """A handle that is awaitable but also usable synchronously for tests."""
 
     def __init__(self, coroutine_factory: Callable[[], Awaitable[List[Dict[str, Any]]]]):
+        """Initializes the async batch handle.
+
+        Args:
+            coroutine_factory: A function that returns an awaitable which produces
+                               the batch results.
+        """
         self._coroutine_factory = coroutine_factory
         self._result: Optional[List[Dict[str, Any]]] = None
 
     async def _execute(self) -> List[Dict[str, Any]]:
+        """Executes the batch processing asynchronously.
+
+        Returns:
+            The list of results from the batch processing.
+        """
         if self._result is None:
             self._result = await self._coroutine_factory()
         return self._result
 
     def __await__(self):  # type: ignore[override]
+        """Allows the handle to be awaited directly."""
         return self._execute().__await__()
 
     def _resolve_sync(self) -> List[Dict[str, Any]]:
+        """Resolves the batch synchronously (blocking).
+
+        Returns:
+            The list of results from the batch processing.
+        """
         if self._result is None:
             self._result = asyncio.run(self._coroutine_factory())
         return self._result
 
     def __len__(self) -> int:
+        """Returns the number of results in the batch."""
         return len(self._resolve_sync())
 
     def __iter__(self):  # type: ignore[override]
+        """Iterates over the results in the batch."""
         return iter(self._resolve_sync())
 
     def __getitem__(self, index: int) -> Dict[str, Any]:
+        """Retrieves a result by index."""
         return self._resolve_sync()[index]
 
 
@@ -201,12 +243,24 @@ class HighThroughputKafkaConsumer(IKafkaConsumer):
         return metrics_snapshot
 
     def is_running(self) -> bool:
-        """Checks if the consumer is currently running."""
+        """Checks if the consumer is currently running.
+
+        Returns:
+            True if running, False otherwise.
+        """
 
         return self._running
 
     def _process_batch_async(self, texts: List[str], message_ids: List[str]) -> AsyncBatchHandle:
-        """Process a batch of messages asynchronously."""
+        """Process a batch of messages asynchronously.
+
+        Args:
+            texts: List of text contents to process.
+            message_ids: List of corresponding message IDs.
+
+        Returns:
+            An AsyncBatchHandle for the processing task.
+        """
 
         async def runner() -> List[Dict[str, Any]]:
             return await self._execute_batch(texts, message_ids)
@@ -216,6 +270,15 @@ class HighThroughputKafkaConsumer(IKafkaConsumer):
     async def _execute_batch(
         self, texts: List[str], message_ids: List[str]
     ) -> List[Dict[str, Any]]:
+        """Executes the batch prediction using the stream processor.
+
+        Args:
+            texts: List of texts.
+            message_ids: List of message IDs.
+
+        Returns:
+            List of prediction results.
+        """
         start = time.perf_counter()
         try:
             predictions = await asyncio.to_thread(self.stream_processor.model.predict_batch, texts)
@@ -285,7 +348,12 @@ class HighThroughputKafkaConsumer(IKafkaConsumer):
                 del self._message_batches[batch_key]
 
     def _handle_batch_results(self, batch: MessageBatch, results: List[Dict[str, Any]]) -> None:
-        """Handle processing results, dispatching failures to the DLQ if needed."""
+        """Handle processing results, dispatching failures to the DLQ if needed.
+
+        Args:
+            batch: The batch object containing original messages.
+            results: The results from processing.
+        """
 
         for (message, metadata), result in zip(batch.iter_messages(), results, strict=False):
             if result.get("success", False):
@@ -315,7 +383,16 @@ class HighThroughputKafkaConsumer(IKafkaConsumer):
                     self.metrics.throughput_tps = self.metrics.messages_consumed / elapsed
 
     def _is_duplicate_message(self, topic: str, partition: int, offset: int) -> bool:
-        """Return ``True`` if the message offset was processed recently."""
+        """Return ``True`` if the message offset was processed recently.
+
+        Args:
+            topic: Kafka topic.
+            partition: Partition number.
+            offset: Message offset.
+
+        Returns:
+            True if duplicate, False otherwise.
+        """
 
         cache = self._recent_offsets[(topic, partition)]
         if offset in cache:

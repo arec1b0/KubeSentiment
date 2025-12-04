@@ -28,6 +28,13 @@ class DeadLetterQueue:
     """
 
     def __init__(self, producer: KafkaProducer, dlq_topic: str, max_retries: int = 3):
+        """Initializes the DeadLetterQueue.
+
+        Args:
+            producer: The Kafka producer instance used to send messages.
+            dlq_topic: The name of the dead-letter queue topic.
+            max_retries: The maximum number of attempts to send to the DLQ.
+        """
         self.producer = producer
         self.dlq_topic = dlq_topic
         self.max_retries = max_retries

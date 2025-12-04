@@ -93,6 +93,12 @@ class ChaosTestSuite:
     """Orchestrates chaos engineering tests"""
 
     def __init__(self, namespace: str = "default", dry_run: bool = False):
+        """Initializes the ChaosTestSuite.
+
+        Args:
+            namespace: The Kubernetes namespace to run experiments in.
+            dry_run: If True, simulate actions without applying changes.
+        """
         self.namespace = namespace
         self.dry_run = dry_run
         self.results: List[ExperimentResult] = []
@@ -706,6 +712,7 @@ class ChaosTestSuite:
 
 
 async def main():
+    """Main entry point for the chaos test suite."""
     parser = argparse.ArgumentParser(description="Run chaos engineering test suite")
     parser.add_argument("--namespace", default="default", help="Kubernetes namespace")
     parser.add_argument("--dry-run", action="store_true", help="Dry run mode")
