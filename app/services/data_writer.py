@@ -175,6 +175,7 @@ class DataLakeWriter(IDataWriter):
 
         enriched = {
             "timestamp": now.isoformat(),
+            "prediction_id": prediction_data.get("prediction_id", ""),
             "year": now.year,
             "month": now.month,
             "day": now.day,
@@ -288,6 +289,7 @@ class DataLakeWriter(IDataWriter):
         schema = pa.schema(
             [
                 ("timestamp", pa.timestamp("us", tz="UTC")),
+                ("prediction_id", pa.string()),
                 ("year", pa.int32()),
                 ("month", pa.int32()),
                 ("day", pa.int32()),

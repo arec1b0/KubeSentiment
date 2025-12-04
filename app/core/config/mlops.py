@@ -97,3 +97,4 @@ class MLOpsConfig(BaseSettings):
         env_prefix = "MLOPS_"
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"

@@ -235,6 +235,15 @@ def create_app() -> FastAPI:
         tags=["Advanced Monitoring"],
     )
 
+    # Include feedback routes
+    from app.api.routes.feedback import router as feedback_router
+
+    app.include_router(
+        feedback_router,
+        prefix="/api/v1" if not settings.server.debug else "",
+        tags=["Feedback"],
+    )
+
     # Add root endpoint
     @app.get("/", tags=["root"])
     async def root() -> dict:

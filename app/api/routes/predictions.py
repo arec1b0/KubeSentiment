@@ -74,6 +74,11 @@ async def predict_sentiment(
     try:
         # Perform sentiment analysis through service
         result = prediction_service.predict(payload.text)
+        
+        # Generate unique prediction ID
+        import uuid
+        prediction_id = str(uuid.uuid4())
+        result["prediction_id"] = prediction_id
 
         # Add inference time to response headers
         response.headers["X-Inference-Time-MS"] = str(result["inference_time_ms"])
@@ -94,6 +99,7 @@ async def predict_sentiment(
         # Stream prediction to data lake asynchronously
         if settings.data_lake.data_lake_enabled:
             prediction_data = {
+                "prediction_id": prediction_id,
                 "text": payload.text,
                 "label": result["label"],
                 "score": result["score"],

@@ -76,6 +76,21 @@ def get_model_service(
     return ModelFactory.create_model(backend)
 
 
+def get_feature_engineer():
+    """Provides a singleton instance of the feature engineering service.
+
+    This dependency ensures that the `FeatureEngineer` class, which may have a
+    costly initialization process (e.g., downloading NLTK data), is created
+    only once and reused across the application.
+
+    Returns:
+        The singleton instance of the `FeatureEngineer`.
+    """
+    from app.features.feature_engineering import get_feature_engineer as get_fe
+
+    return get_fe()
+
+
 def get_prediction_service(
     model=Depends(get_model_service),
     settings: Settings = Depends(get_settings),
@@ -103,21 +118,6 @@ def get_prediction_service(
     return PredictionService(model=model, settings=settings, feature_engineer=feature_engineer)
 
 
-def get_feature_engineer():
-    """Provides a singleton instance of the feature engineering service.
-
-    This dependency ensures that the `FeatureEngineer` class, which may have a
-    costly initialization process (e.g., downloading NLTK data), is created
-    only once and reused across the application.
-
-    Returns:
-        The singleton instance of the `FeatureEngineer`.
-    """
-    from app.features.feature_engineering import get_feature_engineer as get_fe
-
-    return get_fe()
-
-
 def get_data_writer(settings: Settings = Depends(get_settings)) -> IDataWriter:
     """Provides a singleton instance of the data lake writer service.
 
@@ -135,6 +135,20 @@ def get_data_writer(settings: Settings = Depends(get_settings)) -> IDataWriter:
     from app.services.data_writer import get_data_writer as get_dw
 
     return get_dw(settings)
+
+
+def get_feedback_service(settings: Settings = Depends(get_settings)):
+    """Provides a singleton instance of the feedback service.
+
+    Args:
+        settings: The application's configuration settings.
+
+    Returns:
+        The singleton instance of FeedbackService.
+    """
+    from app.services.feedback_service import get_feedback_service as get_fs
+    
+    return get_fs(settings)
 
 
 # ============================================================================

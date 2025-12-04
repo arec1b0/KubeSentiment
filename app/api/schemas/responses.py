@@ -44,6 +44,11 @@ class PredictionResponse(BaseModel):
         description="Predicted sentiment label: POSITIVE, NEGATIVE, or NEUTRAL",
         examples=["POSITIVE", "NEGATIVE", "NEUTRAL"]
     )
+    prediction_id: str = Field(
+        ...,
+        description="Unique identifier for this prediction, used for feedback and tracking.",
+        examples=["550e8400-e29b-41d4-a716-446655440000"]
+    )
     score: float = Field(
         ...,
         description="Confidence score between 0.0 and 1.0. Scores closer to 1.0 indicate higher confidence.",

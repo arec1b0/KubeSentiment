@@ -180,3 +180,55 @@ class BatchTextInput(BaseModel):
                 raise ValueError(f"Text at index {i} is empty or contains only whitespace.")
 
         return v
+
+
+class FeedbackRequest(BaseModel):
+    """Defines the schema for submitting user feedback on predictions.
+
+    This model captures user corrections or confirmations of sentiment predictions,
+    enabling active learning and continuous model improvement.
+
+    Attributes:
+        prediction_id: Unique identifier of the prediction (UUID).
+        text: The original text (optional, for verification).
+        corrected_label: The user-provided correct label (POSITIVE, NEGATIVE, NEUTRAL).
+        score: User's confidence in their feedback (0.0-1.0) (optional).
+        user_id: Identifier of the user submitting feedback (optional).
+        comments: Additional comments or context (optional).
+    """
+
+    prediction_id: str = Field(
+        ...,
+        description="Unique identifier of the prediction being corrected (UUID format).",
+        min_length=36,
+        max_length=36,
+        examples=["550e8400-e29b-41d4-a716-446655440000"]
+    )
+    text: Optional[str] = Field(
+        None,
+        description="Original text for verification purposes.",
+        examples=["I love this product!"]
+    )
+    corrected_label: str = Field(
+        ...,
+        description="Correct sentiment label: POSITIVE, NEGATIVE, or NEUTRAL.",
+        pattern=r"^(POSITIVE|NEGATIVE|NEUTRAL)$",
+        examples=["POSITIVE", "NEGATIVE"]
+    )
+    score: Optional[float] = Field(
+        None,
+        description="Confidence score of the feedback (0.0-1.0).",
+        ge=0.0,
+        le=1.0,
+        examples=[1.0, 0.8]
+    )
+    user_id: Optional[str] = Field(
+        None,
+        description="ID of the user providing feedback.",
+        examples=["user_123"]
+    )
+    comments: Optional[str] = Field(
+        None,
+        description="Optional comments or context for the feedback.",
+        examples=["Sarcasm was missed by the model."]
+    )

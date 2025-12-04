@@ -57,6 +57,11 @@ class KafkaConfig(BaseSettings):
         description="Kafka topic to consume from",
         min_length=1,
     )
+    kafka_feedback_topic: str = Field(
+        default="sentiment_feedback",
+        description="Kafka topic to publish feedback events to",
+        min_length=1,
+    )
 
     # Consumer settings
     kafka_auto_offset_reset: str = Field(
@@ -189,3 +194,4 @@ class KafkaConfig(BaseSettings):
         env_prefix = "MLOPS_"
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"
