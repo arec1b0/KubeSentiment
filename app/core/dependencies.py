@@ -148,6 +148,9 @@ def get_feedback_service(settings: Settings = Depends(get_settings)):
     """
     from app.services.feedback_service import get_feedback_service as get_fs
     
+    # The getter itself just returns the singleton
+    # The singleton handles its own initialization state (e.g. _started flag)
+    # So it is safe to return even if start() failed or hasn't run yet
     return get_fs(settings)
 
 

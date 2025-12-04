@@ -47,7 +47,7 @@ def test_submit_feedback_success(client, mock_feedback_service):
     assert data["prediction_id"] == payload["prediction_id"]
     
     # Verify service was called
-    mock_feedback_service.submit_feedback.assert_called_once()
+    mock_feedback_service.submit_feedback.assert_awaited_once()
     # Verify arguments match
     call_args = mock_feedback_service.submit_feedback.call_args
     feedback_obj = call_args[0][0]

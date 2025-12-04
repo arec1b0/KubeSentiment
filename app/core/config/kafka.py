@@ -180,6 +180,18 @@ class KafkaConfig(BaseSettings):
         description="Producer compression type",
         pattern=r"^(none|gzip|snappy|lz4|zstd)$",
     )
+    kafka_producer_timeout_seconds: float = Field(
+        default=10.0,
+        description="Timeout in seconds for waiting for producer acknowledgment",
+        ge=1.0,
+        le=60.0,
+    )
+    kafka_producer_init_retries: int = Field(
+        default=10,
+        description="Number of retries for producer initialization",
+        ge=1,
+        le=50,
+    )
 
     # Advanced settings
     kafka_partition_assignment_strategy: str = Field(

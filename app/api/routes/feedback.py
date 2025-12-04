@@ -42,10 +42,13 @@ async def submit_feedback(
     Raises:
         HTTPException: If the feedback submission fails.
     """
+    # We create the logger first to ensure we have context even if subsequent steps fail
+    # Note: validation errors are handled by global exception handler before this point
+    prediction_id_str = str(payload.prediction_id)
     logger = get_contextual_logger(
         __name__,
         endpoint="feedback",
-        prediction_id=str(payload.prediction_id),
+        prediction_id=prediction_id_str,
     )
 
     logger.info("Received feedback submission")
@@ -69,5 +72,5 @@ async def submit_feedback(
     return {
         "status": "success",
         "message": "Feedback received and queued for processing",
-        "prediction_id": str(payload.prediction_id)
+        "prediction_id": prediction_id_str
     }

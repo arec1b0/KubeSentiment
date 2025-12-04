@@ -53,7 +53,7 @@ class FeedbackService:
 
     async def _init_producer_with_retry(self):
         """Initialize the Kafka producer with retry logic."""
-        max_retries = 5
+        max_retries = self.settings.kafka.kafka_producer_init_retries
         for attempt in range(max_retries):
             try:
                 # Run blocking init in thread
@@ -78,7 +78,7 @@ class FeedbackService:
                     error=str(e)
                 )
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                    await asyncio.sleep(min(2 ** attempt, 30))  # Exponential backoff with cap
         
         logger.error("Failed to initialize Feedback Kafka producer after all retries")
         self.producer = None
@@ -129,7 +129,8 @@ class FeedbackService:
                     value=feedback_data
                 )
                 # Wait for acknowledgment to ensure delivery
-                return future.get(timeout=10.0)
+                # Single attempt here; internal producer retries handle transient errors
+                return future.get(timeout=self.settings.kafka.kafka_producer_timeout_seconds)
 
             await loop.run_in_executor(None, _send_and_wait)
             
@@ -161,6 +162,8 @@ class FeedbackService:
         """Close the Kafka producer (sync wrapper for backward compatibility if needed)."""
         if self.producer:
             self.producer.close()
+            self.producer = None
+            self._started = False
 
 
 # Singleton instance
