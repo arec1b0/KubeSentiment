@@ -241,7 +241,6 @@ class SentimentAnalyzer(BaseModelMetrics):
         is_cache_hit = self._track_cache_stats(cache_info_before, cache_info_after)
         if self.settings.model.prediction_cache_enabled:
             ctx_logger.debug("Cache hit" if is_cache_hit else "Cache miss")
-        ctx_logger.debug("Cache hit" if is_cache_hit else "Cache miss")
 
         # Update metrics
         self._update_metrics(inference_time, prediction_count=1)

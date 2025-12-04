@@ -341,7 +341,7 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
             CacheInfo object (real if cache enabled, mock if disabled).
         """
         if self.settings.model.prediction_cache_enabled:
-            return self._get_cache_info()
+            return self._cached_predict.cache_info()
         else:
             # Return mock cache info with zeros
             return CacheInfo(hits=0, misses=0, maxsize=0, currsize=0)
