@@ -6,8 +6,9 @@ using Hugging Face Transformers. It implements the ModelStrategy protocol and
 provides caching, metrics tracking, and comprehensive error handling.
 """
 
-from functools import lru_cache
 import time
+from collections import namedtuple
+from functools import lru_cache
 from typing import Any, Optional
 
 import torch
@@ -17,6 +18,9 @@ from app.core.config import Settings, get_settings
 from app.core.logging import get_contextual_logger, get_logger
 from app.models.base import BaseModelMetrics
 from app.utils.exceptions import ModelInferenceError, ModelNotLoadedError, TextEmptyError
+
+# Mock cache info for when cache is disabled
+CacheInfo = namedtuple("CacheInfo", ["hits", "misses", "maxsize", "currsize"])
 
 logger = get_logger(__name__)
 
@@ -56,6 +60,9 @@ class SentimentAnalyzer(BaseModelMetrics):
 
         # Initialize the model
         self._load_model()
+
+        # Initialize cache based on settings
+        self._init_cache()
 
     def _determine_device(self) -> str:
         """Determine the best available device for inference.
@@ -134,12 +141,22 @@ class SentimentAnalyzer(BaseModelMetrics):
             ctx_logger.error("Empty text provided")
             raise TextEmptyError()
 
-    @lru_cache(maxsize=1000)
-    def _cached_predict(self, text: str) -> tuple:
-        """Internal cached prediction method.
+    def _init_cache(self) -> None:
+        """Initialize the prediction cache based on configuration.
 
-        This method is cached using LRU cache to avoid recomputing predictions
-        for identical inputs.
+        If cache is enabled, wraps _predict_internal with lru_cache.
+        If disabled, _cached_predict directly calls _predict_internal.
+        """
+        if self.settings.model.prediction_cache_enabled:
+            # Apply lru_cache decorator dynamically
+            maxsize = self.settings.model.prediction_cache_max_size
+            self._cached_predict = lru_cache(maxsize=maxsize)(self._predict_internal)
+        else:
+            # No caching - directly use the internal method
+            self._cached_predict = self._predict_internal
+
+    def _predict_internal(self, text: str) -> tuple:
+        """Internal prediction method (may be cached or not based on config).
 
         Args:
             text: The input text to analyze.
@@ -156,6 +173,18 @@ class SentimentAnalyzer(BaseModelMetrics):
         except Exception as e:
             logger.error(f"Inference failed: {e}")
             raise ModelInferenceError(f"Model inference failed: {e}") from e
+
+    def _get_cache_info(self) -> Any:
+        """Get cache info, returning a mock object if cache is disabled.
+
+        Returns:
+            CacheInfo object (real if cache enabled, mock if disabled).
+        """
+        if self.settings.model.prediction_cache_enabled:
+            return self._cached_predict.cache_info()
+        else:
+            # Return mock cache info with zeros
+            return CacheInfo(hits=0, misses=0, maxsize=0, currsize=0)
 
     def predict(self, text: str) -> dict[str, Any]:
         """Perform sentiment analysis on a single text input.
@@ -195,8 +224,8 @@ class SentimentAnalyzer(BaseModelMetrics):
         # Perform prediction with timing
         start_time = time.time()
 
-        # Check if result is cached
-        cache_info_before = self._cached_predict.cache_info()
+        # Check if result is cached (only if cache is enabled)
+        cache_info_before = self._get_cache_info()
 
         try:
             label, score = self._cached_predict(cleaned_text)
@@ -207,9 +236,11 @@ class SentimentAnalyzer(BaseModelMetrics):
         inference_time = time.time() - start_time
         inference_time_ms = inference_time * 1000
 
-        # Update cache statistics
-        cache_info_after = self._cached_predict.cache_info()
+        # Update cache statistics (only if cache is enabled)
+        cache_info_after = self._get_cache_info()
         is_cache_hit = self._track_cache_stats(cache_info_before, cache_info_after)
+        if self.settings.model.prediction_cache_enabled:
+            ctx_logger.debug("Cache hit" if is_cache_hit else "Cache miss")
         ctx_logger.debug("Cache hit" if is_cache_hit else "Cache miss")
 
         # Update metrics
@@ -257,7 +288,8 @@ class SentimentAnalyzer(BaseModelMetrics):
 
         # Clean and truncate texts
         cleaned_texts = [
-            t.strip()[: self.settings.model.max_text_length] if t and t.strip() else "" for t in texts
+            t.strip()[: self.settings.model.max_text_length] if t and t.strip() else ""
+            for t in texts
         ]
 
         # Filter out empty texts and track their indices
@@ -326,7 +358,7 @@ class SentimentAnalyzer(BaseModelMetrics):
         Returns:
             A dictionary containing model metadata.
         """
-        cache_info = self._cached_predict.cache_info()
+        cache_info = self._get_cache_info()
 
         return {
             "model_name": self.settings.model.model_name,
@@ -334,8 +366,13 @@ class SentimentAnalyzer(BaseModelMetrics):
             "device": self._device,
             "is_loaded": self._is_loaded,
             "max_text_length": self.settings.model.max_text_length,
-            "cache_size": cache_info.currsize,
-            "cache_maxsize": cache_info.maxsize,
+            "cache_enabled": self.settings.model.prediction_cache_enabled,
+            "cache_size": (
+                cache_info.currsize if self.settings.model.prediction_cache_enabled else 0
+            ),
+            "cache_maxsize": (
+                cache_info.maxsize if self.settings.model.prediction_cache_enabled else 0
+            ),
         }
 
     def clear_cache(self) -> None:
@@ -343,9 +380,13 @@ class SentimentAnalyzer(BaseModelMetrics):
 
         This method clears the LRU cache, forcing all subsequent predictions
         to be recomputed. Extends the base class method to add logging.
+        If cache is disabled, this is a no-op.
         """
-        super().clear_cache()
-        logger.info("Prediction cache cleared")
+        if self.settings.model.prediction_cache_enabled:
+            super().clear_cache()
+            logger.info("Prediction cache cleared")
+        else:
+            logger.debug("Cache clear called but cache is disabled")
 
 
 def get_sentiment_analyzer() -> SentimentAnalyzer:

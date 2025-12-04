@@ -105,8 +105,9 @@ class BaseModelMetrics:
     - Cache hit/miss statistics
     - Performance metrics calculation
 
-    Subclasses must implement a _cached_predict method decorated with
-    @lru_cache(maxsize=N) that returns a tuple of (label, score).
+    Subclasses must implement a _cached_predict method that returns a tuple of (label, score).
+    If caching is enabled, this method should be decorated with @lru_cache(maxsize=N).
+    Subclasses should also implement _get_cache_info() to return cache info safely.
 
     Attributes:
         _prediction_count: Total number of predictions made.
@@ -132,12 +133,14 @@ class BaseModelMetrics:
         Returns:
             True if cache hit occurred, False otherwise.
         """
-        if cache_info_after.hits > cache_info_before.hits:
-            self._cache_hits += 1
-            return True
-        else:
-            self._cache_misses += 1
-            return False
+        # If cache is disabled, both will have hits=0, so this will return False
+        if hasattr(cache_info_after, "hits") and hasattr(cache_info_before, "hits"):
+            if cache_info_after.hits > cache_info_before.hits:
+                self._cache_hits += 1
+                return True
+
+        self._cache_misses += 1
+        return False
 
     def _update_metrics(self, inference_time: float, prediction_count: int = 1) -> None:
         """Update prediction metrics.
@@ -160,9 +163,28 @@ class BaseModelMetrics:
                 - cache_hits: Number of cache hits
                 - cache_misses: Number of cache misses
                 - cache_hit_rate: Ratio of cache hits to total cache requests
-                - cache_info: Detailed LRU cache information
+                - cache_info: Detailed LRU cache information (if cache enabled)
+                - cache_enabled: Whether cache is enabled
         """
-        cache_info = self._cached_predict.cache_info()
+        # Try to get cache info, handling both cached and non-cached methods
+        cache_info = None
+        cache_enabled = False
+        if hasattr(self, "_get_cache_info"):
+            cache_info = self._get_cache_info()
+            # Check if cache is enabled by checking if settings exist and cache is enabled
+            if hasattr(self, "settings") and hasattr(self.settings, "model"):
+                cache_enabled = getattr(self.settings.model, "prediction_cache_enabled", True)
+        elif hasattr(self._cached_predict, "cache_info"):
+            cache_info = self._cached_predict.cache_info()
+            cache_enabled = True
+        else:
+            # No cache - create mock cache info
+            from collections import namedtuple
+
+            CacheInfo = namedtuple("CacheInfo", ["hits", "misses", "maxsize", "currsize"])
+            cache_info = CacheInfo(hits=0, misses=0, maxsize=0, currsize=0)
+            cache_enabled = False
+
         total_cache_requests = self._cache_hits + self._cache_misses
         cache_hit_rate = (
             self._cache_hits / total_cache_requests if total_cache_requests > 0 else 0.0
@@ -181,18 +203,25 @@ class BaseModelMetrics:
             "cache_hits": self._cache_hits,
             "cache_misses": self._cache_misses,
             "cache_hit_rate": cache_hit_rate,
-            "cache_info": {
-                "hits": cache_info.hits,
-                "misses": cache_info.misses,
-                "maxsize": cache_info.maxsize,
-                "currsize": cache_info.currsize,
-            },
+            "cache_enabled": cache_enabled,
+            "cache_info": (
+                {
+                    "hits": cache_info.hits,
+                    "misses": cache_info.misses,
+                    "maxsize": cache_info.maxsize,
+                    "currsize": cache_info.currsize,
+                }
+                if cache_info
+                else None
+            ),
         }
 
     def clear_cache(self) -> None:
         """Clear the prediction cache.
 
         This method clears the LRU cache, forcing all subsequent predictions
-        to be recomputed.
+        to be recomputed. If cache is disabled, this is a no-op.
         """
-        self._cached_predict.cache_clear()
+        # Only clear cache if it has the cache_clear method (i.e., it's cached)
+        if hasattr(self._cached_predict, "cache_clear"):
+            self._cached_predict.cache_clear()

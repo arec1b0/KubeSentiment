@@ -7,7 +7,7 @@ reducing the need for extensive environment variable configuration.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 
 class ConfigProfile(ABC):
@@ -102,6 +102,7 @@ class DevelopmentProfile(ConfigProfile):
             "MLOPS_CORS_ORIGINS": "*",
             # Model configuration (smaller cache for dev)
             "MLOPS_PREDICTION_CACHE_MAX_SIZE": "100",
+            "MLOPS_PREDICTION_CACHE_ENABLED": "true",  # Enabled for testing
             "MLOPS_MAX_TEXT_LENGTH": "512",
         }
 
@@ -158,6 +159,7 @@ class StagingProfile(ConfigProfile):
             "MLOPS_MAX_REQUEST_TIMEOUT": "60",
             # Model configuration (moderate caching)
             "MLOPS_PREDICTION_CACHE_MAX_SIZE": "1000",
+            "MLOPS_PREDICTION_CACHE_ENABLED": "true",  # Enabled by default, disable if hit rate <5%
             "MLOPS_MAX_TEXT_LENGTH": "512",
             # Redis configuration
             "MLOPS_REDIS_MAX_CONNECTIONS": "50",
@@ -219,6 +221,7 @@ class ProductionProfile(ConfigProfile):
             "MLOPS_MAX_REQUEST_TIMEOUT": "30",
             # Model configuration (large cache for performance)
             "MLOPS_PREDICTION_CACHE_MAX_SIZE": "10000",
+            "MLOPS_PREDICTION_CACHE_ENABLED": "true",  # Disable if hit rate <5% in production
             "MLOPS_MAX_TEXT_LENGTH": "512",
             "MLOPS_ENABLE_FEATURE_ENGINEERING": "true",
             # Redis configuration (production-optimized)

@@ -7,9 +7,10 @@ provides similar functionality to the PyTorch implementation but with improved
 performance characteristics.
 """
 
+import time
+from collections import namedtuple
 from functools import lru_cache
 from pathlib import Path
-import time
 from typing import Any
 
 import numpy as np
@@ -20,6 +21,9 @@ from app.core.config import Settings, get_settings
 from app.core.logging import get_contextual_logger, get_logger
 from app.models.base import BaseModelMetrics
 from app.utils.exceptions import ModelInferenceError, ModelNotLoadedError, TextEmptyError
+
+# Mock cache info for when cache is disabled
+CacheInfo = namedtuple("CacheInfo", ["hits", "misses", "maxsize", "currsize"])
 
 logger = get_logger(__name__)
 
@@ -71,6 +75,9 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
 
         # Initialize the model
         self._load_model()
+
+        # Initialize cache based on settings
+        self._init_cache()
 
     def _determine_providers(self) -> list[str]:
         """Determine the best available execution providers for ONNX Runtime.
@@ -265,12 +272,22 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
         exp_logits = np.exp(logits - np.max(logits, axis=-1, keepdims=True))
         return exp_logits / np.sum(exp_logits, axis=-1, keepdims=True)
 
-    @lru_cache(maxsize=1000)
-    def _cached_predict(self, text: str) -> tuple:
-        """Internal cached prediction method.
+    def _init_cache(self) -> None:
+        """Initialize the prediction cache based on configuration.
 
-        This method is cached using LRU cache to avoid recomputing predictions
-        for identical inputs.
+        If cache is enabled, wraps _predict_internal with lru_cache.
+        If disabled, _cached_predict directly calls _predict_internal.
+        """
+        if self.settings.model.prediction_cache_enabled:
+            # Apply lru_cache decorator dynamically
+            maxsize = self.settings.model.prediction_cache_max_size
+            self._cached_predict = lru_cache(maxsize=maxsize)(self._predict_internal)
+        else:
+            # No caching - directly use the internal method
+            self._cached_predict = self._predict_internal
+
+    def _predict_internal(self, text: str) -> tuple:
+        """Internal prediction method (may be cached or not based on config).
 
         Args:
             text: The input text to analyze.
@@ -317,6 +334,18 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
             logger.error(f"ONNX inference failed: {e}")
             raise ModelInferenceError(f"ONNX model inference failed: {e}") from e
 
+    def _get_cache_info(self) -> Any:
+        """Get cache info, returning a mock object if cache is disabled.
+
+        Returns:
+            CacheInfo object (real if cache enabled, mock if disabled).
+        """
+        if self.settings.model.prediction_cache_enabled:
+            return self._get_cache_info()
+        else:
+            # Return mock cache info with zeros
+            return CacheInfo(hits=0, misses=0, maxsize=0, currsize=0)
+
     def predict(self, text: str) -> dict[str, Any]:
         """Perform sentiment analysis on a single text input.
 
@@ -355,8 +384,8 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
         # Perform prediction with timing
         start_time = time.time()
 
-        # Check if result is cached
-        cache_info_before = self._cached_predict.cache_info()
+        # Check if result is cached (only if cache is enabled)
+        cache_info_before = self._get_cache_info()
 
         try:
             label, score = self._cached_predict(cleaned_text)
@@ -367,10 +396,11 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
         inference_time = time.time() - start_time
         inference_time_ms = inference_time * 1000
 
-        # Update cache statistics
-        cache_info_after = self._cached_predict.cache_info()
+        # Update cache statistics (only if cache is enabled)
+        cache_info_after = self._get_cache_info()
         is_cache_hit = self._track_cache_stats(cache_info_before, cache_info_after)
-        ctx_logger.debug("Cache hit" if is_cache_hit else "Cache miss")
+        if self.settings.model.prediction_cache_enabled:
+            ctx_logger.debug("Cache hit" if is_cache_hit else "Cache miss")
 
         # Update metrics
         self._update_metrics(inference_time, prediction_count=1)
@@ -513,7 +543,7 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
         Returns:
             A dictionary containing model metadata including quantization status.
         """
-        cache_info = self._cached_predict.cache_info()
+        cache_info = self._get_cache_info()
 
         # Determine model optimization level from loaded file
         model_file_name = self._loaded_model_file.name if self._loaded_model_file else None
@@ -532,8 +562,13 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
             "is_quantized": is_quantized,
             "is_optimized": is_optimized,
             "max_text_length": self.settings.model.max_text_length,
-            "cache_size": cache_info.currsize,
-            "cache_maxsize": cache_info.maxsize,
+            "cache_enabled": self.settings.model.prediction_cache_enabled,
+            "cache_size": (
+                cache_info.currsize if self.settings.model.prediction_cache_enabled else 0
+            ),
+            "cache_maxsize": (
+                cache_info.maxsize if self.settings.model.prediction_cache_enabled else 0
+            ),
             # ONNX Runtime thread settings
             "onnx_intra_op_threads": self.settings.model.onnx_intra_op_num_threads,
             "onnx_inter_op_threads": self.settings.model.onnx_inter_op_num_threads,
@@ -547,9 +582,13 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
 
         This method clears the LRU cache, forcing all subsequent predictions
         to be recomputed. Extends the base class method to add logging.
+        If cache is disabled, this is a no-op.
         """
-        super().clear_cache()
-        logger.info("ONNX prediction cache cleared")
+        if self.settings.model.prediction_cache_enabled:
+            super().clear_cache()
+            logger.info("ONNX prediction cache cleared")
+        else:
+            logger.debug("Cache clear called but cache is disabled")
 
 
 def get_onnx_sentiment_analyzer(model_path: str) -> ONNXSentimentAnalyzer:

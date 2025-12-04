@@ -46,6 +46,7 @@ Machine learning model settings.
 | `MLOPS_ONNX_MODEL_PATH_DEFAULT` | str | "./models/onnx" | - | Default ONNX path fallback |
 | `MLOPS_MAX_TEXT_LENGTH` | int | 512 | 1-10000 | Maximum input text length (characters) |
 | `MLOPS_PREDICTION_CACHE_MAX_SIZE` | int | 1000 | 10-100000 | LRU cache size for predictions |
+| `MLOPS_PREDICTION_CACHE_ENABLED` | bool | true | - | Enable LRU cache for predictions (disable if hit rate <5%) |
 | `MLOPS_ENABLE_FEATURE_ENGINEERING` | bool | false | - | Enable advanced feature engineering |
 | `MLOPS_MODEL_BACKEND` | str | "onnx" | onnx/pytorch/mock | Model inference backend |
 
@@ -59,6 +60,7 @@ Machine learning model settings.
 export MLOPS_MODEL_NAME=distilbert-base-uncased-finetuned-sst-2-english
 export MLOPS_MAX_TEXT_LENGTH=512
 export MLOPS_PREDICTION_CACHE_MAX_SIZE=1000
+export MLOPS_PREDICTION_CACHE_ENABLED=true  # Set to false if cache hit rate <5%
 export MLOPS_MODEL_BACKEND=onnx
 ```
 

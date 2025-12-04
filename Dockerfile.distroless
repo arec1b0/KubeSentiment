@@ -108,7 +108,8 @@ EXPOSE 8000
 
 # Run the application
 # Note: Must use exec form (JSON array) as there's no shell in distroless
-ENTRYPOINT ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Note: distroless images only provide python3, not python
+ENTRYPOINT ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
 
 # ==================== Stage 3: Runtime (Debug) ====================
 # Debug distroless image (use with --target runtime-debug)
@@ -156,11 +157,13 @@ COPY --from=builder --chown=65532:65532 /build/tmp ./tmp
 EXPOSE 8000
 
 # Debug variant includes shell, so HEALTHCHECK can use shell commands
+# Note: distroless images only provide python3, not python
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python healthcheck.py || exit 1
+    CMD python3 healthcheck.py || exit 1
 
 # Distroless debug runs as nonroot (UID 65532) by default
 # No USER directive needed
 
 # Run the application
-ENTRYPOINT ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Note: distroless images only provide python3, not python
+ENTRYPOINT ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

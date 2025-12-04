@@ -84,6 +84,7 @@ build: ## Build Docker image
 build-distroless: ## Build distroless Docker image
 	@echo "🔒 Building distroless Docker image..."
 	docker build -f Dockerfile.distroless \
+		--target runtime \
 		--build-arg VERSION=$$(git describe --tags --always 2>/dev/null || echo "latest") \
 		--build-arg REVISION=$$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
 		--build-arg BUILDTIME=$$(date -u +"%Y-%m-%dT%H:%M:%SZ") \

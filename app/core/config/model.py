@@ -67,6 +67,10 @@ class ModelConfig(BaseSettings):
         ge=10,
         le=100000,
     )
+    prediction_cache_enabled: bool = Field(
+        default=True,
+        description="Enable LRU cache for predictions (disable if hit rate <5%)",
+    )
     enable_feature_engineering: bool = Field(
         default=False,
         description="Enable advanced feature engineering",
