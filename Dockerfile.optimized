@@ -1,3 +1,11 @@
+# Production (Standard) Dockerfile
+# Optimized for performance with pre-compiled assets and baked-in models.
+#
+# Usage:
+#   docker build -f Dockerfile.optimized -t sentiment:prod .
+#
+# See docs/docker/DOCKERFILE_GUIDE.md for details.
+
 # Optimized Multi-stage Dockerfile with Baked-in Models
 # Achieves 160x cold-start improvement (8s → 50ms) by pre-caching models in image layers
 

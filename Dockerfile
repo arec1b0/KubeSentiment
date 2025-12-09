@@ -1,3 +1,11 @@
+# Development Dockerfile
+# Optimized for local development with build tools and shell access.
+#
+# Usage:
+#   docker build -f Dockerfile -t sentiment:dev .
+#
+# See docs/docker/DOCKERFILE_GUIDE.md for details.
+
 # Multi-stage build for production-ready ML service
 FROM python:3.11-slim as base
 

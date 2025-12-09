@@ -14,8 +14,8 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./config/prometheus-rules.yaml:/etc/prometheus/rules.yaml:ro
+      - ./config/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/monitoring/prometheus-rules.yaml:/etc/prometheus/rules.yaml:ro
       - prometheus_data:/prometheus
     networks:
       - observability
@@ -34,10 +34,10 @@ services:
       - GF_SERVER_ROOT_URL=http://localhost:3000
       - GF_INSTALL_PLUGINS=grafana-piechart-panel
     volumes:
-      - ./config/grafana-datasources-complete.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
-      - ./config/grafana-advanced-dashboard.json:/etc/grafana/provisioning/dashboards/advanced.json:ro
-      - ./config/grafana-business-metrics-dashboard.json:/etc/grafana/provisioning/dashboards/business.json:ro
-      - ./config/grafana-vault-dashboard.json:/etc/grafana/provisioning/dashboards/vault.json:ro
+      - ./config/monitoring/grafana-datasources-complete.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ./config/monitoring/grafana-advanced-dashboard.json:/etc/grafana/provisioning/dashboards/advanced.json:ro
+      - ./config/monitoring/grafana-business-metrics-dashboard.json:/etc/grafana/provisioning/dashboards/business.json:ro
+      - ./config/monitoring/grafana-vault-dashboard.json:/etc/grafana/provisioning/dashboards/vault.json:ro
       - grafana_data:/var/lib/grafana
     networks:
       - observability
@@ -55,7 +55,7 @@ services:
     ports:
       - "9093:9093"
     volumes:
-      - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./config/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager_data:/alertmanager
     networks:
       - observability
@@ -114,8 +114,8 @@ services:
       - "5000:5000/udp"  # UDP input
       - "9600:9600"      # Monitoring API
     volumes:
-      - ./config/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
-      - ./config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./config/monitoring/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - ./config/monitoring/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
     environment:
       - "LS_JAVA_OPTS=-Xms256m -Xmx256m"
     networks:
@@ -152,7 +152,7 @@ services:
       - "3100:3100"
     command: -config.file=/etc/loki/loki-config.yaml
     volumes:
-      - ./config/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - ./config/monitoring/loki-config.yaml:/etc/loki/loki-config.yaml:ro
       - loki_data:/loki
     networks:
       - observability
@@ -163,7 +163,7 @@ services:
     image: grafana/promtail:latest
     container_name: promtail
     volumes:
-      - ./config/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - ./config/monitoring/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
       - /var/log:/var/log:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
     command: -config.file=/etc/promtail/promtail-config.yaml

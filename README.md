@@ -120,7 +120,14 @@ This is the quickest way to get the service running on your local machine.
     make install-dev
     ```
 
-3.  **Start the service:**
+3.  **Build the service:**
+    The project includes multiple Dockerfiles for different use cases (see [Dockerfile Guide](docs/docker/DOCKERFILE_GUIDE.md)).
+    ```bash
+    # Standard development build
+    make build-dev
+    ```
+
+4.  **Start the service:**
     ```bash
     docker-compose up --build
     ```

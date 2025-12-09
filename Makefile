@@ -78,10 +78,19 @@ clean: ## Clean up cache files and build artifacts
 	find . -type f -name "*.pyo" -delete
 	find . -type f -name ".coverage" -delete
 
-build: ## Build Docker image
+build: ## Build Docker image (Default: Development)
 	docker build -t sentiment-service:latest .
 
-build-distroless: ## Build distroless Docker image
+build-dev: ## Build development Docker image
+	docker build -f Dockerfile -t sentiment:dev .
+
+build-prod: ## Build optimized production Docker image
+	docker build -f Dockerfile.optimized -t sentiment:prod .
+
+build-secure: ## Build distroless secure Docker image
+	docker build -f Dockerfile.distroless -t sentiment:secure .
+
+build-distroless: ## Build distroless Docker image (Legacy target)
 	@echo "🔒 Building distroless Docker image..."
 	docker build -f Dockerfile.distroless \
 		--target runtime \

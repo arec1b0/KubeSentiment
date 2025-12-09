@@ -64,7 +64,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -83,8 +83,8 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana-dashboards:/var/lib/grafana/dashboards
-      - ./monitoring/grafana-provisioning:/etc/grafana/provisioning
+      - ./config/monitoring:/var/lib/grafana/dashboards
+      - ./config/monitoring:/etc/grafana/provisioning
 
   # KubeSentiment API with Kafka consumer
   kubesentiment-kafka:
@@ -109,7 +109,7 @@ services:
       - ENABLE_METRICS=true
       - LOG_LEVEL=INFO
     volumes:
-      - ./configs/kafka.yaml:/app/configs/kafka.yaml
+      - ./config/infrastructure/kafka.yaml:/app/configs/kafka.yaml
       - model_cache:/app/model_cache
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -135,7 +135,7 @@ services:
       - TARGET_TPS=5000
     volumes:
       - ./benchmarking:/app/benchmarking
-      - ./configs:/app/configs
+      - ./config/infrastructure:/app/configs
     command: >
       bash -c "sleep 30 &&
                python benchmarking/kafka_performance_test.py

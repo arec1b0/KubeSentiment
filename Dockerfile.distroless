@@ -1,3 +1,11 @@
+# Production (Secure) Dockerfile
+# Minimal attack surface using Google's distroless base image.
+#
+# Usage:
+#   docker build -f Dockerfile.distroless -t sentiment:secure .
+#
+# See docs/docker/DOCKERFILE_GUIDE.md for details.
+
 # Distroless Multi-stage Dockerfile for Enhanced Security
 # Uses Google's distroless Python image to minimize attack surface
 #
