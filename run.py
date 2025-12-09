@@ -53,7 +53,7 @@ if __name__ == "__main__":
     try:
         import uvicorn
 
-        from app.config import get_settings
+        from app.core.config import get_settings
 
         settings = get_settings()
 
@@ -76,5 +76,4 @@ if __name__ == "__main__":
         sys.exit(1)
     except Exception as e:
         print(f"❌ Error starting server: {e}")
-        sys.exit(1)
         sys.exit(1)

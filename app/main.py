@@ -27,7 +27,6 @@ from app.core.config import get_settings
 from app.core.events import lifespan
 from app.core.logging import get_logger, setup_structured_logging
 from app.core.tracing import setup_tracing, instrument_fastapi_app
-from app.monitoring.routes import router as monitoring_router
 from app.utils.exceptions import ServiceError
 
 # Setup structured logging
@@ -220,19 +219,14 @@ def create_app() -> FastAPI:
 
     # Include API router
     app.include_router(router, prefix="/api/v1" if not settings.server.debug else "")
+
+    # Include monitoring routes (Unified)
+    from app.api.routes.monitoring_routes import router as monitoring_router
+    
     app.include_router(
         monitoring_router,
         prefix="/api/v1" if not settings.server.debug else "",
         tags=["Monitoring"],
-    )
-
-    # Include advanced monitoring routes (drift detection, MLflow, explainability, KPIs)
-    from app.api.routes.monitoring_routes import router as advanced_monitoring_router
-
-    app.include_router(
-        advanced_monitoring_router,
-        prefix="/api/v1" if not settings.server.debug else "",
-        tags=["Advanced Monitoring"],
     )
 
     # Include feedback routes

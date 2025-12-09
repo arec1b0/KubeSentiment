@@ -2,27 +2,61 @@
 API routes for monitoring, drift detection, and advanced metrics.
 
 This module provides endpoints for:
-- Drift detection summaries and reports
-- Advanced KPIs (business, quality, cost, performance)
-- Model registry information
-- Explainability and interpretability
+- System health and readiness checks (Standard)
+- Prometheus and JSON metrics (Standard)
+- Drift detection summaries and reports (Advanced)
+- Advanced KPIs (business, quality, cost, performance) (Advanced)
+- Model registry information (Advanced)
+- Explainability and interpretability (Advanced)
 """
 
 import logging
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends, Request, Response
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import require_initialized
+from app.api.schemas.responses import (
+    AsyncBatchMetricsResponse,
+    DetailedHealthResponse,
+    HealthResponse,
+    KafkaMetricsResponse,
+    MetricsResponse,
+)
+from app.core.config import Settings, get_settings
+from app.core.dependencies import require_initialized, get_model_service
+from app.core.secrets import get_secret_manager
+from app.services.monitoring_service import MonitoringService
+from app.services.async_batch_service import AsyncBatchService
 from app.services.drift_detection import get_drift_detector
 from app.services.mlflow_registry import get_model_registry
 from app.services.explainability import get_explainability_engine
 from app.monitoring.advanced_metrics import get_advanced_metrics_collector
 from app.utils.error_codes import ErrorCode, raise_validation_error
+from app.utils.error_handlers import handle_prometheus_metrics_error
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/monitoring", tags=["monitoring"])
+# Use empty prefix so we can mount standard routes at root (e.g. /health)
+# and advanced routes under /monitoring
+router = APIRouter(tags=["monitoring"])
+
+
+def get_monitoring_service(settings: Settings = Depends(get_settings)) -> MonitoringService:
+    return MonitoringService(settings)
+
+
+async def get_async_batch_service_dependency(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> AsyncBatchService:
+    if not settings.performance.async_batch_enabled:
+        raise HTTPException(status_code=404, detail="Async batch processing is disabled")
+    if (
+        not hasattr(request.app.state, "async_batch_service")
+        or not request.app.state.async_batch_service
+    ):
+        raise HTTPException(status_code=503, detail="Async batch service not initialized")
+    return request.app.state.async_batch_service
 
 
 # Request/Response Models
@@ -36,18 +70,131 @@ class ExplainRequest(BaseModel):
     use_gradients: bool = Field(default=False, description="Use gradient-based methods")
 
 
-# Drift Detection Endpoints
-@router.get("/drift", summary="Get drift detection summary")
-async def get_drift_summary() -> Dict[str, Any]:
-    """
-    Get drift detection summary and statistics.
+# --- Standard Monitoring Endpoints ---
 
-    Returns drift metrics including:
-    - Baseline status
-    - Current window size
-    - Recent drift detections
-    - Drift scores and thresholds
-    """
+@router.get(
+    "/health/details",
+    response_model=DetailedHealthResponse,
+    summary="Detailed service health check",
+    description="Provides a detailed health status of the service and its dependencies.",
+)
+async def detailed_health_check(
+    request: Request,
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+    model=Depends(get_model_service),
+    secret_manager=Depends(get_secret_manager),
+) -> DetailedHealthResponse:
+    """Performs a detailed health check of all major components."""
+    return await monitoring_service.get_detailed_health(request, model, secret_manager)
+
+
+@router.get(
+    "/health",
+    response_model=HealthResponse,
+    summary="Service health check",
+    description="Provides a high-level health status of the service, suitable for liveness probes.",
+)
+async def health_check(
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+    model=Depends(get_model_service),
+    secret_manager=Depends(get_secret_manager),
+) -> HealthResponse:
+    """Performs a high-level health check of the service."""
+    return await monitoring_service.get_simple_health(model, secret_manager)
+
+
+@router.get(
+    "/ready",
+    summary="Readiness check",
+    description="Checks if the service is ready to accept traffic, suitable for readiness probes.",
+)
+async def readiness_check(
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+    model=Depends(get_model_service),
+):
+    """Checks if the service is fully initialized and ready to accept traffic."""
+    is_ready = await monitoring_service.get_readiness(model)
+    if not is_ready:
+        from app.utils.exceptions import ServiceUnavailableError
+        raise ServiceUnavailableError("Model not ready for inference.")
+    return {"status": "ready"}
+
+
+@router.get(
+    "/metrics",
+    summary="Prometheus metrics",
+    description="Exposes performance and health metrics in Prometheus format.",
+)
+async def get_prometheus_metrics(
+    settings: Settings = Depends(get_settings),
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+):
+    """Exposes application and model metrics in Prometheus format."""
+    if not settings.monitoring.enable_metrics:
+        raise HTTPException(status_code=404, detail="Metrics endpoint is disabled")
+    try:
+        metrics = monitoring_service.get_prometheus_metrics()
+        return Response(
+            content=metrics.get_metrics(), media_type=metrics.get_metrics_content_type()
+        )
+    except Exception as e:
+        handle_prometheus_metrics_error(e)
+
+
+@router.get(
+    "/metrics-json",
+    response_model=MetricsResponse,
+    summary="Service metrics (JSON)",
+    description="Provides performance metrics in JSON format (legacy endpoint).",
+)
+async def get_metrics_json(model=Depends(get_model_service)):
+    """Provides service and model performance metrics in JSON format."""
+    try:
+        return MetricsResponse(**model.get_performance_metrics())
+    except Exception as e:
+        logger.error(f"Error retrieving JSON metrics: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve metrics")
+
+
+@router.get(
+    "/kafka-metrics",
+    response_model=KafkaMetricsResponse,
+    summary="Kafka consumer metrics",
+    description="Provides detailed metrics about the Kafka consumer's performance.",
+)
+async def get_kafka_metrics(request: Request, settings: Settings = Depends(get_settings)):
+    """Retrieves detailed metrics about the Kafka consumer's performance."""
+    if not settings.kafka.kafka_enabled:
+        raise HTTPException(status_code=404, detail="Kafka consumer is disabled")
+    consumer = getattr(request.app.state, "kafka_consumer", None)
+    if not consumer:
+        raise HTTPException(status_code=503, detail="Kafka consumer not initialized")
+    return KafkaMetricsResponse(**consumer.get_metrics())
+
+
+@router.get(
+    "/async-batch-metrics",
+    response_model=AsyncBatchMetricsResponse,
+    summary="Async batch processing metrics",
+    description="Provides comprehensive metrics for the async batch processing service.",
+)
+async def get_async_batch_metrics(
+    async_batch_service: AsyncBatchService = Depends(get_async_batch_service_dependency),
+):
+    """Retrieves performance metrics for the asynchronous batch processing service."""
+    try:
+        return await async_batch_service.get_batch_metrics()
+    except Exception as e:
+        logger.error(f"Error retrieving async batch metrics: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve metrics")
+
+
+# --- Advanced Monitoring Endpoints (Prefixed with /monitoring) ---
+
+# Drift Detection Endpoints
+@router.get("/monitoring/drift", summary="Get drift detection summary")
+async def get_drift_summary() -> Dict[str, Any]:
+    """Get drift detection summary and statistics."""
     detector = get_drift_detector()
 
     if detector is None or not detector.enabled:
@@ -56,13 +203,9 @@ async def get_drift_summary() -> Dict[str, Any]:
     return detector.get_drift_summary()
 
 
-@router.get("/drift/check", summary="Check for current drift")
+@router.get("/monitoring/drift/check", summary="Check for current drift")
 async def check_drift() -> Dict[str, Any]:
-    """
-    Check for drift in current window vs baseline.
-
-    Performs statistical tests and returns drift metrics.
-    """
+    """Check for drift in current window vs baseline."""
     detector = get_drift_detector()
     detector = require_initialized(
         detector,
@@ -90,13 +233,9 @@ async def check_drift() -> Dict[str, Any]:
     }
 
 
-@router.post("/drift/reset", summary="Reset drift detection window")
+@router.post("/monitoring/drift/reset", summary="Reset drift detection window")
 async def reset_drift_window() -> Dict[str, str]:
-    """
-    Reset the current drift detection window.
-
-    Useful after deploying a new model or when baseline needs updating.
-    """
+    """Reset the current drift detection window."""
     detector = get_drift_detector()
     detector = require_initialized(
         detector,
@@ -109,13 +248,9 @@ async def reset_drift_window() -> Dict[str, str]:
     return {"message": "Drift detection window reset successfully"}
 
 
-@router.post("/drift/update-baseline", summary="Update drift baseline")
+@router.post("/monitoring/drift/update-baseline", summary="Update drift baseline")
 async def update_drift_baseline() -> Dict[str, str]:
-    """
-    Update drift baseline with current window data.
-
-    Moves current data to baseline and resets current window.
-    """
+    """Update drift baseline with current window data."""
     detector = get_drift_detector()
     detector = require_initialized(
         detector,
@@ -128,13 +263,9 @@ async def update_drift_baseline() -> Dict[str, str]:
     return {"message": "Drift baseline updated successfully"}
 
 
-@router.get("/drift/report", summary="Export drift report", response_class=None)
+@router.get("/monitoring/drift/report", summary="Export drift report", response_class=None)
 async def export_drift_report():
-    """
-    Export detailed drift report in HTML format.
-
-    Uses Evidently library to generate comprehensive drift analysis.
-    """
+    """Export detailed drift report in HTML format."""
     detector = get_drift_detector()
     detector = require_initialized(
         detector,
@@ -158,18 +289,9 @@ async def export_drift_report():
 
 
 # Advanced KPI Endpoints
-@router.get("/kpis/business", summary="Get business KPIs")
+@router.get("/monitoring/kpis/business", summary="Get business KPIs")
 async def get_business_kpis() -> Dict[str, Any]:
-    """
-    Get business-focused KPIs.
-
-    Returns:
-    - Total predictions
-    - Positive/negative ratios
-    - Average confidence
-    - High quality prediction ratio
-    - Predictions by label and confidence bucket
-    """
+    """Get business-focused KPIs."""
     collector = get_advanced_metrics_collector()
     collector = require_initialized(
         collector,
@@ -181,16 +303,9 @@ async def get_business_kpis() -> Dict[str, Any]:
     return collector.get_business_kpis()
 
 
-@router.get("/kpis/quality", summary="Get quality metrics")
+@router.get("/monitoring/kpis/quality", summary="Get quality metrics")
 async def get_quality_metrics() -> Dict[str, Any]:
-    """
-    Get model quality metrics.
-
-    Returns:
-    - Low confidence rate
-    - Confidence distribution statistics
-    - Confidence percentiles (P50, P95, P99)
-    """
+    """Get model quality metrics."""
     collector = get_advanced_metrics_collector()
     collector = require_initialized(
         collector,
@@ -202,18 +317,9 @@ async def get_quality_metrics() -> Dict[str, Any]:
     return collector.get_quality_metrics()
 
 
-@router.get("/kpis/cost", summary="Get cost metrics")
+@router.get("/monitoring/kpis/cost", summary="Get cost metrics")
 async def get_cost_metrics() -> Dict[str, Any]:
-    """
-    Get cost and efficiency metrics.
-
-    Returns:
-    - Total cost in USD
-    - Cost per prediction
-    - Monthly cost estimate
-    - Cache savings percentage
-    - Cost breakdown by day
-    """
+    """Get cost and efficiency metrics."""
     collector = get_advanced_metrics_collector()
     collector = require_initialized(
         collector,
@@ -225,16 +331,9 @@ async def get_cost_metrics() -> Dict[str, Any]:
     return collector.get_cost_metrics()
 
 
-@router.get("/kpis/performance", summary="Get performance metrics")
+@router.get("/monitoring/kpis/performance", summary="Get performance metrics")
 async def get_performance_metrics() -> Dict[str, Any]:
-    """
-    Get detailed performance metrics.
-
-    Returns:
-    - Latency statistics (avg, P50, P95, P99)
-    - Latency by backend
-    - Current throughput (requests per second)
-    """
+    """Get detailed performance metrics."""
     collector = get_advanced_metrics_collector()
     collector = require_initialized(
         collector,
@@ -246,23 +345,13 @@ async def get_performance_metrics() -> Dict[str, Any]:
     return collector.get_performance_metrics()
 
 
-@router.get("/kpis/slo", summary="Check SLO compliance")
+@router.get("/monitoring/kpis/slo", summary="Check SLO compliance")
 async def check_slo_compliance(
     availability_target: float = Query(default=99.9, ge=0, le=100),
     latency_p95_target_ms: float = Query(default=100, ge=0),
     latency_p99_target_ms: float = Query(default=250, ge=0),
 ) -> Dict[str, Any]:
-    """
-    Check SLO (Service Level Objective) compliance.
-
-    Args:
-        availability_target: Target availability percentage (default: 99.9)
-        latency_p95_target_ms: Target P95 latency in ms (default: 100)
-        latency_p99_target_ms: Target P99 latency in ms (default: 250)
-
-    Returns:
-        SLO compliance status for availability and latency targets
-    """
+    """Check SLO (Service Level Objective) compliance."""
     collector = get_advanced_metrics_collector()
     collector = require_initialized(
         collector,
@@ -279,21 +368,12 @@ async def check_slo_compliance(
 
 
 # Model Registry Endpoints
-@router.get("/models", summary="List registered models")
+@router.get("/monitoring/models", summary="List registered models")
 async def list_models(
     filter_string: Optional[str] = Query(default=None, description="Filter expression"),
     max_results: int = Query(default=10, ge=1, le=100),
 ) -> Dict[str, Any]:
-    """
-    List registered models in MLflow registry.
-
-    Args:
-        filter_string: Optional filter (e.g., "name LIKE 'sentiment%'")
-        max_results: Maximum number of results (1-100)
-
-    Returns:
-        List of registered models with metadata
-    """
+    """List registered models in MLflow registry."""
     registry = get_model_registry()
 
     if registry is None or not registry.enabled:
@@ -304,17 +384,9 @@ async def list_models(
     return {"enabled": True, "count": len(models), "models": models}
 
 
-@router.get("/models/{model_name}/production", summary="Get production model")
+@router.get("/monitoring/models/{model_name}/production", summary="Get production model")
 async def get_production_model(model_name: str) -> Dict[str, Any]:
-    """
-    Get the production version of a model.
-
-    Args:
-        model_name: Name of the model
-
-    Returns:
-        Production model version information
-    """
+    """Get the production version of a model."""
     registry = get_model_registry()
     registry = require_initialized(
         registry,
@@ -336,17 +408,9 @@ async def get_production_model(model_name: str) -> Dict[str, Any]:
     return model_info
 
 
-@router.get("/models/{model_name}/versions", summary="Get all model versions")
+@router.get("/monitoring/models/{model_name}/versions", summary="Get all model versions")
 async def get_all_production_models(model_name: str) -> Dict[str, Any]:
-    """
-    Get all production versions of a model (for A/B testing).
-
-    Args:
-        model_name: Name of the model
-
-    Returns:
-        List of production model versions
-    """
+    """Get all production versions of a model (for A/B testing)."""
     registry = get_model_registry()
     registry = require_initialized(
         registry,
@@ -361,23 +425,9 @@ async def get_all_production_models(model_name: str) -> Dict[str, Any]:
 
 
 # Explainability Endpoints
-@router.post("/explain", summary="Explain prediction")
+@router.post("/monitoring/explain", summary="Explain prediction")
 async def explain_prediction(request: ExplainRequest) -> Dict[str, Any]:
-    """
-    Generate explanation for a prediction.
-
-    Provides interpretability insights including:
-    - Attention weights (if available)
-    - Word-level importance scores
-    - Confidence interpretation
-    - Text features
-
-    Args:
-        request: Explanation request with text, prediction, and confidence
-
-    Returns:
-        Comprehensive explanation with various interpretation methods
-    """
+    """Generate explanation for a prediction."""
     explainer = get_explainability_engine()
 
     if explainer is None or not explainer.enabled:
@@ -400,17 +450,9 @@ async def explain_prediction(request: ExplainRequest) -> Dict[str, Any]:
     return explanation
 
 
-@router.post("/explain/html", summary="Get HTML explanation", response_class=None)
+@router.post("/monitoring/explain/html", summary="Get HTML explanation", response_class=None)
 async def get_html_explanation(request: ExplainRequest):
-    """
-    Generate HTML visualization of prediction explanation.
-
-    Args:
-        request: Explanation request
-
-    Returns:
-        HTML page with visualization
-    """
+    """Generate HTML visualization of prediction explanation."""
     explainer = get_explainability_engine()
     explainer = require_initialized(
         explainer,
@@ -434,14 +476,9 @@ async def get_html_explanation(request: ExplainRequest):
     return HTMLResponse(content=html)
 
 
-@router.get("/health", summary="Monitoring health check")
-async def monitoring_health() -> Dict[str, Any]:
-    """
-    Check health of all monitoring components.
-
-    Returns:
-        Status of drift detection, model registry, explainability, and metrics
-    """
+@router.get("/monitoring/health", summary="Monitoring subsystem health check")
+async def monitoring_subsystem_health() -> Dict[str, Any]:
+    """Check health of advanced monitoring components (drift, registry, etc)."""
     detector = get_drift_detector()
     registry = get_model_registry()
     explainer = get_explainability_engine()
