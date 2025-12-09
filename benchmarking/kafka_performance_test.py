@@ -7,7 +7,7 @@ and demonstrates 10x throughput improvement (500 → 5,000+ TPS).
 
 Usage:
     python kafka_performance_test.py --help
-    python kafka_performance_test.py --config configs/kafka.yaml --duration 300
+    python kafka_performance_test.py --config ../config/infrastructure/kafka.yaml --duration 300
 """
 
 import argparse
@@ -17,6 +17,7 @@ import random
 import string
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict, List, Any
 
 import yaml
@@ -34,6 +35,10 @@ MESSAGES_PROCESSED = Counter('test_messages_processed_total', 'Total test messag
 PROCESSING_LATENCY = Histogram('test_processing_latency_seconds', 'Message processing latency')
 END_TO_END_LATENCY = Histogram('test_end_to_end_latency_seconds', 'End-to-end latency')
 THROUGHPUT_GAUGE = Gauge('test_throughput_tps', 'Current throughput in TPS')
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_KAFKA_CONFIG = PROJECT_ROOT / "config" / "infrastructure" / "kafka.yaml"
 
 
 class KafkaPerformanceTester:
@@ -379,7 +384,7 @@ async def main():
     parser = argparse.ArgumentParser(description="Kafka Consumer Performance Test")
     parser.add_argument(
         "--config",
-        default="configs/kafka.yaml",
+        default=str(DEFAULT_KAFKA_CONFIG),
         help="Path to Kafka configuration file"
     )
     parser.add_argument(

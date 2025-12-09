@@ -324,7 +324,7 @@ async def predict(text: str) -> dict:
 ### Alert Rules
 
 ```yaml
-# config/prometheus-rules.yaml
+# config/monitoring/prometheus-rules.yaml
 groups:
   - name: slo_alerts
     interval: 30s

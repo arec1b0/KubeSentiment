@@ -108,7 +108,7 @@ helm install mlops-sentiment ./helm/mlops-sentiment \
 
 ```bash
 # Apply custom alerting rules
-kubectl apply -f config/prometheus-rules.yaml -n monitoring
+kubectl apply -f config/monitoring/prometheus-rules.yaml -n monitoring
 ```
 
 ### Step 4: Import Grafana Dashboards
@@ -314,7 +314,7 @@ spec:
 
 ### Custom Alerting Rules
 
-Create custom rules in `config/prometheus-rules.yaml`:
+Create custom rules in `config/monitoring/prometheus-rules.yaml`:
 
 ```yaml
 apiVersion: monitoring.coreos.com/v1

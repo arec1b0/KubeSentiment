@@ -139,7 +139,7 @@ services:
     command: >
       bash -c "sleep 30 &&
                python benchmarking/kafka_performance_test.py
-               --config configs/kafka.yaml
+               --config /app/configs/kafka.yaml
                --duration 300
                --target-tps 5000"
 

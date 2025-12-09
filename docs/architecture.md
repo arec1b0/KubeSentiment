@@ -104,7 +104,7 @@ Kubernetes is the target deployment platform, and Helm is used for packaging and
 ## 7. Configuration Management (`config/` and `app/core/config.py`)
 
 - **Application Configuration**: Managed via `app/core/config.py` using Pydantic's `BaseSettings`, which reads from environment variables. This provides type-safe and validated configuration.
-- **Monitoring Configuration**: The `config/` directory contains configuration files for the monitoring stack, such as Prometheus alerting rules (`prometheus-rules.yaml`) and Grafana dashboards (`grafana-*.json`). These are deployed via the Helm chart.
+- **Monitoring Configuration**: The `config/` directory contains monitoring configuration files (Prometheus alerting rules in `monitoring/prometheus-rules.yaml`, Grafana dashboards `monitoring/grafana-*.json`) that are deployed via the Helm chart.
 
 ## 8. Security
 
@@ -122,7 +122,7 @@ The project has a comprehensive observability stack, typically deployed via the 
 - **Metrics**: The application exposes Prometheus metrics at the `/metrics` endpoint. Key metrics include request latency, error rates, and model performance.
 - **Logging**: Structured JSON logging is used throughout the application, with correlation IDs to trace requests across services.
 - **Dashboards**: Pre-configured Grafana dashboards are provided in the `config/` directory for visualizing key application and system metrics.
-- **Alerting**: Prometheus `AlertManager` is configured with rules (`prometheus-rules.yaml`) to send alerts for critical issues (e.g., high latency, high error rate, service downtime).
+- **Alerting**: Prometheus `AlertManager` is configured with rules (`monitoring/prometheus-rules.yaml`) to send alerts for critical issues (e.g., high latency, high error rate, service downtime).
 
 For more details, refer to the [Monitoring Setup Guide](docs/setup/MONITORING_SETUP.md).
 

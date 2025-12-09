@@ -101,9 +101,9 @@ KubeSentiment/
 ├── k8s/                          # Raw Kubernetes manifests
 │
 ├── config/                       # Configuration files
-│   ├── prometheus.yml            # Prometheus config
-│   ├── grafana-*.json            # Grafana dashboards
-│   └── alertmanager.yml          # Alert configuration
+│   ├── monitoring/               # Prometheus, Grafana, Alertmanager, Loki, Logstash
+│   ├── infrastructure/           # Kafka, async batch configs
+│   └── environments/             # Environment overrides (dev/staging/prod)
 │
 ├── benchmarking/                 # Performance benchmarking
 │   ├── scripts/                  # Benchmark scripts

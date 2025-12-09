@@ -52,7 +52,7 @@ graph TB
 ### Core Settings
 
 ```yaml
-# configs/kafka.yaml
+# config/infrastructure/kafka.yaml
 kafka:
   enabled: true
   bootstrap_servers: ["localhost:9092"]
@@ -239,7 +239,7 @@ spec:
 ```bash
 # Run comprehensive performance test
 python benchmarking/kafka_performance_test.py \
-    --config configs/kafka.yaml \
+    --config config/infrastructure/kafka.yaml \
     --duration 300 \
     --target-tps 5000
 ```

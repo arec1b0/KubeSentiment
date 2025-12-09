@@ -16,6 +16,7 @@ Contains configuration for the observability stack:
 Contains infrastructure service configurations:
 - `kafka.yaml`: Kafka consumer/producer settings
 - `async_batch.yaml`: Async batch processing settings
+  (previously in the root-level `configs/` directory)
 
 ### `environments/`
 Contains environment-specific overrides:

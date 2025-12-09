@@ -67,6 +67,6 @@ Configured alerts include:
 
 ## Configuration Files
 
-- `config/prometheus-rules.yaml` - Prometheus alerting rules
+- `config/monitoring/prometheus-rules.yaml` - Prometheus alerting rules
 - `config/grafana-*.json` - Grafana dashboard definitions
 - `helm/mlops-sentiment/values.yaml` - Monitoring configuration

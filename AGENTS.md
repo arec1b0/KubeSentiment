@@ -1,6 +1,6 @@
 # AGENTS.md - AI Agent Guide for KubeSentiment
 
-> **Last Updated:** 2025-12-04  
+> **Last Updated:** 2025-12-04
 > **Purpose:** This document provides AI agents with a comprehensive understanding of the KubeSentiment project, including its architecture, subsystems, build commands, and development workflows.
 
 ---
@@ -377,9 +377,9 @@ KubeSentiment/
 ├── k8s/                          # Raw Kubernetes manifests
 │
 ├── config/                       # Configuration files
-│   ├── prometheus.yml            # Prometheus config
-│   ├── grafana-*.json            # Grafana dashboards
-│   └── alertmanager.yml          # Alert configuration
+│   ├── monitoring/               # Prometheus, Grafana, Alertmanager, Loki, Logstash
+│   ├── infrastructure/           # Kafka, async batch configs
+│   └── environments/             # Environment overrides (dev/staging/prod)
 │
 ├── benchmarking/                 # Performance benchmarking
 │   ├── scripts/                  # Benchmark scripts

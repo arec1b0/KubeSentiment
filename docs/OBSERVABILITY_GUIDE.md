@@ -260,7 +260,7 @@ In Grafana, click on a trace ID in logs to jump to the corresponding trace in Ja
 ### Alert Configuration
 
 AlertManager rules are defined in:
-- **Prometheus Rules:** `config/prometheus-rules.yaml`
+- **Prometheus Rules:** `config/monitoring/prometheus-rules.yaml`
 - **AlertManager Config:** `config/alertmanager.yml`
 
 ### Alert Categories
@@ -365,7 +365,7 @@ kubectl create namespace monitoring
 
 ```bash
 # Apply Prometheus rules
-kubectl apply -f config/prometheus-rules.yaml -n monitoring
+kubectl apply -f config/monitoring/prometheus-rules.yaml -n monitoring
 
 # Apply AlertManager config
 kubectl apply -f config/alertmanager-config.yaml -n monitoring
@@ -414,7 +414,7 @@ MLOPS_LOG_LEVEL=INFO
 
 ### Prometheus Configuration
 
-Edit `config/prometheus.yml` to add custom scrape targets:
+Edit `config/monitoring/prometheus.yml` to add custom scrape targets:
 
 ```yaml
 scrape_configs:
