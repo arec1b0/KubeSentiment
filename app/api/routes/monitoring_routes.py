@@ -1,13 +1,12 @@
 """
 API routes for monitoring, drift detection, and advanced metrics.
 
-This module provides endpoints for:
-- System health and readiness checks (Standard)
-- Prometheus and JSON metrics (Standard)
-- Drift detection summaries and reports (Advanced)
-- Advanced KPIs (business, quality, cost, performance) (Advanced)
-- Model registry information (Advanced)
-- Explainability and interpretability (Advanced)
+This module consolidates all monitoring-related endpoints, including:
+- Standard health checks (liveness/readiness)
+- Prometheus and JSON metrics
+- Advanced drift detection and MLflow integration
+- KPI reporting (business, quality, cost, performance)
+- Explainability services
 """
 
 import logging
@@ -45,7 +44,7 @@ def get_monitoring_service(settings: Settings = Depends(get_settings)) -> Monito
     return MonitoringService(settings)
 
 
-async def get_async_batch_service_dependency(
+async def get_async_batch_service(
     request: Request,
     settings: Settings = Depends(get_settings),
 ) -> AsyncBatchService:
@@ -179,7 +178,7 @@ async def get_kafka_metrics(request: Request, settings: Settings = Depends(get_s
     description="Provides comprehensive metrics for the async batch processing service.",
 )
 async def get_async_batch_metrics(
-    async_batch_service: AsyncBatchService = Depends(get_async_batch_service_dependency),
+    async_batch_service: AsyncBatchService = Depends(get_async_batch_service),
 ):
     """Retrieves performance metrics for the asynchronous batch processing service."""
     try:

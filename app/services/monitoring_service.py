@@ -6,10 +6,11 @@ health checks from various components and providing unified metrics access.
 """
 
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from fastapi import Request
 
+from app.api.schemas.responses import ComponentHealth, HealthDetail
 from app.core.config import Settings
 from app.core.logging import get_logger
 from app.monitoring.health import HealthChecker
@@ -67,13 +68,13 @@ class MonitoringService:
                 overall_status = "unhealthy"
             
             # Create dependency dict structure matching ComponentHealth schema
-            dependencies.append({
-                "component_name": name,
-                "details": {
-                    "status": status,
-                    "error": result.get("error")
-                }
-            })
+            dependencies.append(ComponentHealth(
+                component_name=name,
+                details=HealthDetail(
+                    status=status,
+                    error=result.get("error")
+                )
+            ))
 
         return {
             "status": overall_status,
@@ -98,6 +99,6 @@ class MonitoringService:
         """Checks if the service is ready to accept traffic."""
         return model.is_ready()
 
-    def get_prometheus_metrics(self):
+    def get_prometheus_metrics(self) -> Any:
         """Retrieves Prometheus metrics."""
         return get_prometheus_metrics_data()
