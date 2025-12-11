@@ -76,7 +76,7 @@ async def predict_sentiment(
 
     try:
         # Perform sentiment analysis through service
-        result = prediction_service.predict(payload.text)
+        result = await asyncio.to_thread(prediction_service.predict, payload.text)
 
         # Generate unique prediction ID
         prediction_id = str(uuid.uuid4())

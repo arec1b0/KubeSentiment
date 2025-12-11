@@ -14,7 +14,7 @@ from datetime import datetime
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import ORJSONResponse
 
 from app.api import router
 from app.api.middleware import (
@@ -60,6 +60,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
         docs_url="/docs" if settings.server.debug else None,
         redoc_url="/redoc" if settings.server.debug else None,
+        default_response_class=ORJSONResponse,
     )
 
     # Add correlation ID middleware (first to ensure all logs have correlation ID)
@@ -98,7 +99,7 @@ def create_app() -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(
         request: Request, exc: RequestValidationError
-    ) -> JSONResponse:
+    ) -> ORJSONResponse:
         """Handles FastAPI/Pydantic request validation errors.
 
         This handler provides detailed error information about validation failures,
@@ -109,7 +110,7 @@ def create_app() -> FastAPI:
             exc: The validation error instance.
 
         Returns:
-            A JSONResponse with detailed validation error information.
+            A ORJSONResponse with detailed validation error information.
         """
         correlation_id = getattr(request.state, "correlation_id", None)
 
@@ -130,7 +131,7 @@ def create_app() -> FastAPI:
             path=request.url.path,
         )
 
-        return JSONResponse(
+        return ORJSONResponse(
             status_code=422,
             content={
                 "error_code": "E1001",
@@ -144,7 +145,7 @@ def create_app() -> FastAPI:
 
     # Global exception handler for unhandled errors
     @app.exception_handler(Exception)
-    async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    async def global_exception_handler(request: Request, exc: Exception) -> ORJSONResponse:
         """Handles unexpected exceptions across the application.
 
         This global handler catches any unhandled exceptions, logs them, and
@@ -158,7 +159,7 @@ def create_app() -> FastAPI:
             exc: The exception instance that was raised.
 
         Returns:
-            A JSONResponse containing the error details.
+            A ORJSONResponse containing the error details.
         """
         # Extract correlation ID if available
         correlation_id = getattr(request.state, "correlation_id", None)
@@ -190,7 +191,7 @@ def create_app() -> FastAPI:
             if context:
                 response_content["context"] = context
 
-            return JSONResponse(
+            return ORJSONResponse(
                 status_code=status_code,
                 content=response_content,
             )
@@ -205,7 +206,7 @@ def create_app() -> FastAPI:
             exc_info=True,
         )
 
-        return JSONResponse(
+        return ORJSONResponse(
             status_code=500,
             content={
                 "error_code": "E4001",
