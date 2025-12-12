@@ -210,9 +210,8 @@ class SentimentAnalyzer(BaseModelMetrics):
         self._validate_input_text(text, ctx_logger)
 
         # Clean and truncate text
-        cleaned_text = text.strip()
-        if len(cleaned_text) > self.settings.model.max_text_length:
-            cleaned_text = cleaned_text[: self.settings.model.max_text_length]
+        cleaned_text = self._preprocess_text(text, self.settings.model.max_text_length)
+        if len(cleaned_text) < len(text.strip()):
             ctx_logger.warning(
                 "Text truncated",
                 extra={
@@ -285,19 +284,10 @@ class SentimentAnalyzer(BaseModelMetrics):
         if not texts:
             return []
 
-        # Clean and truncate texts
-        cleaned_texts = [
-            t.strip()[: self.settings.model.max_text_length] if t and t.strip() else ""
-            for t in texts
-        ]
-
-        # Filter out empty texts and track their indices
-        valid_texts = []
-        valid_indices = []
-        for idx, text in enumerate(cleaned_texts):
-            if text:
-                valid_texts.append(text)
-                valid_indices.append(idx)
+        # Preprocess texts
+        valid_texts, valid_indices = self._preprocess_batch_texts(
+            texts, self.settings.model.max_text_length
+        )
 
         # Perform batch prediction
         start_time = time.time()
@@ -318,27 +308,7 @@ class SentimentAnalyzer(BaseModelMetrics):
         self._update_metrics(inference_time, prediction_count=len(valid_texts))
 
         # Build results array with placeholders for invalid texts
-        results = []
-        result_iter = iter(raw_results)
-
-        for idx in range(len(texts)):
-            if idx in valid_indices:
-                result = next(result_iter)
-                results.append(
-                    {
-                        "label": result["label"],
-                        "score": float(result["score"]),
-                        "inference_time_ms": inference_time_ms / len(valid_texts),
-                    }
-                )
-            else:
-                results.append(
-                    {
-                        "error": "Invalid or empty input",
-                        "label": None,
-                        "score": None,
-                    }
-                )
+        results = self._build_batch_results(raw_results, valid_indices, len(texts), inference_time_ms)
 
         ctx_logger.info(
             "Batch prediction completed",
