@@ -7,8 +7,6 @@ provides caching, metrics tracking, and comprehensive error handling.
 """
 
 import time
-from collections import namedtuple
-from functools import lru_cache
 from typing import Any, Optional
 
 import torch
@@ -18,9 +16,6 @@ from app.core.config import Settings, get_settings
 from app.core.logging import get_contextual_logger, get_logger
 from app.models.base import BaseModelMetrics
 from app.utils.exceptions import ModelInferenceError, ModelNotLoadedError, TextEmptyError
-
-# Mock cache info for when cache is disabled
-CacheInfo = namedtuple("CacheInfo", ["hits", "misses", "maxsize", "currsize"])
 
 logger = get_logger(__name__)
 
@@ -144,16 +139,13 @@ class SentimentAnalyzer(BaseModelMetrics):
     def _init_cache(self) -> None:
         """Initialize the prediction cache based on configuration.
 
-        If cache is enabled, wraps _predict_internal with lru_cache.
-        If disabled, _cached_predict directly calls _predict_internal.
+        Uses the base class method to set up caching uniformly.
         """
-        if self.settings.model.prediction_cache_enabled:
-            # Apply lru_cache decorator dynamically
-            maxsize = self.settings.model.prediction_cache_max_size
-            self._cached_predict = lru_cache(maxsize=maxsize)(self._predict_internal)
-        else:
-            # No caching - directly use the internal method
-            self._cached_predict = self._predict_internal
+        super()._init_cache(
+            self._predict_internal,
+            self.settings.model.prediction_cache_enabled,
+            self.settings.model.prediction_cache_max_size,
+        )
 
     def _predict_internal(self, text: str) -> tuple:
         """Internal prediction method (may be cached or not based on config).
@@ -177,14 +169,12 @@ class SentimentAnalyzer(BaseModelMetrics):
     def _get_cache_info(self) -> Any:
         """Get cache info, returning a mock object if cache is disabled.
 
+        Uses the base class method for uniform cache info handling.
+
         Returns:
             CacheInfo object (real if cache enabled, mock if disabled).
         """
-        if self.settings.model.prediction_cache_enabled:
-            return self._cached_predict.cache_info()
-        else:
-            # Return mock cache info with zeros
-            return CacheInfo(hits=0, misses=0, maxsize=0, currsize=0)
+        return super()._get_cache_info(self.settings.model.prediction_cache_enabled)
 
     def predict(self, text: str) -> dict[str, Any]:
         """Perform sentiment analysis on a single text input.

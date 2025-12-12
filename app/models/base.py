@@ -9,7 +9,12 @@ It also provides BaseModelMetrics, a base class that implements shared
 metrics tracking functionality to reduce code duplication across model backends.
 """
 
-from typing import Any, Protocol, runtime_checkable
+from collections import namedtuple
+from functools import lru_cache
+from typing import Any, Callable, Protocol, runtime_checkable
+
+# Mock cache info for when cache is disabled
+CacheInfo = namedtuple("CacheInfo", ["hits", "misses", "maxsize", "currsize"])
 
 
 @runtime_checkable
@@ -227,6 +232,42 @@ class BaseModelMetrics:
         # Only clear cache if it has the cache_clear method (i.e., it's cached)
         if hasattr(self._cached_predict, "cache_clear"):
             self._cached_predict.cache_clear()
+
+    def _init_cache(
+        self, predict_internal_method: Callable[[str], tuple], cache_enabled: bool, cache_size: int
+    ) -> None:
+        """Initialize the prediction cache based on configuration.
+
+        This method should be called during model initialization to set up caching.
+        If cache is enabled, wraps the internal prediction method with lru_cache.
+        If disabled, _cached_predict directly calls the internal method.
+
+        Args:
+            predict_internal_method: The internal prediction method to cache.
+            cache_enabled: Whether caching is enabled.
+            cache_size: Maximum size of the cache.
+        """
+        if cache_enabled:
+            # Apply lru_cache decorator dynamically
+            self._cached_predict = lru_cache(maxsize=cache_size)(predict_internal_method)
+        else:
+            # No caching - directly use the internal method
+            self._cached_predict = predict_internal_method
+
+    def _get_cache_info(self, cache_enabled: bool) -> CacheInfo:
+        """Get cache info, returning a mock object if cache is disabled.
+
+        Args:
+            cache_enabled: Whether caching is enabled.
+
+        Returns:
+            CacheInfo object (real if cache enabled, mock if disabled).
+        """
+        if cache_enabled and hasattr(self._cached_predict, "cache_info"):
+            return self._cached_predict.cache_info()
+        else:
+            # Return mock cache info with zeros
+            return CacheInfo(hits=0, misses=0, maxsize=0, currsize=0)
 
     def _preprocess_text(self, text: str, max_length: int) -> str:
         """Clean and truncate text for inference.
