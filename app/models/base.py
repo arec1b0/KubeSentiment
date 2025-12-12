@@ -9,7 +9,12 @@ It also provides BaseModelMetrics, a base class that implements shared
 metrics tracking functionality to reduce code duplication across model backends.
 """
 
-from typing import Any, Protocol, runtime_checkable
+from collections import namedtuple
+from functools import lru_cache
+from typing import Any, Callable, Protocol, runtime_checkable
+
+# Mock cache info for when cache is disabled
+CacheInfo = namedtuple("CacheInfo", ["hits", "misses", "maxsize", "currsize"])
 
 
 @runtime_checkable
@@ -104,6 +109,8 @@ class BaseModelMetrics:
     - Inference time tracking
     - Cache hit/miss statistics
     - Performance metrics calculation
+    - Text preprocessing and validation
+    - Result building for batch predictions
 
     Subclasses must implement a _cached_predict method that returns a tuple of (label, score).
     If caching is enabled, this method should be decorated with @lru_cache(maxsize=N).
@@ -225,3 +232,127 @@ class BaseModelMetrics:
         # Only clear cache if it has the cache_clear method (i.e., it's cached)
         if hasattr(self._cached_predict, "cache_clear"):
             self._cached_predict.cache_clear()
+
+    def _init_cache(
+        self, predict_internal_method: Callable[[str], tuple], cache_enabled: bool, cache_size: int
+    ) -> None:
+        """Initialize the prediction cache based on configuration.
+
+        This method should be called during model initialization to set up caching.
+        If cache is enabled, wraps the internal prediction method with lru_cache.
+        If disabled, _cached_predict directly calls the internal method.
+
+        Args:
+            predict_internal_method: The internal prediction method to cache.
+            cache_enabled: Whether caching is enabled.
+            cache_size: Maximum size of the cache.
+        """
+        if cache_enabled:
+            # Apply lru_cache decorator dynamically
+            self._cached_predict = lru_cache(maxsize=cache_size)(predict_internal_method)
+        else:
+            # No caching - directly use the internal method
+            self._cached_predict = predict_internal_method
+
+    def _get_cache_info(self, cache_enabled: bool) -> CacheInfo:
+        """Get cache info, returning a mock object if cache is disabled.
+
+        Args:
+            cache_enabled: Whether caching is enabled.
+
+        Returns:
+            CacheInfo object (real if cache enabled, mock if disabled).
+        """
+        if cache_enabled and hasattr(self._cached_predict, "cache_info"):
+            return self._cached_predict.cache_info()
+        else:
+            # Return mock cache info with zeros
+            return CacheInfo(hits=0, misses=0, maxsize=0, currsize=0)
+
+    def _preprocess_text(self, text: str, max_length: int) -> str:
+        """Clean and truncate text for inference.
+
+        Args:
+            text: The input text to preprocess.
+            max_length: Maximum allowed text length.
+
+        Returns:
+            Cleaned and truncated text.
+        """
+        cleaned_text = text.strip()
+        if len(cleaned_text) > max_length:
+            cleaned_text = cleaned_text[:max_length]
+        return cleaned_text
+
+    def _preprocess_batch_texts(
+        self, texts: list[str], max_length: int
+    ) -> tuple[list[str], list[int]]:
+        """Clean, truncate, and filter batch texts for inference.
+
+        Args:
+            texts: List of input texts to preprocess.
+            max_length: Maximum allowed text length.
+
+        Returns:
+            A tuple containing:
+                - List of valid, cleaned texts
+                - List of indices of valid texts in the original list
+        """
+        # Clean and truncate texts
+        cleaned_texts = [
+            t.strip()[:max_length] if t and t.strip() else "" for t in texts
+        ]
+
+        # Filter out empty texts and track their indices
+        valid_texts = []
+        valid_indices = []
+        for idx, text in enumerate(cleaned_texts):
+            if text:
+                valid_texts.append(text)
+                valid_indices.append(idx)
+
+        return valid_texts, valid_indices
+
+    def _build_batch_results(
+        self,
+        raw_results: list[dict[str, Any]],
+        valid_indices: list[int],
+        total_count: int,
+        inference_time_ms: float,
+    ) -> list[dict[str, Any]]:
+        """Build results array with placeholders for invalid texts.
+
+        Args:
+            raw_results: List of prediction results for valid texts.
+            valid_indices: List of indices of valid texts in the original list.
+            total_count: Total number of texts in the original batch.
+            inference_time_ms: Total inference time in milliseconds.
+
+        Returns:
+            List of results with placeholders for invalid texts.
+        """
+        results = []
+        result_iter = iter(raw_results)
+        valid_count = len(valid_indices)
+        per_text_time = inference_time_ms / valid_count if valid_count > 0 else 0.0
+
+        for idx in range(total_count):
+            if idx in valid_indices:
+                result = next(result_iter)
+                results.append(
+                    {
+                        "label": result["label"],
+                        "score": float(result["score"]),
+                        "inference_time_ms": per_text_time,
+                    }
+                )
+            else:
+                results.append(
+                    {
+                        "error": "Invalid or empty input",
+                        "label": None,
+                        "score": None,
+                    }
+                )
+
+        return results
