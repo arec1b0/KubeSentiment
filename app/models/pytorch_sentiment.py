@@ -200,12 +200,13 @@ class SentimentAnalyzer(BaseModelMetrics):
         self._validate_input_text(text, ctx_logger)
 
         # Clean and truncate text
+        original_length = len(text.strip())
         cleaned_text = self._preprocess_text(text, self.settings.model.max_text_length)
-        if len(cleaned_text) < len(text.strip()):
+        if len(cleaned_text) < original_length:
             ctx_logger.warning(
                 "Text truncated",
                 extra={
-                    "original_length": len(text),
+                    "original_length": original_length,
                     "max_length": self.settings.model.max_text_length,
                 },
             )
