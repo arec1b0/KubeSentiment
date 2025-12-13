@@ -60,12 +60,35 @@ Scripts for running tests and benchmarks.
 
 ### Module Structure
 This directory is structured as a Python package to support shared utilities.
-However, most scripts are designed to be run as standalone executables from the project root.
+However, scripts that import from the main application (`app`) rely on `sys.path` modification to locate the project root.
+
+> **Important:** These scripts must be executed from the project root directory.
 
 Example:
 ```bash
 # Correct execution from project root
 python scripts/ci/check_code_quality.py
 ```
+
+### Script Categories
+
+#### CI & Quality (`scripts/ci/`)
+- **Environment**: No specific variables required.
+- **Exit Codes**: Returns `1` on any linting error or quality gate failure.
+
+#### Infrastructure (`scripts/infra/`)
+- **Prerequisites**: `kubectl`, `helm`, `docker` must be installed and configured.
+- **Environment**: Scripts may require cloud provider credentials if deploying to cloud clusters.
+
+#### Setup (`scripts/setup/`)
+- **Environment**: `PYTHON_VERSION` (optional) to override default Python version.
+
+#### Operations (`scripts/ops/`)
+- **Environment**:
+  - `convert_to_onnx.py`: None specific.
+  - `rotate-secrets.py` / `migrate-secrets-to-vault.py`: Require `VAULT_ADDR` and `VAULT_TOKEN`.
+
+#### Tests (`scripts/tests/`)
+- **Environment**: `MLOPS_PROFILE` (optional) to target specific environments.
 
 
