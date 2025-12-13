@@ -29,6 +29,8 @@ Each ADR follows this structure:
 | [007](007-three-pillars-of-observability.md) | Implement Three Pillars of Observability | Accepted | 2024-03-01 |
 | [008](008-use-terraform-for-iac.md) | Use Terraform for Multi-Cloud Infrastructure as Code | Accepted | 2024-03-10 |
 | [009](009-profile-based-configuration.md) | Implement Profile-Based Configuration System | Accepted | 2024-03-15 |
+| [010](010-refactor-model-hierarchy.md) | Refactor Model Hierarchy for Maintainability | Accepted | 2025-12-13 |
+| [011](011-standardize-concurrency-serialization.md) | Standardize Concurrency and Serialization | Accepted | 2025-12-13 |
 
 ## ADR Categories
 
@@ -48,6 +50,8 @@ Our ADRs are organized into the following categories:
 
 ### ML/AI
 - [ADR 001](001-use-onnx-for-model-optimization.md) - ONNX for Model Optimization
+- [ADR 010](010-refactor-model-hierarchy.md) - Refactor Model Hierarchy
+- [ADR 011](011-standardize-concurrency-serialization.md) - Concurrency & Serialization
 
 ### Security
 - [ADR 006](006-use-hashicorp-vault-for-secrets.md) - HashiCorp Vault for Secrets Management

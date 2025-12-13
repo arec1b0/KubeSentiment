@@ -597,6 +597,7 @@ def test_endpoint(test_settings):
 - [ADR 003: Use Kafka for Async Processing](003-use-kafka-for-async-processing.md) - Kafka configuration
 - [ADR 006: Use HashiCorp Vault for Secrets Management](006-use-hashicorp-vault-for-secrets.md) - Vault integration
 - [ADR 004: Use FastAPI as Web Framework](004-use-fastapi-as-web-framework.md) - Settings dependency injection
+- [ADR 011: Standardize Concurrency and Serialization](011-standardize-concurrency-serialization.md) - Uses profile configuration for thread settings
 
 ## Change History
 

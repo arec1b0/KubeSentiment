@@ -215,6 +215,7 @@ Track key metrics to ensure ONNX performance:
 
 - [ADR 004: Use FastAPI as Web Framework](004-use-fastapi-as-web-framework.md) - Framework that hosts ONNX inference
 - [ADR 005: Use Helm for Kubernetes Deployments](005-use-helm-for-kubernetes-deployments.md) - Deployment of ONNX models
+- [ADR 010: Refactor Model Hierarchy](010-refactor-model-hierarchy.md) - Refactoring the model implementation structure
 
 ## Change History
 

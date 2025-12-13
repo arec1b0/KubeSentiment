@@ -267,6 +267,7 @@ curl http://localhost:8000/openapi.json > openapi.json
 - [ADR 001: Use ONNX for Model Optimization](001-use-onnx-for-model-optimization.md)
 - [ADR 002: Use Redis for Distributed Caching](002-use-redis-for-distributed-caching.md)
 - [ADR 003: Use Kafka for Async Processing](003-use-kafka-for-async-processing.md)
+- [ADR 011: Standardize Concurrency and Serialization](011-standardize-concurrency-serialization.md) - How models integrate with FastAPI concurrency
 
 ## Change History
 
