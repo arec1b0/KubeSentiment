@@ -62,7 +62,7 @@ Scripts for running tests and benchmarks.
 This directory is structured as a Python package to support shared utilities.
 However, scripts that import from the main application (`app`) rely on `sys.path` modification to locate the project root.
 
-> **Important:** These scripts must be executed from the project root directory.
+> **Important:** These scripts must be executed from the project root directory (not as standalone executables).
 
 Example:
 ```bash

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 # Add parent directory to path
+# This allows importing 'app' from the project root
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
