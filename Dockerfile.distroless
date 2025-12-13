@@ -55,7 +55,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 
 # Copy application code
 COPY app/ ./app/
-COPY scripts/healthcheck.py ./scripts/healthcheck.py
+COPY scripts/infra/healthcheck.py ./scripts/healthcheck.py
 
 # Create necessary directories with correct permissions for distroless nonroot user (UID 65532)
 RUN mkdir -p /build/logs /build/tmp && \

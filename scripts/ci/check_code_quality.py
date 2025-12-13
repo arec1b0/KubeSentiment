@@ -200,7 +200,7 @@ class CodeQualityChecker:
 
 def main():
     """The main entry point for the script."""
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
 
     checker = CodeQualityChecker(project_root)
     all_passed = checker.run_all_checks()

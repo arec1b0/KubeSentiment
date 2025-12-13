@@ -160,7 +160,7 @@ rm -f ${KIND_CONFIG_FILE}
 
 echo -e "${GREEN}🎉 Kind setup completed successfully!${NC}"
 echo -e "${BLUE}📝 Next steps:${NC}"
-echo -e "  • Deploy the service: ${YELLOW}./scripts/deploy.sh${NC}"
+echo -e "  • Deploy the service: ${YELLOW}./scripts/infra/deploy-helm.sh${NC}"
 echo -e "  • View cluster status: ${YELLOW}kubectl get nodes${NC}"
 echo -e "  • Delete cluster: ${YELLOW}kind delete cluster --name ${CLUSTER_NAME}${NC}"
 

@@ -118,7 +118,7 @@ kubectl delete namespace test-namespace
 
 echo -e "${GREEN}🎉 Minikube setup completed successfully!${NC}"
 echo -e "${BLUE}📝 Next steps:${NC}"
-echo -e "  • Deploy the service: ${YELLOW}./scripts/deploy.sh${NC}"
+echo -e "  • Deploy the service: ${YELLOW}./scripts/infra/deploy-helm.sh${NC}"
 echo -e "  • Access dashboard: ${YELLOW}minikube dashboard${NC}"
 echo -e "  • View cluster status: ${YELLOW}minikube status${NC}"
 echo -e "  • Stop Minikube: ${YELLOW}minikube stop${NC}"

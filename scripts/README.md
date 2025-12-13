@@ -1,20 +1,38 @@
 # Scripts Directory
 
-This directory contains utility scripts for development, testing, and operations.
+This directory contains utility scripts for development, testing, and operations, organized by function.
 
-## Profile Validation
+## Directory Structure
 
-- `test_profiles.py`: Tests the profile loading mechanism to ensure configuration defaults are applied correctly.
-- `validate_profiles.py`: Validates that all defined profiles adhere to the schema and environment variable overrides work as expected.
+### `scripts/ci/` - Continuous Integration & Quality
+Scripts used by CI/CD pipelines and local quality checks.
+- `check_code_quality.py`: Runs formatters and linters (Black, Ruff, Isort).
+- `quality_gate.py`: Enforces quality standards (coverage, complexity, etc.).
+- `format_code.sh` / `format_code.ps1`: Applies code formatting.
 
-## Deployment & Setup
+### `scripts/infra/` - Infrastructure & Deployment
+Scripts for setting up environments and deploying the application.
+- `setup-kind.sh`: Sets up a local Kubernetes cluster using Kind.
+- `setup-minikube.sh`: Sets up a local Kubernetes cluster using Minikube.
+- `deploy-helm.sh`: Helper to deploy the application via Helm.
+- `setup-monitoring.sh`: Deploys the observability stack (Prometheus/Grafana).
+- `build-optimized-image.sh`: Builds production Docker images.
+- `healthcheck.py`: Used by Docker/K8s for service health verification.
 
-- `setup-monitoring.sh`: Deploys the full observability stack (Prometheus, Grafana, etc.) to Kubernetes.
-- `setup-kind.sh`: Sets up a local KIND (Kubernetes in Docker) cluster.
-- `deploy-helm.sh`: Helper script to deploy the application via Helm.
+### `scripts/setup/` - Environment Setup
+Scripts for initializing the local development environment.
+- `setup_dev_environment.py`: Bootstraps the dev environment (venv, dependencies, pre-commit).
+- `cleanup.sh`: Removes temporary build artifacts.
 
-## Maintenance
+### `scripts/ops/` - Operations & Maintenance
+Scripts for operational tasks.
+- `convert_to_onnx.py`: Converts PyTorch models to ONNX format.
+- `migrate-secrets-to-vault.py`: Helper for secret migration.
+- `rotate-secrets.py`: Utility for rotating secrets.
 
-- `cleanup.sh`: Removes temporary files and build artifacts.
-- `format_code.sh`: Runs linters and formatters.
-- `rotate-secrets.py`: Utility for rotating secrets in Vault/Kubernetes.
+### `scripts/tests/` - Testing & Benchmarks
+Scripts for running tests and benchmarks.
+- `benchmark_vectorization.py`: Benchmarks model performance.
+- `test-cold-start.sh`: Measures application startup time.
+- `test_profiles.py`: Tests profile loading.
+- `validate_profiles.py`: Validates configuration profiles.

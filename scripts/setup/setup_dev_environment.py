@@ -6,9 +6,9 @@ This script automates the setup of a local development environment for KubeSenti
 It handles virtual environment creation, dependency installation, and pre-commit hook setup.
 
 Usage:
-    python scripts/setup_dev_environment.py
+    python scripts/setup/setup_dev_environment.py
     # Or with options:
-    python scripts/setup_dev_environment.py --full --with-observability
+    python scripts/setup/setup_dev_environment.py --full --with-observability
 
 Features:
     - Creates Python virtual environment
@@ -449,16 +449,16 @@ def main() -> int:
         epilog="""
 Examples:
   # Basic setup
-  python scripts/setup_dev_environment.py
+  python scripts/setup/setup_dev_environment.py
 
   # Setup with all optional dependencies
-  python scripts/setup_dev_environment.py --full
+  python scripts/setup/setup_dev_environment.py --full
 
   # Setup with observability tools
-  python scripts/setup_dev_environment.py --with-observability
+  python scripts/setup/setup_dev_environment.py --with-observability
 
   # Setup with GPU support
-  python scripts/setup_dev_environment.py --with-gpu
+  python scripts/setup/setup_dev_environment.py --with-gpu
         """,
     )
 
@@ -496,7 +496,7 @@ Examples:
 
     try:
         # Determine project root
-        project_root = Path(__file__).parent.parent
+        project_root = Path(__file__).parent.parent.parent
         print_header(f"KubeSentiment Development Environment Setup")
         print_info(f"Project root: {project_root}")
 

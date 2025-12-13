@@ -8,13 +8,13 @@ quantization for reduced model size and faster CPU inference.
 
 Usage:
     # Basic export
-    python scripts/convert_to_onnx.py --model-name distilbert-base-uncased-finetuned-sst-2-english
+    python scripts/ops/convert_to_onnx.py --model-name distilbert-base-uncased-finetuned-sst-2-english
 
     # Export with INT8 quantization (recommended for production)
-    python scripts/convert_to_onnx.py --quantize
+    python scripts/ops/convert_to_onnx.py --quantize
 
     # Quantize existing ONNX model
-    python scripts/convert_to_onnx.py --quantize-only --input-model ./onnx_models/model.onnx
+    python scripts/ops/convert_to_onnx.py --quantize-only --input-model ./onnx_models/model.onnx
 """
 
 import argparse
@@ -22,7 +22,7 @@ from pathlib import Path
 import sys
 
 # Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
@@ -39,13 +39,13 @@ def main():
         epilog="""
 Examples:
   # Convert model to ONNX with optimization
-  python scripts/convert_to_onnx.py --model-name distilbert-base-uncased-finetuned-sst-2-english
+  python scripts/ops/convert_to_onnx.py --model-name distilbert-base-uncased-finetuned-sst-2-english
 
   # Convert with INT8 quantization (4x smaller, 2-3x faster on CPU)
-  python scripts/convert_to_onnx.py --quantize
+  python scripts/ops/convert_to_onnx.py --quantize
 
   # Quantize an existing ONNX model
-  python scripts/convert_to_onnx.py --quantize-only --input-model ./onnx_models/model.onnx
+  python scripts/ops/convert_to_onnx.py --quantize-only --input-model ./onnx_models/model.onnx
         """,
     )
     parser.add_argument(

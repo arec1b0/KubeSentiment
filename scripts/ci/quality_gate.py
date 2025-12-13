@@ -296,7 +296,7 @@ class QualityGate:
 
 def main():
     """Main entry point."""
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
     gate = QualityGate(project_root)
     success = gate.run_all_checks()
     sys.exit(0 if success else 1)
