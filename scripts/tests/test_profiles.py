@@ -7,7 +7,11 @@ This script validates that all profiles load correctly and have the expected def
 
 import os
 import sys
+from pathlib import Path
 from typing import Dict, Any
+
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
 def clear_mlops_env_vars():

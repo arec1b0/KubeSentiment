@@ -53,3 +53,13 @@ repos:
         args: [--ignore-missing-imports, --show-error-codes]
         additional_dependencies:
           - types-requests
+
+  # Local CI/CD hooks (Optional - runs quality_gate.py)
+  # - repo: local
+  #   hooks:
+  #     - id: quality-gate
+  #       name: Quality Gate
+  #       entry: python scripts/ci/quality_gate.py
+  #       language: system
+  #       types: [python]
+  #       pass_filenames: false
