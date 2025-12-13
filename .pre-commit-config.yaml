@@ -57,8 +57,8 @@ repos:
   # Local CI/CD hooks (Optional - runs quality_gate.py)
   # NOTE: To enable this hook:
   # 1) Uncomment lines 63-68 below
-  # 2) Run `pre-commit install` to update hooks
-  # 3) Run `make quality-gate` to generate required .coverage file
+  # 2) Run `pre-commit install` (to register the hook)
+  # 3) Run `make quality-gate` (to generate required .coverage file)
   #
   # - repo: local
   #   hooks:
