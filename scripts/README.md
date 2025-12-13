@@ -52,3 +52,20 @@ Scripts for running tests and benchmarks.
 - `test_profiles.py`: Tests profile loading.
 - `validate_profiles.py`: Validates configuration profiles.
 
+## Usage Notes
+
+### Exit Codes
+- **0**: Success.
+- **1**: Failure (e.g., linting errors, quality gate breach, setup failure).
+
+### Module Structure
+This directory is structured as a Python package to support shared utilities.
+However, most scripts are designed to be run as standalone executables from the project root.
+
+Example:
+```bash
+# Correct execution from project root
+python scripts/ci/check_code_quality.py
+```
+
+

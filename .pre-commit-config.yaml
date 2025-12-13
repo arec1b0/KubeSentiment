@@ -55,6 +55,10 @@ repos:
           - types-requests
 
   # Local CI/CD hooks (Optional - runs quality_gate.py)
+  # NOTE: To enable this hook, you must have run pytest with coverage
+  # and have a .coverage file in the root.
+  # Usage: make quality-gate
+  #
   # - repo: local
   #   hooks:
   #     - id: quality-gate
