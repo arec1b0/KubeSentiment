@@ -120,6 +120,11 @@ This is the quickest way to get the service running on your local machine.
     make install-dev
     ```
 
+    > **Tip:** You can also use our setup script to automate virtual environment creation and dependency installation:
+    > ```bash
+    > python scripts/setup/setup_dev_environment.py
+    > ```
+
 3.  **Build the service:**
     The project includes multiple Dockerfiles for different use cases (see [Dockerfile Guide](docs/docker/DOCKERFILE_GUIDE.md)).
     ```bash
@@ -165,7 +170,7 @@ Our **[Quick Start Guide](docs/setup/QUICKSTART.md)** provides a one-line script
 
 ```bash
 # Follow the instructions in the Quick Start guide
-./scripts/setup-monitoring.sh
+./scripts/infra/setup-monitoring.sh
 ```
 
 This will deploy the application along with Prometheus for metrics, Grafana for dashboards, and Alertmanager for alerts.

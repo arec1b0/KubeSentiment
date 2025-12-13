@@ -20,7 +20,7 @@ Completed: 2024
 - `requirements-dev.txt`: Removed flake8, added ruff
 - `Makefile`: Updated lint commands to use ruff
 - `.github/workflows/ci.yml`: Updated CI to use ruff instead of flake8
-- `scripts/check_code_quality.py`: Updated to use ruff
+- `scripts/ci/check_code_quality.py`: Updated to use ruff
 
 **Configuration**:
 - Enabled rules: E, W, F, I, B, C4, UP, ARG, SIM, PTH, ERA, PD, PL, TRY, RUF
@@ -36,8 +36,8 @@ Completed: 2024
 - `pyproject.toml`: Added radon configuration
 - `Makefile`: Added `complexity` target
 - `.github/workflows/ci.yml`: Added complexity check step
-- `scripts/check_code_quality.py`: Added complexity check method
-- `scripts/quality_gate.py`: Added complexity threshold checking
+- `scripts/ci/check_code_quality.py`: Added complexity check method
+- `scripts/ci/quality_gate.py`: Added complexity threshold checking
 
 **Configuration**:
 - Minimum complexity grade: B (6-10)
@@ -53,8 +53,8 @@ Completed: 2024
 
 **Files Modified**:
 - `pyproject.toml`: Enhanced `[tool.mypy]` section
-- `scripts/check_code_quality.py`: Updated to use config file
-- `scripts/quality_gate.py`: Added type checking gate
+- `scripts/ci/check_code_quality.py`: Updated to use config file
+- `scripts/ci/quality_gate.py`: Added type checking gate
 
 **New Settings**:
 - `warn_return_any = true`
@@ -72,7 +72,7 @@ Completed: 2024
 
 **Files Modified**:
 - `.github/workflows/ci.yml`: Enhanced code quality checks
-- `scripts/quality_gate.py`: New quality gate enforcement script
+- `scripts/ci/quality_gate.py`: New quality gate enforcement script
 
 **Quality Gates**:
 - Code Coverage: ≥ 80%
@@ -124,8 +124,8 @@ Completed: 2024
 ### 7. Updated Scripts
 
 **Files Modified**:
-- `scripts/check_code_quality.py`: Updated to use ruff and radon
-- `scripts/quality_gate.py`: New script for CI/CD quality gates
+- `scripts/ci/check_code_quality.py`: Updated to use ruff and radon
+- `scripts/ci/quality_gate.py`: New script for CI/CD quality gates
 
 **Improvements**:
 - Modern Python 3.11+ type hints (dict, list, tuple)

@@ -143,10 +143,10 @@ kubectl scale deployment mlops-sentiment --replicas=5 -n mlops-sentiment
 helm upgrade mlops-sentiment ./helm/mlops-sentiment -n mlops-sentiment --set image.tag=v1.1.0
 
 # Status
-./scripts/setup-monitoring.sh status
+./scripts/infra/setup-monitoring.sh status
 
 # Complete removal
-./scripts/setup-monitoring.sh cleanup
+./scripts/infra/setup-monitoring.sh cleanup
 ```
 
 ## 📈 Grafana Dashboards

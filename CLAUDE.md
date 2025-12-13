@@ -214,10 +214,8 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 # 3. Install dependencies
 make install-dev
-# Or manually:
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
-pip install -r requirements-test.txt
+# Or use the setup script:
+python scripts/setup/setup_dev_environment.py
 
 # 4. Install pre-commit hooks (IMPORTANT)
 pre-commit install
