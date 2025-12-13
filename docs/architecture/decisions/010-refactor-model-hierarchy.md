@@ -55,6 +55,8 @@ We will refactor the model layer to use the **Strategy Pattern** with a shared *
 
 -   **Coupling**: Changes to `BaseModelMetrics` affect all subclasses.
 -   **Indirection**: Developers must check the base class to understand the full behavior of a model implementation.
+-   **Base Class Bloat**: Risk of the base class accumulating unrelated logic over time if strict separation of concerns is not maintained.
+-   **LSP Violations**: Potential for Liskov Substitution Principle violations if future models deviate significantly from the shared logic assumptions.
 
 ### Neutral
 
@@ -87,3 +89,5 @@ class BaseModelMetrics:
 ## Related ADRs
 
 -   [ADR 001: Use ONNX for Model Optimization](001-use-onnx-for-model-optimization.md)
+-   [ADR 004: Use FastAPI as Web Framework](004-use-fastapi-as-web-framework.md) - Model hierarchy designed to support FastAPI dependency injection.
+-   [ADR 011: Standardize Concurrency and Serialization](011-standardize-concurrency-serialization.md) - Addresses concurrency concerns that motivated the singleton pattern.

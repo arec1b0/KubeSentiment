@@ -44,14 +44,16 @@ The `ModelStrategy` interface will strictly use **Python primitives** (str, dict
 ### Positive
 
 -   **Resource Efficiency**: Single model instance per process minimizes memory footprint (crucial for GPU memory).
--   **Predictable Performance**: restricting intra-op threads prevents CPU saturation when many requests arrive simultaneously.
+-   **Predictable Performance**: Restricting intra-op threads prevents CPU saturation when many requests arrive simultaneously.
 -   **Decoupling**: The model core is independent of the web framework. It can be easily used in CLI tools or offline scripts without needing the full API stack.
 -   **Thread Safety**: Explicitly addressing thread safety ensures stability under load.
 
 ### Negative
 
 -   **Global State**: Singleton pattern introduces global state, which can make unit testing harder (requires careful setup/teardown or mocking).
--   **Metric Accuracy**: Lack of strict locking on metrics means counts might be slightly off under extreme concurrency (acceptable for telemetry).
+    -   *Mitigation*: Use pytest fixtures with `clear_instances()` helper or dependency injection mocks for unit tests.
+-   **Metric Accuracy**: Lack of strict locking on metrics means counts might be slightly off under extreme concurrency.
+    -   *Note*: This is acceptable for telemetry, but critical business metrics (e.g., billing) should use atomic operations or a database.
 
 ### Neutral
 
@@ -79,4 +81,6 @@ sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
 
 ## Related ADRs
 
+-   [ADR 003: Use Kafka for Async Processing](003-use-kafka-for-async-processing.md) - High-throughput requirements driving the concurrency strategy.
+-   [ADR 004: Use FastAPI as Web Framework](004-use-fastapi-as-web-framework.md) - The target runtime environment for these concurrency settings.
 -   [ADR 009: Profile-Based Configuration System](009-profile-based-configuration.md) - Defines where thread settings are stored.

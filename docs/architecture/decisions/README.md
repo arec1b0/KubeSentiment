@@ -29,8 +29,8 @@ Each ADR follows this structure:
 | [007](007-three-pillars-of-observability.md) | Implement Three Pillars of Observability | Accepted | 2024-03-01 |
 | [008](008-use-terraform-for-iac.md) | Use Terraform for Multi-Cloud Infrastructure as Code | Accepted | 2024-03-10 |
 | [009](009-profile-based-configuration.md) | Implement Profile-Based Configuration System | Accepted | 2024-03-15 |
-| [010](010-refactor-model-hierarchy.md) | Refactor Model Hierarchy for Maintainability | Accepted | 2025-12-13 |
-| [011](011-standardize-concurrency-serialization.md) | Standardize Concurrency and Serialization | Accepted | 2025-12-13 |
+| [010](010-refactor-model-hierarchy.md) | Refactor Model Hierarchy for Maintainability | Accepted | 2024-12-13 |
+| [011](011-standardize-concurrency-serialization.md) | Standardize Concurrency and Serialization | Accepted | 2024-12-13 |
 
 ## ADR Categories
 
@@ -64,7 +64,7 @@ Our ADRs are organized into the following categories:
 When creating a new ADR:
 
 1. Create a new file named `NNN-title-with-dashes.md`
-2. Use the next available number (NNN - next is 010)
+2. Use the next available number (NNN - next is 012)
 3. Follow the [ADR template](TEMPLATE.md)
 4. Update this index
 5. Add to the appropriate category above
