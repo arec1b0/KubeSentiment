@@ -1,6 +1,6 @@
 # CLAUDE.md - AI Assistant Guide for KubeSentiment
 
-> **Last Updated:** 2025-11-19
+> **Last Updated:** 2025-12-15
 > **Purpose:** This document provides AI assistants with comprehensive guidance on the KubeSentiment codebase structure, development workflows, and key conventions to follow when making contributions.
 
 ---
@@ -120,6 +120,12 @@ KubeSentiment/
 │   └── tutorials/                # Tutorial notebooks
 │
 ├── scripts/                      # Utility scripts
+│   ├── ci/                       # CI/CD scripts
+│   ├── deployment/               # Deployment automation scripts
+│   ├── monitoring/               # Monitoring and logging scripts
+│   ├── quality_gate/             # Quality gate and pre-commit scripts
+│   ├── setup/                    # Environment setup scripts
+│   └── utils/                    # General utility scripts
 │
 ├── sdk/                          # Client SDKs
 │   ├── python/                   # Python SDK
@@ -873,6 +879,8 @@ Architecture Decision Records (ADRs) document key architectural decisions. Alway
 | [007](docs/architecture/decisions/007-three-pillars-of-observability.md) | Implement Three Pillars of Observability | Metrics, logs, traces for full observability |
 | [008](docs/architecture/decisions/008-use-terraform-for-iac.md) | Use Terraform for Multi-Cloud IaC | Terraform for cloud-agnostic infrastructure |
 | [009](docs/architecture/decisions/009-profile-based-configuration.md) | Implement Profile-Based Configuration System | Modular, profile-based configuration with Pydantic |
+| [010](docs/architecture/decisions/010-refactor-model-hierarchy.md) | Refactor Model Hierarchy for Maintainability | Simplified model class hierarchy with base class extraction |
+| [011](docs/architecture/decisions/011-standardize-concurrency-serialization.md) | Standardize Concurrency and Serialization | Pickle serialization with ThreadPoolExecutor for thread safety |
 
 ### ADR Template Location
 
@@ -1000,6 +1008,7 @@ MLOPS_DEBUG=false
 | Date | Changes |
 |------|---------|
 | 2025-11-19 | Initial CLAUDE.md creation - comprehensive guide for AI assistants |
+| 2025-12-15 | Added ADRs 010 & 011, updated documentation references, refreshed architecture patterns |
 
 ---
 
