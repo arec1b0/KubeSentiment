@@ -1,0 +1,112 @@
+name: Pull Request CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # Code quality checks
+  code-quality:
+    name: Code Quality
+    uses: ./.github/workflows/_reusable-code-quality.yml
+    with:
+      python-version: "3.11"
+
+  # Unit tests - fast, isolated
+  unit-tests:
+    name: Unit Tests
+    uses: ./.github/workflows/_reusable-tests.yml
+    with:
+      python-version: "3.11"
+      test-type: unit
+
+  # Integration tests
+  integration-tests:
+    name: Integration Tests
+    needs: unit-tests
+    uses: ./.github/workflows/_reusable-tests.yml
+    with:
+      python-version: "3.11"
+      test-type: integration
+
+  # Performance tests
+  performance-tests:
+    name: Performance Tests
+    needs: unit-tests
+    uses: ./.github/workflows/_reusable-tests.yml
+    with:
+      python-version: "3.11"
+      test-type: performance
+
+  # Combined coverage check
+  coverage-check:
+    name: Coverage Threshold
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, performance-tests]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Run full test suite with coverage threshold
+        run: pytest tests/ -v --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=85
+        env:
+          MLOPS_DEBUG: true
+          MLOPS_LOG_LEVEL: DEBUG
+
+      - name: Upload combined coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: combined
+          name: combined-coverage
+          fail_ci_if_error: true
+
+  # PR summary
+  pr-summary:
+    name: PR Summary
+    runs-on: ubuntu-latest
+    needs: [code-quality, coverage-check]
+    if: always()
+
+    steps:
+      - name: Generate PR summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const summary = `## CI/CD Pipeline Results
+
+            ### Job Status
+            - **Code Quality**: ${{ needs.code-quality.result }}
+            - **Coverage Check**: ${{ needs.coverage-check.result }}
+
+            ### Next Steps
+            ${needs.code-quality.result === 'success' && needs.coverage-check.result === 'success'
+              ? '✅ All checks passed! Ready for review.'
+              : '❌ Some checks failed. Please review the logs and fix the issues.'}
+
+            ---
+            *Triggered by: @${{ github.actor }}*
+            *Commit: ${{ github.sha }}*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });

@@ -1,0 +1,102 @@
+name: Main Branch CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ["v*"]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # Code quality checks
+  code-quality:
+    name: Code Quality
+    uses: ./.github/workflows/_reusable-code-quality.yml
+    with:
+      python-version: "3.11"
+
+  # Full test suite with coverage
+  test-suite:
+    name: Full Test Suite
+    uses: ./.github/workflows/_reusable-tests.yml
+    with:
+      python-version: "3.11"
+      test-type: all
+      coverage-threshold: 85
+
+  # Build Docker image
+  build:
+    name: Build Docker Image
+    needs: [code-quality, test-suite]
+    uses: ./.github/workflows/_reusable-docker-build.yml
+    with:
+      dockerfile: Dockerfile
+      image-name: ${{ github.repository }}
+      push: true
+      platforms: linux/amd64,linux/arm64
+
+  # Security scanning
+  security-scan:
+    name: Security Scan
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ needs.build.outputs.image-full }}
+          format: "sarif"
+          output: "trivy-results.sarif"
+          severity: "CRITICAL,HIGH"
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: "trivy-results.sarif"
+
+      - name: Run Trivy in table mode
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ needs.build.outputs.image-full }}
+          format: "table"
+          severity: "CRITICAL,HIGH"
+
+  # Trigger deployment workflow
+  trigger-deploy:
+    name: Trigger Deployment
+    needs: [build, security-scan]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Trigger deployment workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ref = context.ref;
+            const environment = ref.includes('develop') ? 'development'
+              : ref.includes('main') ? 'staging'
+              : ref.includes('v') ? 'production'
+              : 'unknown';
+
+            if (environment !== 'unknown') {
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'deploy.yml',
+                ref: context.ref,
+                inputs: {
+                  environment: environment,
+                  image_tag: '${{ needs.build.outputs.image-tag }}'
+                }
+              });
+              console.log(`Triggered deployment to ${environment}`);
+            }

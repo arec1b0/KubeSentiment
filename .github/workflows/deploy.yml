@@ -1,0 +1,138 @@
+name: Deploy to Kubernetes
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy"
+        required: true
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+      image_tag:
+        description: "Image tag to deploy"
+        required: true
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: "v1.28.0"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: "v3.13.0"
+
+      - name: Setup kubectl config
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+          export KUBECONFIG=$HOME/.kube/config
+          kubectl cluster-info
+
+      - name: Determine deployment parameters
+        id: params
+        run: |
+          case "${{ inputs.environment }}" in
+            development)
+              echo "namespace=mlops-sentiment-dev" >> $GITHUB_OUTPUT
+              echo "replicas=1" >> $GITHUB_OUTPUT
+              echo "values_file=values-development.yaml" >> $GITHUB_OUTPUT
+              ;;
+            staging)
+              echo "namespace=mlops-sentiment-staging" >> $GITHUB_OUTPUT
+              echo "replicas=2" >> $GITHUB_OUTPUT
+              echo "values_file=values-staging.yaml" >> $GITHUB_OUTPUT
+              ;;
+            production)
+              echo "namespace=mlops-sentiment" >> $GITHUB_OUTPUT
+              echo "replicas=3" >> $GITHUB_OUTPUT
+              echo "values_file=values-production.yaml" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Deploy with Helm
+        run: |
+          export KUBECONFIG=$HOME/.kube/config
+
+          helm upgrade --install mlops-sentiment ./helm/mlops-sentiment \
+            --namespace ${{ steps.params.outputs.namespace }} \
+            --create-namespace \
+            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --set image.tag=${{ inputs.image_tag }} \
+            --set replicaCount=${{ steps.params.outputs.replicas }} \
+            --values ./helm/mlops-sentiment/values.yaml \
+            --values ./helm/mlops-sentiment/${{ steps.params.outputs.values_file }} \
+            --wait --timeout=10m
+
+          echo "✅ Deployment to ${{ inputs.environment }} completed successfully"
+
+      - name: Run health checks
+        run: |
+          export KUBECONFIG=$HOME/.kube/config
+
+          echo "Waiting for pods to be ready..."
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/name=mlops-sentiment \
+            -n ${{ steps.params.outputs.namespace }} \
+            --timeout=300s
+
+          echo "Pod status:"
+          kubectl get pods -n ${{ steps.params.outputs.namespace }} -l app.kubernetes.io/name=mlops-sentiment
+
+      - name: Run smoke tests
+        run: |
+          export KUBECONFIG=$HOME/.kube/config
+
+          if kubectl get ingress -n ${{ steps.params.outputs.namespace }} mlops-sentiment &>/dev/null; then
+            SERVICE_URL=$(kubectl get ingress mlops-sentiment -n ${{ steps.params.outputs.namespace }} -o jsonpath='{.spec.rules[0].host}')
+            echo "Testing health endpoint: http://$SERVICE_URL/health"
+
+            for i in {1..5}; do
+              if curl -f -s -o /dev/null -w "%{http_code}" http://$SERVICE_URL/health | grep -q "200"; then
+                echo "✅ Health check passed"
+                exit 0
+              fi
+              echo "Attempt $i/5 failed, waiting 10 seconds..."
+              sleep 10
+            done
+
+            echo "❌ Health check failed after 5 attempts"
+            exit 1
+          else
+            echo "Testing internal health check..."
+            POD_NAME=$(kubectl get pod -n ${{ steps.params.outputs.namespace }} -l app.kubernetes.io/name=mlops-sentiment -o jsonpath='{.items[0].metadata.name}')
+            kubectl exec -n ${{ steps.params.outputs.namespace }} $POD_NAME -- curl -f http://localhost:8000/health
+          fi
+
+      - name: Deployment summary
+        run: |
+          echo "## Deployment Summary - ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Namespace**: ${{ steps.params.outputs.namespace }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image**: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Replicas**: ${{ steps.params.outputs.replicas }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployed Resources" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          kubectl get all -n ${{ steps.params.outputs.namespace }} -l app.kubernetes.io/name=mlops-sentiment >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

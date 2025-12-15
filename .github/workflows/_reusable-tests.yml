@@ -1,0 +1,116 @@
+name: Reusable Tests
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: "Python version to use"
+        required: false
+        type: string
+        default: "3.11"
+      test-type:
+        description: "Type of tests to run (unit/integration/performance/all)"
+        required: true
+        type: string
+      coverage-threshold:
+        description: "Minimum coverage threshold"
+        required: false
+        type: number
+        default: 0
+    outputs:
+      coverage-percentage:
+        description: "Test coverage percentage"
+        value: ${{ jobs.test.outputs.coverage }}
+
+jobs:
+  test:
+    name: ${{ inputs.test-type }} Tests
+    runs-on: ubuntu-latest
+    outputs:
+      coverage: ${{ steps.coverage.outputs.percentage }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install -r requirements-test.txt
+
+      - name: Determine test path
+        id: test-path
+        run: |
+          case "${{ inputs.test-type }}" in
+            unit)
+              echo "path=tests/unit/" >> $GITHUB_OUTPUT
+              echo "marker=unit" >> $GITHUB_OUTPUT
+              ;;
+            integration)
+              echo "path=tests/integration/" >> $GITHUB_OUTPUT
+              echo "marker=integration" >> $GITHUB_OUTPUT
+              ;;
+            performance)
+              echo "path=tests/performance/" >> $GITHUB_OUTPUT
+              echo "marker=performance" >> $GITHUB_OUTPUT
+              ;;
+            all)
+              echo "path=tests/" >> $GITHUB_OUTPUT
+              echo "marker=" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "Invalid test type: ${{ inputs.test-type }}"
+              exit 1
+              ;;
+          esac
+
+      - name: Run tests
+        run: |
+          PYTEST_ARGS="${{ steps.test-path.outputs.path }} -v --cov=app --cov-report=xml --cov-report=term-missing"
+
+          if [ -n "${{ steps.test-path.outputs.marker }}" ]; then
+            PYTEST_ARGS="$PYTEST_ARGS -m ${{ steps.test-path.outputs.marker }}"
+          fi
+
+          if [ "${{ inputs.coverage-threshold }}" -gt "0" ]; then
+            PYTEST_ARGS="$PYTEST_ARGS --cov-fail-under=${{ inputs.coverage-threshold }}"
+          fi
+
+          pytest $PYTEST_ARGS
+        env:
+          MLOPS_DEBUG: true
+          MLOPS_LOG_LEVEL: DEBUG
+
+      - name: Extract coverage percentage
+        id: coverage
+        if: always()
+        run: |
+          COVERAGE=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(root.attrib['line-rate'])" 2>/dev/null || echo "0")
+          COVERAGE_PERCENT=$(echo "$COVERAGE * 100" | bc)
+          echo "percentage=${COVERAGE_PERCENT%.*}" >> $GITHUB_OUTPUT
+          echo "Coverage: ${COVERAGE_PERCENT%.*}%"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: ${{ inputs.test-type }}
+          name: ${{ inputs.test-type }}-tests
+          fail_ci_if_error: false
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-${{ inputs.test-type }}
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 7

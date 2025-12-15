@@ -1,0 +1,56 @@
+name: Reusable Code Quality
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: "Python version to use"
+        required: false
+        type: string
+        default: "3.11"
+      target-paths:
+        description: "Paths to check (space-separated)"
+        required: false
+        type: string
+        default: "app/ tests/ scripts/ run.py"
+
+jobs:
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip setuptools wheel
+          pip install -r requirements-dev.txt
+
+      - name: Run Black
+        run: black --check ${{ inputs.target-paths }}
+
+      - name: Run isort
+        run: isort --check-only ${{ inputs.target-paths }}
+
+      - name: Run Ruff
+        run: ruff check ${{ inputs.target-paths }}
+
+      - name: Run Flake8
+        run: flake8 ${{ inputs.target-paths }}
+
+      - name: Run mypy
+        run: mypy app/ --ignore-missing-imports --allow-untyped-decorators
+
+      - name: Check complexity with Radon
+        run: radon cc app/ --min B --show-complexity
+
+      - name: Run Bandit security scan
+        run: bandit -r app/ -c pyproject.toml

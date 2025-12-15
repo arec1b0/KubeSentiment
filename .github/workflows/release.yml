@@ -1,0 +1,192 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., v1.2.3)"
+        required: true
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # Validate release
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version tag
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Expected format: vX.Y.Z (e.g., v1.2.3)"
+            exit 1
+          fi
+          echo "✅ Valid version: $VERSION"
+
+      - name: Check if tag exists
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "✅ Tag $VERSION exists"
+          else
+            echo "❌ Tag $VERSION does not exist"
+            exit 1
+          fi
+
+  # Run full test suite
+  test:
+    name: Full Test Suite
+    needs: validate
+    uses: ./.github/workflows/_reusable-tests.yml
+    with:
+      python-version: "3.11"
+      test-type: all
+      coverage-threshold: 85
+
+  # Build multi-platform release images
+  build:
+    name: Build Release Images
+    needs: test
+    strategy:
+      matrix:
+        dockerfile:
+          - name: standard
+            file: Dockerfile
+          - name: optimized
+            file: Dockerfile.optimized
+          - name: distroless
+            file: Dockerfile.distroless
+
+    uses: ./.github/workflows/_reusable-docker-build.yml
+    with:
+      dockerfile: ${{ matrix.dockerfile.file }}
+      image-name: ${{ github.repository }}
+      push: true
+      platforms: linux/amd64,linux/arm64
+      build-args: |
+        VERSION=${{ github.event.inputs.version || github.ref_name }}
+        BUILDTIME=${{ github.event.repository.updated_at }}
+
+  # Create GitHub release
+  create-release:
+    name: Create GitHub Release
+    needs: [validate, test, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          PREV_TAG=$(git describe --tags --abbrev=0 $VERSION^ 2>/dev/null || echo "")
+
+          echo "## What's Changed" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          if [ -n "$PREV_TAG" ]; then
+            git log $PREV_TAG..$VERSION --pretty=format:"- %s (%h)" --no-merges >> CHANGELOG.md
+          else
+            git log $VERSION --pretty=format:"- %s (%h)" --no-merges >> CHANGELOG.md
+          fi
+
+          echo "" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...$VERSION" >> CHANGELOG.md
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.version || github.ref_name }}
+          name: Release ${{ github.event.inputs.version || github.ref_name }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Deploy to production
+  deploy-production:
+    name: Deploy to Production
+    needs: create-release
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
+    with:
+      environment: production
+      image_tag: ${{ github.event.inputs.version || github.ref_name }}
+
+  # Update Helm chart
+  update-helm-chart:
+    name: Update Helm Chart
+    needs: create-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Chart.yaml version
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          VERSION_NO_V="${VERSION#v}"
+
+          sed -i "s/^version: .*/version: $VERSION_NO_V/" helm/mlops-sentiment/Chart.yaml
+          sed -i "s/^appVersion: .*/appVersion: \"$VERSION\"/" helm/mlops-sentiment/Chart.yaml
+
+      - name: Package Helm chart
+        run: |
+          helm package helm/mlops-sentiment/ -d helm-packages/
+
+      - name: Upload Helm chart as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: helm-chart-${{ github.event.inputs.version || github.ref_name }}
+          path: helm-packages/*.tgz
+          retention-days: 90
+
+  # Notify release
+  notify:
+    name: Notify Release
+    needs: [deploy-production, update-helm-chart]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Send Slack notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            🚀 Release ${{ github.event.inputs.version || github.ref_name }} deployed!
+
+            **Status**: ${{ needs.deploy-production.result }}
+            **Environment**: Production
+            **Image**: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.version || github.ref_name }}
+
+            [View Release](https://github.com/${{ github.repository }}/releases/tag/${{ github.event.inputs.version || github.ref_name }})
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: always()

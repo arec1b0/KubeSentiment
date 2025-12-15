@@ -1,0 +1,153 @@
+name: Reusable Docker Build
+
+on:
+  workflow_call:
+    inputs:
+      dockerfile:
+        description: "Dockerfile to use"
+        required: false
+        type: string
+        default: "Dockerfile"
+      image-name:
+        description: "Image name (without registry)"
+        required: true
+        type: string
+      push:
+        description: "Push image to registry"
+        required: false
+        type: boolean
+        default: false
+      platforms:
+        description: "Target platforms (comma-separated)"
+        required: false
+        type: string
+        default: "linux/amd64"
+      build-args:
+        description: "Build arguments (newline-separated KEY=VALUE)"
+        required: false
+        type: string
+        default: ""
+    outputs:
+      image-tag:
+        description: "Short image tag"
+        value: ${{ jobs.build.outputs.tag }}
+      image-full:
+        description: "Full image reference"
+        value: ${{ jobs.build.outputs.full }}
+      image-digest:
+        description: "Image digest"
+        value: ${{ jobs.build.outputs.digest }}
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.extract.outputs.tag }}
+      full: ${{ steps.extract.outputs.full }}
+      digest: ${{ steps.build.outputs.digest }}
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to registry
+        if: ${{ inputs.push }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ inputs.image-name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix={{branch}}-,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=${{ inputs.image-name }}
+            org.opencontainers.image.description=KubeSentiment MLOps Microservice
+            org.opencontainers.image.vendor=KubeSentiment
+
+      - name: Prepare build args
+        id: build-args
+        run: |
+          # Add standard build args
+          BUILD_ARGS="BUILDTIME=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}"
+          BUILD_ARGS="$BUILD_ARGS
+          VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}"
+          BUILD_ARGS="$BUILD_ARGS
+          REVISION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}"
+
+          # Add custom build args if provided
+          if [ -n "${{ inputs.build-args }}" ]; then
+            BUILD_ARGS="$BUILD_ARGS
+          ${{ inputs.build-args }}"
+          fi
+
+          # Convert to multiline format for GitHub Actions
+          echo "args<<EOF" >> $GITHUB_OUTPUT
+          echo "$BUILD_ARGS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ inputs.dockerfile }}
+          platforms: ${{ inputs.platforms }}
+          push: ${{ inputs.push }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: ${{ steps.build-args.outputs.args }}
+
+      - name: Extract image info
+        id: extract
+        run: |
+          FULL_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          SHORT_TAG=$(echo "$FULL_TAG" | cut -d':' -f2)
+          echo "tag=$SHORT_TAG" >> $GITHUB_OUTPUT
+          echo "full=$FULL_TAG" >> $GITHUB_OUTPUT
+          echo "Extracted tag: $SHORT_TAG"
+          echo "Full image: $FULL_TAG"
+          echo "Digest: ${{ steps.build.outputs.digest }}"
+
+      - name: Generate SBOM
+        if: ${{ inputs.push }}
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ steps.extract.outputs.full }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: Upload SBOM
+        if: ${{ inputs.push }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom.spdx.json
+          retention-days: 30
