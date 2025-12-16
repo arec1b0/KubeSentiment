@@ -139,7 +139,18 @@ function Deploy-Application {
     
     # Add values file if it exists
     if (Test-Path "$ChartPath\$ValuesFile") {
-        $helmArgs += "-f", "$ChartPath\$ValuesFile"
+        # Validate YAML syntax
+        try {
+            $yamlContent = Get-Content "$ChartPath\$ValuesFile" -Raw
+            # Basic YAML validation - check for common syntax errors
+            if ($yamlContent -match ':\s*$' -or $yamlContent -match '^\s*-\s*$') {
+                throw "Invalid YAML structure detected"
+            }
+            $helmArgs += "-f", "$ChartPath\$ValuesFile"
+        } catch {
+            Write-Error "Invalid YAML in $ValuesFile : $_"
+            exit 1
+        }
     } else {
         Write-Warning "Values file $ValuesFile not found, using default values"
     }

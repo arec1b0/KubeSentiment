@@ -66,14 +66,24 @@ if ($minikubeRunning) {
     }
 }
 
+# Check available resources
+$availableMemory = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1MB
+$requestedMemory = 8192
+
+if ($availableMemory -lt 10240) {
+    Write-Warning "Low memory detected ($([math]::Round($availableMemory))MB available). Reducing Minikube memory allocation."
+    $requestedMemory = 4096
+}
+
 # Start Minikube with optimized settings for ML workloads
 Write-Host "Starting Minikube..." -ForegroundColor Blue
+Write-Host "Allocating ${requestedMemory}MB memory, 4 CPUs, 20GB disk" -ForegroundColor Cyan
 $k8sVersion = "v1.28.3"
 
 minikube start `
     --driver=docker `
     --cpus=4 `
-    --memory=8192 `
+    --memory=$requestedMemory `
     --disk-size=20g `
     --kubernetes-version=$k8sVersion `
     --container-runtime=docker `
@@ -84,7 +94,7 @@ if ($LASTEXITCODE -ne 0) {
     minikube start `
         --driver=docker `
         --cpus=4 `
-        --memory=8192 `
+        --memory=$requestedMemory `
         --disk-size=20g `
         --kubernetes-version=stable `
         --container-runtime=docker `
@@ -93,6 +103,12 @@ if ($LASTEXITCODE -ne 0) {
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Failed to start Minikube" -ForegroundColor Red
         exit 1
+    }
+    
+    # Show actual version used
+    $actualVersion = minikube kubectl -- version --short 2>$null | Select-String "Server Version"
+    if ($actualVersion) {
+        Write-Host "Started with stable version: $actualVersion" -ForegroundColor Cyan
     }
 }
 
