@@ -121,14 +121,6 @@ function Install-Monitoring {
 function Deploy-Application {
     Write-Info "Deploying MLOps Sentiment Analysis application..."
     
-    # Check if values file exists
-    $ValuesArg = ""
-    if (Test-Path "$ChartPath\$ValuesFile") {
-        $ValuesArg = "-f $ChartPath\$ValuesFile"
-    } else {
-        Write-Warning "Values file $ValuesFile not found, using default values"
-    }
-    
     # Build helm command
     $imageTag = if ($env:IMAGE_TAG) { $env:IMAGE_TAG } else { "latest" }
     $debug = if ($env:DEBUG) { $env:DEBUG } else { "false" }
@@ -145,8 +137,11 @@ function Deploy-Application {
         "--timeout=10m"
     )
     
-    if ($ValuesArg) {
-        $helmArgs += $ValuesArg.Split()
+    # Add values file if it exists
+    if (Test-Path "$ChartPath\$ValuesFile") {
+        $helmArgs += "-f", "$ChartPath\$ValuesFile"
+    } else {
+        Write-Warning "Values file $ValuesFile not found, using default values"
     }
     
     & helm @helmArgs

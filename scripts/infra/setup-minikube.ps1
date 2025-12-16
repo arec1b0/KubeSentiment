@@ -68,14 +68,33 @@ if ($minikubeRunning) {
 
 # Start Minikube with optimized settings for ML workloads
 Write-Host "Starting Minikube..." -ForegroundColor Blue
+$k8sVersion = "v1.28.3"
+
 minikube start `
     --driver=docker `
     --cpus=4 `
     --memory=8192 `
     --disk-size=20g `
-    --kubernetes-version=v1.28.3 `
+    --kubernetes-version=$k8sVersion `
     --container-runtime=docker `
     --extra-config=kubelet.housekeeping-interval=10s
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Version $k8sVersion failed, trying stable version..."
+    minikube start `
+        --driver=docker `
+        --cpus=4 `
+        --memory=8192 `
+        --disk-size=20g `
+        --kubernetes-version=stable `
+        --container-runtime=docker `
+        --extra-config=kubelet.housekeeping-interval=10s
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Failed to start Minikube" -ForegroundColor Red
+        exit 1
+    }
+}
 
 Write-Host "Minikube started successfully!" -ForegroundColor Green
 

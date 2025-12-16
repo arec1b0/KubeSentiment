@@ -73,17 +73,17 @@ Write-Host "Image size: $ImageSize" -ForegroundColor Cyan
 # Test the image
 Write-Host ""
 Write-Host "Testing image..." -ForegroundColor Yellow
-docker run --rm "$ImageName" python -c @"
+docker run --rm "$ImageName" python -c @'
 import sys
 sys.path.insert(0, '/app')
 from app.models.persistence import ModelPersistenceManager
 mgr = ModelPersistenceManager(cache_dir='/models')
 info = mgr.get_cache_info()
-print(f'Models cached: {info[""cached_models_count""]}')
-print(f'Cache size: {info[""total_cache_size_mb""]} MB')
+print(f"Models cached: {info['cached_models_count']}")
+print(f"Cache size: {info['total_cache_size_mb']} MB")
 for model in info['cached_models']:
-    print(f'  - {model}')
-"@
+    print(f"  - {model}")
+'@
 
 # Push if requested
 if ($Push) {
