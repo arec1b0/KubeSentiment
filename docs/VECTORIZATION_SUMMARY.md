@@ -8,34 +8,38 @@ This document summarizes the stream processing vectorization optimization implem
 
 ## 📊 Performance Results
 
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| **Avg Latency** | 300ms | 50ms | **83% reduction** |
-| **Throughput** | 3.3 req/s | 20 req/s | **6x increase** |
-| **P95 Latency** | 310ms | 53ms | **82.9% reduction** |
-| **P99 Latency** | 315ms | 54ms | **82.9% reduction** |
+| Metric          | Before    | After    | Improvement         |
+| --------------- | --------- | -------- | ------------------- |
+| **Avg Latency** | 300ms     | 50ms     | **83% reduction**   |
+| **Throughput**  | 3.3 req/s | 20 req/s | **6x increase**     |
+| **P95 Latency** | 310ms     | 53ms     | **82.9% reduction** |
+| **P99 Latency** | 315ms     | 54ms     | **82.9% reduction** |
 
 ---
 
 ## 🏗️ Components Implemented
 
 ### 1. **Model Strategy Enhancement** (`app/models/base.py`)
+
 - ✅ Added `predict_batch()` method to `ModelStrategy` protocol
 - ✅ Enables vectorized batch processing across all model backends
 
 ### 2. **PyTorch Vectorization** (`app/models/pytorch_sentiment.py`)
+
 - ✅ Implemented `predict_batch()` with Hugging Face pipeline batching
 - ✅ Vectorized tokenization and inference
 - ✅ Integrated caching for batch requests
 - ✅ Comprehensive logging and metrics
 
 ### 3. **ONNX Vectorization** (`app/models/onnx_sentiment.py`)
+
 - ✅ Implemented `predict_batch()` with ONNX Runtime optimization
 - ✅ Single forward pass for multiple inputs
 - ✅ Vectorized tensor operations (softmax, argmax)
 - ✅ Efficient padding and batching
 
 ### 4. **Stream Processor** (`app/services/stream_processor.py`)
+
 - ✅ Intelligent dynamic batching
 - ✅ Configurable batch size and wait time
 - ✅ Async request handling with futures
@@ -43,6 +47,7 @@ This document summarizes the stream processing vectorization optimization implem
 - ✅ Graceful shutdown with queue draining
 
 **Features:**
+
 ```python
 BatchConfig:
   - max_batch_size: 32 (adjustable)
@@ -52,12 +57,14 @@ BatchConfig:
 ```
 
 ### 5. **Prediction Service Enhancement** (`app/services/prediction.py`)
+
 - ✅ Added `predict_batch()` method
 - ✅ Input validation for batch requests
 - ✅ Error handling for individual items in batch
 - ✅ Maintains backward compatibility with single predictions
 
 ### 6. **Benchmarking Utilities** (`app/utils/benchmark.py`)
+
 - ✅ Single prediction benchmarking
 - ✅ Batch prediction benchmarking
 - ✅ Stream processing benchmarking
@@ -65,12 +72,14 @@ BatchConfig:
 - ✅ Comparison and reporting tools
 
 ### 7. **Demonstration Script** (`scripts/benchmark_vectorization.py`)
+
 - ✅ Comprehensive performance demonstration
 - ✅ Side-by-side comparison of methods
 - ✅ Visual results with formatted output
 - ✅ Target achievement validation
 
 ### 8. **Documentation** (`docs/VECTORIZATION_OPTIMIZATION.md`)
+
 - ✅ Architecture overview
 - ✅ Implementation details
 - ✅ Usage examples
@@ -84,6 +93,7 @@ BatchConfig:
 ### Vectorization Techniques
 
 #### **1. Batch Tokenization**
+
 ```python
 # Instead of: for text in texts: tokenize(text)
 # We do: tokenize(texts) - single call with automatic padding
@@ -91,6 +101,7 @@ inputs = tokenizer(texts, padding=True, return_tensors="pt")
 ```
 
 #### **2. Vectorized Inference**
+
 ```python
 # Single forward pass for entire batch
 outputs = model(**inputs)  # Shape: [batch_size, ...]
@@ -98,6 +109,7 @@ predictions = torch.argmax(outputs.logits, dim=-1)  # Vectorized
 ```
 
 #### **3. Dynamic Batching**
+
 ```python
 # Collect requests until:
 # - Batch size reaches max (32)
@@ -108,16 +120,19 @@ predictions = torch.argmax(outputs.logits, dim=-1)  # Vectorized
 ### Key Optimization Points
 
 1. **Reduced Python Overhead**
+
    - Single function call instead of loop
    - Fewer context switches
    - Minimized interpreter overhead
 
 2. **Hardware Utilization**
+
    - Parallel GPU/CPU operations
    - SIMD instructions
    - Optimized memory access
 
 3. **Efficient Caching**
+
    - Batch cache lookups
    - Only process uncached items
    - Merge cached and new results
@@ -159,11 +174,13 @@ Stream:  ████████████████████         20
 ## 🚀 Usage
 
 ### Run Benchmark
+
 ```bash
 python scripts/benchmark_vectorization.py
 ```
 
 ### Use in Code
+
 ```python
 from app.services.stream_processor import StreamProcessor, BatchConfig
 
@@ -180,6 +197,7 @@ print(f"Avg batch size: {stats['avg_batch_size']}")
 ```
 
 ### Batch Predictions
+
 ```python
 from app.services.prediction import PredictionService
 
@@ -192,12 +210,14 @@ results = service.predict_batch(texts)  # List of texts
 ## 📁 Files Modified/Created
 
 ### Modified Files
+
 - ✅ `app/models/base.py` - Added batch prediction protocol
 - ✅ `app/models/pytorch_sentiment.py` - Vectorized PyTorch implementation
 - ✅ `app/models/onnx_sentiment.py` - Vectorized ONNX implementation
 - ✅ `app/services/prediction.py` - Added batch prediction service
 
 ### New Files Created
+
 - ✅ `app/services/stream_processor.py` - Stream processing with batching
 - ✅ `app/utils/benchmark.py` - Performance benchmarking utilities
 - ✅ `scripts/benchmark_vectorization.py` - Demo script
@@ -209,12 +229,14 @@ results = service.predict_batch(texts)  # List of texts
 ## ✅ Quality Assurance
 
 ### Testing
+
 - ✅ All existing tests pass
 - ✅ Backward compatibility maintained
 - ✅ Comprehensive error handling
 - ✅ Type hints throughout
 
 ### Code Quality
+
 - ✅ Follows MLOps best practices
 - ✅ Comprehensive logging
 - ✅ Structured error handling
@@ -222,6 +244,7 @@ results = service.predict_batch(texts)  # List of texts
 - ✅ Extensive documentation
 
 ### Performance Validation
+
 - ✅ Benchmarking utilities
 - ✅ Statistical analysis
 - ✅ Percentile tracking
@@ -234,11 +257,13 @@ results = service.predict_batch(texts)  # List of texts
 ### Why Vectorization Works
 
 1. **Matrix Operations are Faster**
+
    - GPUs/CPUs optimized for matrix math
    - SIMD (Single Instruction Multiple Data)
    - Better cache utilization
 
 2. **Reduced Overhead**
+
    - Single model call vs. many
    - Batch tokenization
    - Amortized initialization costs
@@ -250,13 +275,13 @@ results = service.predict_batch(texts)  # List of texts
 
 ### Trade-offs
 
-| Aspect | Single | Batch/Stream |
-|--------|--------|--------------|
-| **Latency (empty load)** | Low | Slightly higher (wait time) |
-| **Latency (high load)** | High | Much lower |
-| **Throughput** | Low | Much higher |
-| **Implementation** | Simple | More complex |
-| **Resource Usage** | Inefficient | Efficient |
+| Aspect                   | Single      | Batch/Stream                |
+| ------------------------ | ----------- | --------------------------- |
+| **Latency (empty load)** | Low         | Slightly higher (wait time) |
+| **Latency (high load)**  | High        | Much lower                  |
+| **Throughput**           | Low         | Much higher                 |
+| **Implementation**       | Simple      | More complex                |
+| **Resource Usage**       | Inefficient | Efficient                   |
 
 ---
 
@@ -264,19 +289,24 @@ results = service.predict_batch(texts)  # List of texts
 
 Potential further optimizations:
 
-1. **Model Quantization**
-   - INT8 quantization for faster inference
-   - Reduced memory footprint
+1. **Model Quantization (Implemented for ONNX)**
+
+   - INT8 dynamic quantization (weights-only; no calibration) for CPU cost optimization
+   - Produces `model.quantized.onnx` (and a legacy `model_quantized.onnx` copy)
+   - Export command: `python scripts/ops/convert_to_onnx.py --quantize`
 
 2. **Multi-GPU Support**
+
    - Distribute batches across GPUs
    - Even higher throughput
 
 3. **Request Prioritization**
+
    - Fast-lane for urgent requests
    - Separate queues by priority
 
 4. **Adaptive Batching**
+
    - ML-based batch size prediction
    - Learn optimal parameters from traffic
 
@@ -298,17 +328,20 @@ Potential further optimizations:
 ## 🏆 Impact Summary
 
 ### Business Value
+
 - ✅ **6x throughput improvement** → Handle 6x more users with same hardware
 - ✅ **83% latency reduction** → Much better user experience
 - ✅ **Better resource utilization** → Lower cloud costs
 
 ### Technical Excellence
+
 - ✅ **Modern MLOps practices** → Production-ready architecture
 - ✅ **Comprehensive monitoring** → Full observability
 - ✅ **Flexible configuration** → Adapt to different workloads
 - ✅ **Maintainable code** → Clean abstractions and patterns
 
 ### Scalability
+
 - ✅ **Handles concurrent requests** → Ready for high traffic
 - ✅ **Dynamic batching** → Adapts to load patterns
 - ✅ **Resource efficient** → Scales cost-effectively
@@ -318,4 +351,3 @@ Potential further optimizations:
 **Status**: ✅ **COMPLETE** - All objectives achieved, 83% latency reduction validated
 
 For questions or additional information, please refer to the comprehensive documentation in `docs/VECTORIZATION_OPTIMIZATION.md`.
-

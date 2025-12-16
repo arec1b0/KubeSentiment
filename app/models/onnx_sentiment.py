@@ -104,7 +104,8 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
         """Find the best available ONNX model file.
 
         Prioritizes quantized models for better CPU performance:
-        1. model_quantized.onnx (INT8 quantized - ~4x smaller, 2-3x faster on CPU)
+        1. model.quantized.onnx (INT8 quantized - ~4x smaller, 2-3x faster on CPU)
+        2. model_quantized.onnx (legacy name; still supported)
         2. model_optimized.onnx (graph optimized)
         3. model.onnx (base model)
         4. Any other .onnx file
@@ -114,6 +115,7 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
         """
         # Priority order for model files
         priority_files = [
+            "model.quantized.onnx",
             "model_quantized.onnx",
             "model_optimized.onnx",
             "model.onnx",
@@ -141,7 +143,8 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
         """Load the ONNX model and tokenizer.
 
         Prioritizes quantized models for better performance:
-        1. model_quantized.onnx (INT8 quantized - fastest on CPU)
+        1. model.quantized.onnx (INT8 quantized - fastest on CPU)
+        2. model_quantized.onnx (legacy name; still supported)
         2. model_optimized.onnx (graph optimized)
         3. model.onnx (base model)
         4. Any other .onnx file
@@ -485,7 +488,9 @@ class ONNXSentimentAnalyzer(BaseModelMetrics):
         self._update_metrics(inference_time, prediction_count=len(valid_texts))
 
         # Build results array with placeholders for invalid texts
-        results = self._build_batch_results(raw_results, valid_indices, len(texts), inference_time_ms)
+        results = self._build_batch_results(
+            raw_results, valid_indices, len(texts), inference_time_ms
+        )
 
         ctx_logger.info(
             "ONNX batch prediction completed",
@@ -668,12 +673,32 @@ class ONNXModelOptimizer:
                 ONNXModelOptimizer.optimize_graph(str(onnx_path), str(optimized_path))
                 final_model_path = optimized_path
 
-            # Apply INT8 quantization
+            # Apply INT8 dynamic quantization (weights-only; no calibration)
             if quantize:
                 input_path = final_model_path
-                quantized_path = output_dir / "model_quantized.onnx"
-                ONNXModelOptimizer.quantize_model(str(input_path), str(quantized_path))
+                quantized_path = output_dir / "model.quantized.onnx"
+                metrics = ONNXModelOptimizer.quantize_model(
+                    input_path=str(input_path),
+                    output_path=str(quantized_path),
+                    op_types_to_quantize=["MatMul", "Gemm"],
+                )
+                # Backward-compatible artifact name used by older deployments/docs
+                legacy_quantized_path = output_dir / "model_quantized.onnx"
+                if legacy_quantized_path != quantized_path and not legacy_quantized_path.exists():
+                    try:
+                        import shutil
+
+                        shutil.copy2(quantized_path, legacy_quantized_path)
+                    except Exception:
+                        # Non-fatal: primary artifact already created.
+                        logger.warning(
+                            "Failed to create legacy quantized artifact name",
+                            legacy_path=str(legacy_quantized_path),
+                            primary_path=str(quantized_path),
+                        )
+
                 final_model_path = quantized_path
+                logger.info("Quantization metrics", **metrics)
 
             logger.info("Model export completed", final_path=str(final_model_path))
             return str(final_model_path)
@@ -714,6 +739,8 @@ class ONNXModelOptimizer:
         input_path: str,
         output_path: str,
         weight_type: str = "QInt8",
+        op_types_to_quantize: list[str] | None = None,
+        validate_session: bool = True,
     ) -> dict[str, Any]:
         """Apply INT8 dynamic quantization to an ONNX model.
 
@@ -725,6 +752,10 @@ class ONNXModelOptimizer:
             input_path: Path to the input ONNX model.
             output_path: Path to save the quantized model.
             weight_type: Quantization type - "QInt8" or "QUInt8" (default: "QInt8").
+            op_types_to_quantize: Optional list of op types to quantize. Defaults to
+                ["MatMul", "Gemm"] to target transformer linear layers.
+            validate_session: If True, validates the resulting model by creating an
+                onnxruntime.InferenceSession on CPU.
 
         Returns:
             Dictionary containing quantization metrics:
@@ -744,6 +775,7 @@ class ONNXModelOptimizer:
                 "Applying INT8 dynamic quantization",
                 input_path=input_path,
                 weight_type=weight_type,
+                op_types_to_quantize=op_types_to_quantize,
             )
 
             # Map string to QuantType enum
@@ -753,13 +785,27 @@ class ONNXModelOptimizer:
             }
             quant_type = quant_type_map.get(weight_type, QuantType.QInt8)
 
-            # Apply dynamic quantization
+            # Default: target transformer linear layers
+            if op_types_to_quantize is None:
+                op_types_to_quantize = ["MatMul", "Gemm"]
+
+            # Apply dynamic quantization (weights only)
             quantize_dynamic(
                 input_path,
                 output_path,
                 weight_type=quant_type,
+                op_types_to_quantize=op_types_to_quantize,
                 extra_options={"MatMulConstBOnly": True},
             )
+
+            if validate_session:
+                sess_options = ort.SessionOptions()
+                sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+                _ = ort.InferenceSession(
+                    output_path,
+                    sess_options=sess_options,
+                    providers=["CPUExecutionProvider"],
+                )
 
             # Calculate size metrics
             original_size = os.path.getsize(input_path)

@@ -18,8 +18,9 @@ Usage:
 """
 
 import argparse
-from pathlib import Path
+import shutil
 import sys
+from pathlib import Path
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -161,7 +162,8 @@ def quantize_existing_model(input_model: str, output_dir: str) -> int:
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    quantized_path = output_path / "model_quantized.onnx"
+    quantized_path = output_path / "model.quantized.onnx"
+    legacy_quantized_path = output_path / "model_quantized.onnx"
 
     logger.info(
         "Quantizing existing ONNX model",
@@ -173,7 +175,20 @@ def quantize_existing_model(input_model: str, output_dir: str) -> int:
         metrics = ONNXModelOptimizer.quantize_model(
             input_path=str(input_path),
             output_path=str(quantized_path),
+            op_types_to_quantize=["MatMul", "Gemm"],
         )
+
+        # Backward-compatible artifact name
+        if legacy_quantized_path != quantized_path and not legacy_quantized_path.exists():
+            try:
+                shutil.copy2(quantized_path, legacy_quantized_path)
+            except Exception as e:
+                logger.warning(
+                    "Failed to create legacy quantized artifact name",
+                    error=str(e),
+                    legacy_path=str(legacy_quantized_path),
+                    primary_path=str(quantized_path),
+                )
 
         print("\n✓ Model successfully quantized")
         print(f"  Input: {input_model}")
