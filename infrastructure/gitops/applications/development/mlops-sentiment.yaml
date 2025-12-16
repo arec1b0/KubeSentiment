@@ -1,0 +1,62 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-sentiment-development
+  namespace: argocd
+  labels:
+    app: mlops-sentiment
+    environment: development
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: kubesentiment
+
+  source:
+    repoURL: https://github.com/arec1b0/KubeSentiment.git
+    targetRevision: develop  # Track develop branch for development environment
+    path: helm/mlops-sentiment
+    helm:
+      releaseName: mlops-sentiment
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+      parameters:
+        - name: image.repository
+          value: ghcr.io/arec1b0/kubesentiment
+        - name: image.tag
+          value: develop  # Will be updated by CI
+        - name: replicaCount
+          value: "1"
+        - name: deployment.env.MLOPS_PROFILE
+          value: development
+        - name: deployment.env.MLOPS_DEBUG
+          value: "true"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mlops-sentiment-dev
+
+  syncPolicy:
+    automated:
+      prune: true      # Remove resources that are no longer defined in Git
+      selfHeal: true   # Automatically sync when cluster state differs from Git
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true  # Automatically create namespace if it doesn't exist
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 10
+
+  # Health assessment
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # Ignore replica count differences (for HPA)

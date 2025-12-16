@@ -1,10 +1,17 @@
-name: Deploy to Kubernetes
+name: Deploy to Kubernetes (Legacy - Deprecated)
+
+# ⚠️ DEPRECATED: This workflow is deprecated in favor of GitOps with ArgoCD
+# Use .github/workflows/gitops-update.yml instead
+#
+# This workflow is kept for emergency manual deployments only
+# For normal deployments, use the GitOps workflow which updates the Git repository
+# and lets ArgoCD automatically sync the changes to the cluster
 
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment to deploy"
+        description: "Environment to deploy (EMERGENCY ONLY)"
         required: true
         type: choice
         options:
@@ -15,6 +22,10 @@ on:
         description: "Image tag to deploy"
         required: true
         type: string
+      emergency:
+        description: "Confirm this is an emergency deployment (type 'yes')"
+        required: true
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -22,13 +33,24 @@ env:
 
 jobs:
   deploy:
-    name: Deploy to ${{ inputs.environment }}
+    name: Deploy to ${{ inputs.environment }} (Emergency)
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    if: ${{ inputs.emergency == 'yes' }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Warning - Emergency Deployment
+        run: |
+          echo "⚠️⚠️⚠️ WARNING: EMERGENCY DEPLOYMENT ⚠️⚠️⚠️"
+          echo ""
+          echo "This is an emergency deployment bypassing GitOps."
+          echo "Please ensure you update the GitOps repository after this deployment."
+          echo ""
+          echo "Proceeding in 10 seconds..."
+          sleep 10
 
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
@@ -83,7 +105,7 @@ jobs:
             --values ./helm/mlops-sentiment/${{ steps.params.outputs.values_file }} \
             --wait --timeout=10m
 
-          echo "✅ Deployment to ${{ inputs.environment }} completed successfully"
+          echo "✅ Emergency deployment to ${{ inputs.environment }} completed"
 
       - name: Run health checks
         run: |
@@ -98,22 +120,18 @@ jobs:
           echo "Pod status:"
           kubectl get pods -n ${{ steps.params.outputs.namespace }} -l app.kubernetes.io/name=mlops-sentiment
 
-      - name: Run smoke tests
+      - name: Post-deployment notice
         run: |
-          export KUBECONFIG=$HOME/.kube/config
-
-          if kubectl get ingress -n ${{ steps.params.outputs.namespace }} mlops-sentiment &>/dev/null; then
-            SERVICE_URL=$(kubectl get ingress mlops-sentiment -n ${{ steps.params.outputs.namespace }} -o jsonpath='{.spec.rules[0].host}')
-            echo "Testing health endpoint: http://$SERVICE_URL/health"
-
-            for i in {1..5}; do
-              if curl -f -s -o /dev/null -w "%{http_code}" http://$SERVICE_URL/health | grep -q "200"; then
-                echo "✅ Health check passed"
-                exit 0
-              fi
-              echo "Attempt $i/5 failed, waiting 10 seconds..."
-              sleep 10
-            done
+          echo "⚠️ IMPORTANT: Emergency Deployment Complete"
+          echo ""
+          echo "Next steps:"
+          echo "1. Update GitOps repository to match this deployment"
+          echo "2. Run: git checkout ${{ github.ref_name }}"
+          echo "3. Update infrastructure/gitops/environments/${{ inputs.environment }}/values.yaml"
+          echo "4. Set image.tag to: ${{ inputs.image_tag }}"
+          echo "5. Commit and push: git add . && git commit -m 'chore(gitops): sync ${{ inputs.environment }} after emergency deployment' && git push"
+          echo ""
+          echo "This ensures ArgoCD state matches the cluster state."
 
             echo "❌ Health check failed after 5 attempts"
             exit 1

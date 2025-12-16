@@ -1,0 +1,26 @@
+# Development Environment Values for GitOps
+# This file contains image tags and configuration managed by CI/CD
+# DO NOT EDIT MANUALLY - Updated automatically by CI pipeline
+
+image:
+  repository: ghcr.io/arec1b0/kubesentiment
+  tag: develop  # Updated by CI
+
+replicaCount: 1
+
+deployment:
+  env:
+    MLOPS_PROFILE: development
+    MLOPS_DEBUG: "true"
+    MLOPS_LOG_LEVEL: DEBUG
+
+autoscaling:
+  enabled: false
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi

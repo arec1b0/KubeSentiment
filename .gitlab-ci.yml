@@ -295,10 +295,98 @@ security:sast:
     - template: Security/SAST.gitlab-ci.yml
 
 # =============================================================================
-# DEPLOY STAGE - Kubernetes Deployment with Helm
+# DEPLOY STAGE - GitOps Update (ArgoCD)
 # =============================================================================
 
-.deploy_base:
+# GitOps pattern: Update Git repository with new image tags
+# ArgoCD automatically syncs changes to the cluster
+
+.gitops_update_base:
+  stage: deploy
+  image: alpine/git
+  needs: ["build:docker", "security:trivy-scan"]
+  before_script:
+    - apk add --no-cache curl yq
+    - |
+      # Setup git credentials
+      git config --global user.name "GitLab CI"
+      git config --global user.email "ci@gitlab.com"
+  script:
+    - |
+      echo "Updating GitOps repository for $ENVIRONMENT environment..."
+      echo "Image tag: $IMAGE_TAG"
+
+      # Update environment-specific values file
+      yq eval ".image.tag = \"$IMAGE_TAG\"" -i "infrastructure/gitops/environments/$ENVIRONMENT/values.yaml"
+
+      # Update ArgoCD Application manifest
+      yq eval ".spec.source.helm.parameters[] |= select(.name == \"image.tag\").value = \"$IMAGE_TAG\"" \
+        -i "infrastructure/gitops/applications/$ENVIRONMENT/mlops-sentiment.yaml"
+
+      # Commit and push changes
+      git add infrastructure/gitops/environments/$ENVIRONMENT/values.yaml
+      git add infrastructure/gitops/applications/$ENVIRONMENT/mlops-sentiment.yaml
+
+      if git diff --staged --quiet; then
+        echo "No changes to commit"
+      else
+        git commit -m "chore(gitops): update $ENVIRONMENT image to $IMAGE_TAG [skip ci]"
+
+        # Push using GitLab CI token
+        git remote set-url origin https://gitlab-ci-token:${CI_JOB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git
+        git push origin HEAD:${CI_COMMIT_REF_NAME}
+
+        echo "✅ GitOps repository updated successfully"
+        echo ""
+        echo "ArgoCD will automatically sync the changes to $ENVIRONMENT environment"
+        echo "Monitor sync status: argocd app get mlops-sentiment-$ENVIRONMENT"
+      fi
+
+gitops:development:
+  extends: .gitops_update_base
+  environment:
+    name: development
+    url: https://dev.kubesentiment.example.com
+    action: prepare
+  variables:
+    ENVIRONMENT: "development"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: on_success
+
+gitops:staging:
+  extends: .gitops_update_base
+  environment:
+    name: staging
+    url: https://staging.kubesentiment.example.com
+    action: prepare
+  variables:
+    ENVIRONMENT: "staging"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: on_success
+
+gitops:production:
+  extends: .gitops_update_base
+  environment:
+    name: production
+    url: https://kubesentiment.example.com
+    action: prepare
+  variables:
+    ENVIRONMENT: "production"
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
+      when: manual
+  allow_failure: false
+
+# =============================================================================
+# LEGACY DEPLOY STAGE - Direct Helm Deployment (Emergency Only)
+# =============================================================================
+
+# ⚠️ DEPRECATED: These jobs are kept for emergency deployments only
+# Normal deployments should use the GitOps pattern above
+
+.deploy_base_legacy:
   stage: deploy
   image: alpine/helm:${HELM_VERSION}
   needs: ["build:docker", "security:trivy-scan"]
@@ -323,7 +411,9 @@ security:sast:
       fi
   script:
     - |
-      echo "Deploying to $ENVIRONMENT environment..."
+      echo "⚠️⚠️⚠️ WARNING: EMERGENCY DEPLOYMENT ⚠️⚠️⚠️"
+      echo "This bypasses GitOps. Update GitOps repo after deployment!"
+      echo ""
 
       # Deploy with Helm
       helm upgrade --install mlops-sentiment ./helm/mlops-sentiment \
@@ -336,7 +426,7 @@ security:sast:
         --values ./helm/mlops-sentiment/values-${ENVIRONMENT}.yaml \
         --wait --timeout=10m
 
-      echo "✅ Deployment completed successfully"
+      echo "✅ Emergency deployment completed"
 
       # Wait for pods to be ready
       kubectl wait --for=condition=ready pod \
@@ -344,20 +434,10 @@ security:sast:
         -n $NAMESPACE \
         --timeout=300s
 
-      # Display deployment status
-      echo "📊 Deployment Status:"
-      kubectl get all -n $NAMESPACE -l app.kubernetes.io/name=mlops-sentiment
+      echo "⚠️ IMPORTANT: Update GitOps repository to match this deployment"
 
-      # Health check
-      echo "🏥 Running health check..."
-      POD_NAME=$(kubectl get pod -n $NAMESPACE -l app.kubernetes.io/name=mlops-sentiment -o jsonpath='{.items[0].metadata.name}')
-      kubectl exec -n $NAMESPACE $POD_NAME -- curl -f http://localhost:8000/api/v1/health || \
-        kubectl exec -n $NAMESPACE $POD_NAME -- curl -f http://localhost:8000/health
-
-      echo "✅ Health check passed"
-
-deploy:development:
-  extends: .deploy_base
+deploy:development:emergency:
+  extends: .deploy_base_legacy
   environment:
     name: development
     url: https://dev.kubesentiment.example.com
@@ -368,9 +448,10 @@ deploy:development:
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
       when: manual
+  allow_failure: false
 
-deploy:staging:
-  extends: .deploy_base
+deploy:staging:emergency:
+  extends: .deploy_base_legacy
   environment:
     name: staging
     url: https://staging.kubesentiment.example.com
@@ -381,9 +462,10 @@ deploy:staging:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
+  allow_failure: false
 
-deploy:production:
-  extends: .deploy_base
+deploy:production:emergency:
+  extends: .deploy_base_legacy
   environment:
     name: production
     url: https://kubesentiment.example.com
@@ -394,6 +476,7 @@ deploy:production:
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v[0-9]+\.[0-9]+\.[0-9]+$/'
       when: manual
+  allow_failure: false
 
 # =============================================================================
 # CLEANUP JOBS

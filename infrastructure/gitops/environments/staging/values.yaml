@@ -1,0 +1,29 @@
+# Staging Environment Values for GitOps
+# This file contains image tags and configuration managed by CI/CD
+# DO NOT EDIT MANUALLY - Updated automatically by CI pipeline
+
+image:
+  repository: ghcr.io/arec1b0/kubesentiment
+  tag: main  # Updated by CI
+
+replicaCount: 2
+
+deployment:
+  env:
+    MLOPS_PROFILE: staging
+    MLOPS_DEBUG: "false"
+    MLOPS_LOG_LEVEL: INFO
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+  requests:
+    cpu: 1000m
+    memory: 2Gi

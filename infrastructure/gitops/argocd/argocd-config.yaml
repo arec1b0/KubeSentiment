@@ -1,0 +1,126 @@
+# ArgoCD Configuration for KubeSentiment GitOps
+# Customize ArgoCD settings for the project
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # Enable Git repository credentials
+  # For GitHub, you can use HTTPS with personal access token or SSH keys
+  repositories: |
+    - url: https://github.com/arec1b0/KubeSentiment.git
+      passwordSecret:
+        name: github-credentials
+        key: password
+      usernameSecret:
+        name: github-credentials
+        key: username
+
+  # Repository credentials template
+  repository.credentials: |
+    - url: https://github.com/arec1b0
+      passwordSecret:
+        name: github-credentials
+        key: password
+      usernameSecret:
+        name: github-credentials
+        key: username
+
+  # Enable Helm value files from external repos
+  helm.valuesFileSchemes: >-
+    secrets+gpg-import, secrets+gpg-import-kubernetes,
+    secrets+age-import, secrets+age-import-kubernetes,
+    secrets,
+    https
+
+  # Application defaults
+  application.instanceLabelKey: argocd.argoproj.io/instance
+
+  # Timeout for application operations
+  timeout.reconciliation: 180s
+  timeout.hard.reconciliation: 0
+
+  # Enable resource tracking
+  application.resourceTrackingMethod: annotation
+
+  # Status badge
+  statusbadge.enabled: "true"
+
+  # Server properties
+  url: https://argocd.example.com  # Update with your ArgoCD URL
+
+  # SSO configuration (optional - example for GitHub OAuth)
+  # dex.config: |
+  #   connectors:
+  #   - type: github
+  #     id: github
+  #     name: GitHub
+  #     config:
+  #       clientID: $github-oauth:clientId
+  #       clientSecret: $github-oauth:clientSecret
+  #       orgs:
+  #       - name: arec1b0
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-rbac-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # RBAC policy
+  policy.default: role:readonly
+  policy.csv: |
+    # Admin role - full access
+    g, admins, role:admin
+
+    # Developer role - can sync applications in non-prod
+    p, role:developer, applications, get, */*, allow
+    p, role:developer, applications, sync, development/*, allow
+    p, role:developer, applications, sync, staging/*, allow
+    p, role:developer, applications, override, development/*, allow
+    p, role:developer, applications, override, staging/*, allow
+
+    # Production role - can sync production applications
+    p, role:prod-deployer, applications, get, */*, allow
+    p, role:prod-deployer, applications, sync, production/*, allow
+    p, role:prod-deployer, applications, override, production/*, allow
+
+    # Read-only role (default for all authenticated users)
+    p, role:readonly, applications, get, */*, allow
+    p, role:readonly, projects, get, *, allow
+    p, role:readonly, repositories, get, *, allow
+    p, role:readonly, clusters, get, *, allow
+
+    # Example: Grant admin to specific users
+    # g, user@example.com, role:admin
+
+    # Example: Grant developer access to CI/CD service account
+    # g, system:serviceaccount:argocd:argocd-application-controller, role:developer
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cmd-params-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cmd-params-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # Application controller
+  application.controller.self.heal.timeout.seconds: "5"
+  application.controller.status.processors: "20"
+  application.controller.operation.processors: "10"
+
+  # Server
+  server.insecure: "false"  # Set to "true" if running behind ingress with TLS termination
+
+  # Repo server
+  reposerver.parallelism.limit: "0"  # 0 means no limit

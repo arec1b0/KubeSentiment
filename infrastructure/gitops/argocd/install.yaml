@@ -1,0 +1,30 @@
+# ArgoCD Installation Manifest
+# This is the official ArgoCD installation for HA (High Availability) setup
+# To install: kubectl apply -n argocd -f infrastructure/gitops/argocd/install.yaml
+#
+# For the latest version, see: https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+# This is a reference to use the official installation
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    name: argocd
+---
+# To install ArgoCD, run:
+# kubectl create namespace argocd
+# kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+#
+# Or for HA version:
+# kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/ha/install.yaml
+#
+# Get the initial admin password:
+# kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+#
+# Port forward to access UI:
+# kubectl port-forward svc/argocd-server -n argocd 8080:443
+#
+# Access at: https://localhost:8080
+# Username: admin
+# Password: (from the secret above)

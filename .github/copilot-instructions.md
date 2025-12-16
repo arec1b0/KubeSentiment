@@ -218,15 +218,15 @@ from pydantic import BaseModel, Field
 class PredictionRequest(BaseModel):
     """Request schema for predictions."""
     text: str = Field(..., min_length=1, description="Input text")
-    
+
 def predict(text: str, version: str = "latest") -> Dict[str, float]:
     """
     Predict sentiment for text.
-    
+
     Args:
         text: Input text to analyze
         version: Model version to use
-        
+
     Returns:
         Dictionary with label and score
     """
@@ -290,5 +290,5 @@ When suggesting improvements:
 
 ---
 
-*For detailed MLOps standards, see `.cursor/rules/` directory.*  
+*For detailed MLOps standards, see `.cursor/rules/` directory.*
 *Last Updated: October 2025*

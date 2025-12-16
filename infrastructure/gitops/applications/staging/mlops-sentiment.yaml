@@ -1,0 +1,62 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mlops-sentiment-staging
+  namespace: argocd
+  labels:
+    app: mlops-sentiment
+    environment: staging
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: kubesentiment
+
+  source:
+    repoURL: https://github.com/arec1b0/KubeSentiment.git
+    targetRevision: main  # Track main branch for staging
+    path: helm/mlops-sentiment
+    helm:
+      releaseName: mlops-sentiment
+      valueFiles:
+        - values.yaml
+        - values-staging.yaml
+      parameters:
+        - name: image.repository
+          value: ghcr.io/arec1b0/kubesentiment
+        - name: image.tag
+          value: main  # Will be updated by CI
+        - name: replicaCount
+          value: "2"
+        - name: deployment.env.MLOPS_PROFILE
+          value: staging
+        - name: deployment.env.MLOPS_DEBUG
+          value: "false"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mlops-sentiment-staging
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 10
+
+  # Health assessment
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # Ignore replica count differences (for HPA)

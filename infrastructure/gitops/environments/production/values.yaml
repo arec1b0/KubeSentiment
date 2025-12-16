@@ -1,0 +1,29 @@
+# Production Environment Values for GitOps
+# This file contains image tags and configuration managed by CI/CD
+# DO NOT EDIT MANUALLY - Updated automatically by CI pipeline
+
+image:
+  repository: ghcr.io/arec1b0/kubesentiment
+  tag: v1.0.0  # Updated by CI with specific version tags
+
+replicaCount: 3
+
+deployment:
+  env:
+    MLOPS_PROFILE: production
+    MLOPS_DEBUG: "false"
+    MLOPS_LOG_LEVEL: INFO
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 60
+
+resources:
+  limits:
+    cpu: 4000m
+    memory: 8Gi
+  requests:
+    cpu: 2000m
+    memory: 4Gi
