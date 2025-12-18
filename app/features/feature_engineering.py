@@ -281,7 +281,7 @@ class FeatureEngineer:
 _feature_engineer_instance: Optional[FeatureEngineer] = None
 
 
-def get_feature_engineer() -> FeatureEngineer:
+def get_feature_engineer(download_nltk_data: bool = True) -> FeatureEngineer:
     """Provides a singleton instance of the `FeatureEngineer`.
 
     This factory function ensures that the `FeatureEngineer` class, along with
@@ -289,12 +289,16 @@ def get_feature_engineer() -> FeatureEngineer:
     This singleton pattern promotes efficiency and prevents redundant
     initializations.
 
+    Args:
+        download_nltk_data: If True, downloads required NLTK data on
+            initialization. Defaults to True.
+
     Returns:
         The singleton instance of the `FeatureEngineer`.
     """
     global _feature_engineer_instance
     if _feature_engineer_instance is None:
         logger.info("Initializing singleton FeatureEngineer instance...")
-        _feature_engineer_instance = FeatureEngineer()
+        _feature_engineer_instance = FeatureEngineer(download_nltk_data=download_nltk_data)
         logger.info("FeatureEngineer instance created successfully.")
     return _feature_engineer_instance

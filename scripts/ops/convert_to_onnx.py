@@ -7,14 +7,17 @@ improvements for inference. It supports graph optimization and INT8 dynamic
 quantization for reduced model size and faster CPU inference.
 
 Usage:
+    # Run from project root
+    python -m scripts.ops.convert_to_onnx --help
+
     # Basic export
-    python scripts/ops/convert_to_onnx.py --model-name distilbert-base-uncased-finetuned-sst-2-english
+    python -m scripts.ops.convert_to_onnx --model-name distilbert-base-uncased-finetuned-sst-2-english
 
     # Export with INT8 quantization (recommended for production)
-    python scripts/ops/convert_to_onnx.py --quantize
+    python -m scripts.ops.convert_to_onnx --quantize
 
     # Quantize existing ONNX model
-    python scripts/ops/convert_to_onnx.py --quantize-only --input-model ./onnx_models/model.onnx
+    python -m scripts.ops.convert_to_onnx --quantize-only --input-model ./onnx_models/model.onnx
 """
 
 import argparse
@@ -22,12 +25,9 @@ import shutil
 import sys
 from pathlib import Path
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
 from app.core.config import get_settings
 from app.core.logging import get_logger
-from app.models.onnx_sentiment import ONNXModelOptimizer
+from app.ops.onnx.export import ONNXModelOptimizer
 
 logger = get_logger(__name__)
 
@@ -40,13 +40,13 @@ def main():
         epilog="""
 Examples:
   # Convert model to ONNX with optimization
-  python scripts/ops/convert_to_onnx.py --model-name distilbert-base-uncased-finetuned-sst-2-english
+  python -m scripts.ops.convert_to_onnx --model-name distilbert-base-uncased-finetuned-sst-2-english
 
   # Convert with INT8 quantization (4x smaller, 2-3x faster on CPU)
-  python scripts/ops/convert_to_onnx.py --quantize
+  python -m scripts.ops.convert_to_onnx --quantize
 
   # Quantize an existing ONNX model
-  python scripts/ops/convert_to_onnx.py --quantize-only --input-model ./onnx_models/model.onnx
+  python -m scripts.ops.convert_to_onnx --quantize-only --input-model ./onnx_models/model.onnx
         """,
     )
     parser.add_argument(

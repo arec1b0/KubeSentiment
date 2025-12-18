@@ -57,10 +57,10 @@ class ModelFactory:
 
         # Return cached instance if available
         if cache_key in _model_cache:
-            logger.info(f"Returning cached model instance for backend: {backend}")
+            logger.info("Returning cached model instance", backend=backend)
             return _model_cache[cache_key]
 
-        logger.info(f"Creating new model instance for backend: {backend}")
+        logger.info("Creating new model instance", backend=backend)
 
         try:
             if backend.lower() == "pytorch":
@@ -86,7 +86,7 @@ class ModelFactory:
                 raise UnsupportedBackendError(backend=backend, supported_backends=available)
 
         except ImportError as e:
-            logger.error(f"Failed to import backend {backend}: {e}")
+            logger.error("Failed to import backend", backend=backend, error=str(e))
             raise ModelInitializationError(
                 message=f"Backend '{backend}' is not available. "
                 f"Please ensure required dependencies are installed.",
@@ -96,7 +96,7 @@ class ModelFactory:
             # Re-raise our custom exceptions
             raise
         except Exception as e:
-            logger.error(f"Failed to create model for backend {backend}: {e}")
+            logger.error("Failed to create model", backend=backend, error=str(e))
             raise ModelInitializationError(
                 message=f"Failed to initialize model for backend '{backend}': {e}", backend=backend
             ) from e
@@ -158,7 +158,7 @@ class ModelFactory:
             >>> model = ModelFactory.create_model("pytorch")  # Creates new instance
         """
         global _model_cache
-        logger.info(f"Clearing model cache ({len(_model_cache)} instances)")
+        logger.info("Clearing model cache", cached_count=len(_model_cache))
         _model_cache.clear()
 
     @staticmethod

@@ -268,8 +268,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         from app.services.async_batch_service import AsyncBatchService
         from app.services.prediction import PredictionService
         from app.services.stream_processor import StreamProcessor
+        from app.features.feature_engineering import get_feature_engineer
 
-        prediction_svc = PredictionService(model, settings)
+        # Initialize feature engineer with NLTK download controlled by settings
+        # Only download if feature engineering is enabled to save startup time
+        feature_engineer = get_feature_engineer(
+            download_nltk_data=settings.model.enable_feature_engineering
+        )
+        prediction_svc = PredictionService(model, settings, feature_engineer)
         stream_processor = StreamProcessor(model)
         async_batch_service = AsyncBatchService(prediction_svc, stream_processor)
         await async_batch_service.start()

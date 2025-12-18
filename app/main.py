@@ -86,14 +86,14 @@ def create_app() -> FastAPI:
         app.add_middleware(MetricsMiddleware)
         logger.info("Prometheus metrics middleware enabled")
     except Exception as e:
-        logger.warning(f"Prometheus metrics not available: {e}")
+        logger.warning("Prometheus metrics not available", error=str(e))
 
     # Instrument FastAPI for distributed tracing
     try:
         instrument_fastapi_app(app)
         logger.info("Distributed tracing instrumentation enabled")
     except Exception as e:
-        logger.warning(f"Distributed tracing not available: {e}")
+        logger.warning("Distributed tracing not available", error=str(e))
 
     # Handler for Pydantic validation errors
     @app.exception_handler(RequestValidationError)
@@ -171,7 +171,8 @@ def create_app() -> FastAPI:
             context = getattr(exc, "context", None)
 
             logger.warning(
-                f"Service error occurred: {exc}",
+                "Service error occurred",
+                error_message=str(exc),
                 error_code=error_code,
                 status_code=status_code,
                 correlation_id=correlation_id,
@@ -199,7 +200,8 @@ def create_app() -> FastAPI:
         # Handle unexpected errors
         error_id = f"error_{int(time.time())}_{id(exc)}"
         logger.error(
-            f"Unhandled exception: {exc}",
+            "Unhandled exception",
+            error_message=str(exc),
             error_id=error_id,
             correlation_id=correlation_id,
             path=request.url.path,
