@@ -156,7 +156,7 @@ jobs:
           severity: "CRITICAL,HIGH"
 
       - name: Run Grype scanner
-        uses: anchore/scan-action@3343887d815d7b07465f6fdcd395bd66508d486a # v3
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
         with:
           image: sentiment-service:scan
           fail-build: false
