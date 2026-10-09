@@ -20,7 +20,7 @@ plotly>=5.11.0
 psutil>=5.9.0
 
 # GPU monitoring (optional)
-pynvml>=11.4.1
+pynvml>=13.0.1
 
 # Kubernetes integration
 kubernetes>=24.2.0
