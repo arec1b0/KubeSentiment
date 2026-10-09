@@ -38,7 +38,7 @@ widgetsnbextension>=4.0.0
 bokeh>=3.0.0
 
 # Optional: For progress bars in notebooks
-tqdm>=4.64.0
+tqdm>=4.70.1
 
 # Optional: For parallel processing examples
 joblib>=1.2.0
