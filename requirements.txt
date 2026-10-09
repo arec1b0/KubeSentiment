@@ -23,7 +23,7 @@ prometheus-client==0.19.0
 
 # Machine Learning & Model Inference
 torch==2.6.0
-transformers==4.33.0
+transformers==4.46.3
 onnxruntime==1.17.0
 
 # Secrets Management
