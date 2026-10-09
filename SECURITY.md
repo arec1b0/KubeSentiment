@@ -2,20 +2,19 @@
 
 ## Supported Versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+Security fixes are made against the latest stable release. Older releases and
+development builds are not maintained; upgrade to the latest stable release to
+receive security fixes.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+| Version | Supported |
+| ------- | --------- |
+| Latest stable release | Yes |
+| Older releases and development builds | No |
 
 ## Reporting a Vulnerability
 
-Use this section to tell people how to report a vulnerability.
-
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+Please report suspected vulnerabilities through
+[GitHub's private vulnerability reporting](https://github.com/arec1b0/KubeSentiment/security/advisories/new).
+Do not disclose security issues in public issues or discussions. Include the
+affected version, impact, and steps to reproduce. The maintainers will confirm
+receipt and coordinate next steps through the private report.

@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
@@ -56,7 +56,7 @@ jobs:
     with:
       python-version: "3.11"
       test-type: all
-      coverage-threshold: 85
+      coverage-threshold: 90
 
   # Build multi-platform release images
   build:
@@ -92,7 +92,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
@@ -116,7 +116,7 @@ jobs:
           echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...$VERSION" >> CHANGELOG.md
 
       - name: Create release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
           tag_name: ${{ github.event.inputs.version || github.ref_name }}
           name: Release ${{ github.event.inputs.version || github.ref_name }}
@@ -127,16 +127,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Deploy to production
-  deploy-production:
-    name: Deploy to Production
-    needs: create-release
-    uses: ./.github/workflows/deploy.yml
-    secrets: inherit
-    with:
-      environment: production
-      image_tag: ${{ github.event.inputs.version || github.ref_name }}
-
   # Update Helm chart
   update-helm-chart:
     name: Update Helm Chart
@@ -145,7 +135,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -162,7 +152,7 @@ jobs:
           helm package helm/mlops-sentiment/ -d helm-packages/
 
       - name: Upload Helm chart as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: helm-chart-${{ github.event.inputs.version || github.ref_name }}
           path: helm-packages/*.tgz
@@ -171,20 +161,19 @@ jobs:
   # Notify release
   notify:
     name: Notify Release
-    needs: [deploy-production, update-helm-chart]
+    needs: update-helm-chart
     runs-on: ubuntu-latest
     if: always()
 
     steps:
       - name: Send Slack notification
-        uses: 8398a7/action-slack@v3
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3
         with:
           status: ${{ job.status }}
           text: |
-            🚀 Release ${{ github.event.inputs.version || github.ref_name }} deployed!
+            🚀 Release ${{ github.event.inputs.version || github.ref_name }} published!
 
-            **Status**: ${{ needs.deploy-production.result }}
-            **Environment**: Production
+            **Status**: ${{ needs.update-helm-chart.result }}
             **Image**: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.version || github.ref_name }}
 
             [View Release](https://github.com/${{ github.repository }}/releases/tag/${{ github.event.inputs.version || github.ref_name }})

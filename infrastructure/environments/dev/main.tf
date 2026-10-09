@@ -9,7 +9,7 @@ provider "kind" {
 }
 
 module "kind_cluster" {
-  source = "../modules/kind-cluster"
+  source = "../../modules/kind-cluster"
 
   cluster_name = "mlops-dev-cluster"
 }

@@ -20,7 +20,7 @@ Deep dive into KubeSentiment's domain-driven configuration system.
 KubeSentiment uses a **domain-driven configuration architecture** that:
 
 - **Separates concerns** - Each domain (Kafka, Redis, Model, etc.) has its own config class
-- **Maintains compatibility** - 100% backward compatible with existing code via delegation properties
+- **Maintains compatibility** - legacy flat properties still delegate to domain settings
 - **Improves testability** - Mock only the specific domain you need to test
 - **Scales better** - Adding new settings doesn't impact existing code
 - **Clarifies intent** - It's obvious which configuration domain a component depends on
@@ -76,7 +76,7 @@ app/core/config/
 - ✅ Better testing (mock only needed domains)
 - ✅ Clearer dependencies (obvious which config a component needs)
 - ✅ Type safety (explicit types per domain)
-- ✅ 100% backward compatible
+- ✅ Legacy flat properties remain available while callers migrate
 
 ---
 

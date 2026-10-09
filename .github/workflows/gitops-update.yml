@@ -36,7 +36,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
@@ -44,19 +44,20 @@ jobs:
       - name: Determine environment and image tag
         id: determine
         run: |
+          SHORT_SHA="${GITHUB_SHA:0:7}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "environment=${{ inputs.environment }}" >> $GITHUB_OUTPUT
             echo "image_tag=${{ inputs.image_tag }}" >> $GITHUB_OUTPUT
           elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "environment=staging" >> $GITHUB_OUTPUT
-            echo "image_tag=main-${{ github.sha:0:7 }}" >> $GITHUB_OUTPUT
+            echo "image_tag=main-$SHORT_SHA" >> $GITHUB_OUTPUT
           elif [ "${{ github.ref }}" = "refs/heads/develop" ]; then
             echo "environment=development" >> $GITHUB_OUTPUT
-            echo "image_tag=develop-${{ github.sha:0:7 }}" >> $GITHUB_OUTPUT
+            echo "image_tag=develop-$SHORT_SHA" >> $GITHUB_OUTPUT
           fi
 
       - name: Setup yq
-        uses: mikefarah/yq@master
+        uses: mikefarah/yq@504fc38780cc46be8444ea1b72fb55919fc0bfb0 # v4.54.1
 
       - name: Update image tag in GitOps values
         run: |

@@ -1,10 +1,8 @@
 # KubeSentiment: Production-Ready MLOps Sentiment Analysis Microservice
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/arec1b0/KubeSentiment/actions)
+[![Build Status](https://github.com/arec1b0/KubeSentiment/actions/workflows/ci-main.yml/badge.svg?branch=main)](https://github.com/arec1b0/KubeSentiment/actions/workflows/ci-main.yml)
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/arec1b0/KubeSentiment/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Code Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)](https://example.com/coverage)
-[![Code Quality](https://img.shields.io/badge/quality-A-brightgreen.svg)](https://example.com/quality)
 
 **KubeSentiment** is a production-grade, scalable, and observable sentiment analysis microservice. Built with FastAPI and designed for Kubernetes, it embodies modern MLOps best practices from the ground up, providing a robust foundation for deploying machine learning models in a cloud-native environment.
 

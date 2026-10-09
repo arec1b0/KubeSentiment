@@ -14,7 +14,7 @@ pydantic-settings>=2.1.0
 python-dotenv==1.0.0
 
 # HTTP Clients
-requests==2.31.0
+requests==2.34.2
 httpx==0.25.1
 
 # Logging & Monitoring
@@ -71,7 +71,7 @@ shap==0.44.0
 captum==0.7.0
 
 # Drift Detection & Data Quality
-evidently==0.4.11
+evidently==0.6.7
 scipy==1.11.4
 pandas==2.1.4
 

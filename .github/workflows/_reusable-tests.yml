@@ -16,7 +16,7 @@ on:
         description: "Minimum coverage threshold"
         required: false
         type: number
-        default: 0
+        default: 90
     outputs:
       coverage-percentage:
         description: "Test coverage percentage"
@@ -31,10 +31,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@7f4fc3e22c37d6ff65e88745f38bd3157c663f7c # v4
         with:
           python-version: ${{ inputs.python-version }}
           cache: "pip"
@@ -98,7 +98,7 @@ jobs:
           echo "Coverage: ${COVERAGE_PERCENT%.*}%"
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@ab904c41d6ece82784817410c45d8b8c02684457 # v3
         with:
           file: ./coverage.xml
           flags: ${{ inputs.test-type }}
@@ -106,7 +106,7 @@ jobs:
           fail_ci_if_error: false
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: coverage-${{ inputs.test-type }}
