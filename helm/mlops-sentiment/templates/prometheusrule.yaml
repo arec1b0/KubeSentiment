@@ -81,7 +81,7 @@ spec:
         component: resources
       annotations:
         summary: "High CPU usage detected"
-        description: "CPU usage is {{ "{{ $value }}" }}% on pod {{ $labels.pod }}"
+        description: "CPU usage is {{ "{{ $value }}" }}% on pod {{ "{{ $labels.pod }}" }}"
         runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#high-cpu"
 
     - alert: MLOpsHighMemoryUsage
@@ -93,7 +93,7 @@ spec:
         component: resources
       annotations:
         summary: "High memory usage detected"
-        description: "Memory usage is {{ "{{ $value }}" }}% on pod {{ $labels.pod }}"
+        description: "Memory usage is {{ "{{ $value }}" }}% on pod {{ "{{ $labels.pod }}" }}"
         runbook_url: "https://github.com/arec1b0/KubeSentiment/wiki/runbooks#high-memory"
 
     - alert: MLOpsPodCrashLooping

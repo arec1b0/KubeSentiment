@@ -36,14 +36,18 @@ jobs:
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
+            const codeQualityResult = '${{ needs.code-quality.result }}';
+            const testsResult = '${{ needs.tests.result }}';
+            const allPassed = codeQualityResult === 'success' && testsResult === 'success';
+
             const summary = `## CI/CD Pipeline Results
 
             ### Job Status
-            - **Code Quality**: ${{ needs.code-quality.result }}
-            - **Tests and Coverage**: ${{ needs.tests.result }}
+            - **Code Quality**: ${codeQualityResult}
+            - **Tests and Coverage**: ${testsResult}
 
             ### Next Steps
-            ${needs.code-quality.result === 'success' && needs.tests.result === 'success'
+            ${allPassed
               ? '✅ All checks passed! Ready for review.'
               : '❌ Some checks failed. Please review the logs and fix the issues.'}
 
