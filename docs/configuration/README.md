@@ -42,7 +42,7 @@ KubeSentiment uses a **profile-based configuration system** with **domain-driven
 - **Profiles** provide environment-specific defaults (local, development, staging, production)
 - **Domains** organize settings by functionality (server, model, kafka, redis, etc.)
 - **Environment variables** override defaults as needed
-- **100% backward compatible** - existing code works without changes
+- **Backward-compatible migration** - legacy flat settings still delegate to domain settings
 
 ### Key Features
 
@@ -50,7 +50,7 @@ KubeSentiment uses a **profile-based configuration system** with **domain-driven
 ✅ Environment-specific defaults (no repetition)
 ✅ Domain-separated settings (easier to understand)
 ✅ Type-safe configuration with validation
-✅ Full backward compatibility
+✅ Legacy flat properties remain available during migration
 
 ---
 
@@ -202,10 +202,9 @@ Logical groupings of configuration settings by functionality:
 - **Monitoring:** Metrics, logging, tracing configuration
 - ... and 4 more (vault, performance, data_lake, mlops)
 
-Access domain settings:
+Use domain settings in new code:
 ```python
 settings.model.model_name        # New style (recommended)
-settings.model_name              # Old style (still works)
 ```
 
 ### Configuration Loading Order
@@ -220,7 +219,7 @@ This allows:
 - Secrets stay in vault/env, not in code
 
 ### Backward Compatibility
-The new domain-driven architecture is **100% backward compatible** with existing code. All old property names still work via delegation to domain objects:
+Legacy flat property names and constructor arguments are still supported through delegation to domain objects. They exist for compatibility; use nested domain settings in new code and migrate existing callers before removing the aliases:
 
 ```python
 settings.model_name      # → settings.model.model_name

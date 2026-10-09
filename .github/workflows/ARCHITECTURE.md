@@ -40,11 +40,8 @@ This document provides a visual overview of the KubeSentiment GitHub Actions wor
 │  │ Trigger: Pull requests to main/develop                              │   │
 │  ├─────────────────────────────────────────────────────────────────────┤   │
 │  │  1. Code Quality (calls _reusable-code-quality.yml)                 │   │
-│  │  2. Unit Tests (calls _reusable-tests.yml with type=unit)           │   │
-│  │  3. Integration Tests (calls _reusable-tests.yml type=integration)  │   │
-│  │  4. Performance Tests (calls _reusable-tests.yml type=performance)  │   │
-│  │  5. Coverage Check (≥85% threshold)                                 │   │
-│  │  6. PR Summary Comment                                              │   │
+│  │  2. Full Test Suite and Coverage (≥90% threshold)                   │   │
+│  │  3. PR Summary Comment                                              │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
@@ -52,7 +49,7 @@ This document provides a visual overview of the KubeSentiment GitHub Actions wor
 │  │ Trigger: Push to main/develop, version tags                         │   │
 │  ├─────────────────────────────────────────────────────────────────────┤   │
 │  │  1. Code Quality (calls _reusable-code-quality.yml)                 │   │
-│  │  2. Full Test Suite (calls _reusable-tests.yml type=all, 85%)      │   │
+│  │  2. Full Test Suite (calls _reusable-tests.yml type=all, 90%)      │   │
 │  │  3. Docker Build (calls _reusable-docker-build.yml)                 │   │
 │  │     - Multi-platform: amd64, arm64                                  │   │
 │  │     - Push to ghcr.io                                               │   │

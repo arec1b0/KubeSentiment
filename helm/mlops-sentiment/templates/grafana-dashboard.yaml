@@ -102,7 +102,7 @@ data:
             {
               "expr": "rate(sentiment_requests_total{job=\"mlops-sentiment\"}[5m])",
               "interval": "",
-              "legendFormat": "{{method}} {{status}}",
+              "legendFormat": "{{ "{{method}} {{status}}" }}",
               "refId": "A"
             }
           ],
@@ -325,7 +325,7 @@ data:
             {
               "expr": "rate(container_cpu_usage_seconds_total{pod=~\"mlops-sentiment-.*\"}[5m]) * 100",
               "interval": "",
-              "legendFormat": "{{pod}}",
+              "legendFormat": "{{ "{{pod}}" }}",
               "refId": "A"
             }
           ],
@@ -406,7 +406,7 @@ data:
             {
               "expr": "container_memory_usage_bytes{pod=~\"mlops-sentiment-.*\"}",
               "interval": "",
-              "legendFormat": "{{pod}}",
+              "legendFormat": "{{ "{{pod}}" }}",
               "refId": "A"
             }
           ],
@@ -481,7 +481,7 @@ data:
             {
               "expr": "up{job=\"mlops-sentiment\"}",
               "interval": "",
-              "legendFormat": "{{instance}}",
+              "legendFormat": "{{ "{{instance}}" }}",
               "refId": "A"
             }
           ],

@@ -4,7 +4,7 @@ Upgrading to the new domain-driven configuration architecture.
 
 ## Quick Summary
 
-**Good news:** All existing code continues to work without modifications. The refactored configuration system is **100% backward compatible**.
+Legacy flat properties and constructor arguments continue to work through delegation, but new code should use nested domain settings. No removal schedule has been set; migrate callers before any future removal.
 
 ```python
 # Your existing code still works
@@ -88,7 +88,7 @@ class Settings(BaseSettings):
 - One domain per configuration class
 - Easy to find settings (open relevant module)
 - Test only what you need (mock specific domains)
-- 100% backward compatible
+- Legacy flat aliases continue to work; new code should use nested domain settings
 
 ---
 
@@ -496,7 +496,7 @@ def test_prediction_endpoint(client):
 ## Common Questions
 
 ### Q: Do I need to update my code?
-**A:** No! All existing code works without changes. The refactoring is 100% backward compatible.
+**A:** Legacy flat aliases continue to delegate to their domain settings. Use the nested API for new code and migrate existing callers before any future removal.
 
 ### Q: Should I update my code?
 **A:** For new code, using domain-specific access (`settings.model.model_name`) is recommended for clarity. For existing code, updates are optional.

@@ -37,10 +37,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@633666f66e0061ca3b725c73b2ec20cd13a8fdd1 # v2
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
@@ -82,7 +82,7 @@ jobs:
 
       - name: Update PR with Terraform Plan
         if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
             const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
@@ -112,6 +112,7 @@ jobs:
         run: exit 1
 
       - name: Terraform Apply
+        id: apply
         if: |
           (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply') ||
           (github.event_name == 'push' && github.ref == 'refs/heads/main')
@@ -127,7 +128,7 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Upload Terraform Plan
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: steps.plan.outcome == 'success'
         with:
           name: terraform-plan-${{ github.event.inputs.environment || 'dev' }}

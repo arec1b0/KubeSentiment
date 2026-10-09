@@ -1,0 +1,63 @@
+name: Deployment Validation
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "app/**"
+      - "Dockerfile*"
+      - "helm/**"
+      - "infrastructure/**"
+      - "requirements*.txt"
+      - ".github/workflows/deployment-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  helm:
+    name: Helm Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@5119fcb9089d432beecbf79bb2c7915207344b78 # v3
+        with:
+          version: v3.13.0
+
+      - name: Update Helm dependencies
+        run: helm dependency update ./helm/mlops-sentiment
+
+      - name: Lint Helm chart
+        run: helm lint ./helm/mlops-sentiment
+
+      - name: Render Helm chart
+        run: |
+          helm template mlops-sentiment ./helm/mlops-sentiment \
+            --namespace mlops-sentiment \
+            --set prometheus.enabled=false \
+            --set grafana.enabled=false \
+            --set alertmanager.enabled=false
+
+  terraform:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@633666f66e0061ca3b725c73b2ec20cd13a8fdd1 # v2
+        with:
+          terraform_version: 1.6.6
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive infrastructure
+
+      - name: Initialize development configuration
+        run: terraform -chdir=infrastructure/environments/dev init -backend=false -input=false
+
+      - name: Validate development configuration
+        run: terraform -chdir=infrastructure/environments/dev validate -no-color

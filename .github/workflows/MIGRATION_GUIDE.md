@@ -151,7 +151,7 @@ jobs:
     uses: ./.github/workflows/_reusable-tests.yml
     with:
       test-type: unit
-      coverage-threshold: 85
+      coverage-threshold: 90
 ```
 
 **Impact:** DRY principle - write once, use everywhere.
@@ -299,7 +299,7 @@ jobs:
 
 **Solution:**
 1. Adjust threshold in `_reusable-tests.yml` or calling workflow
-2. Run locally: `pytest --cov=app --cov-fail-under=85`
+2. Run locally: `pytest --cov=app --cov-fail-under=90`
 3. Check if test files moved or renamed
 
 ---

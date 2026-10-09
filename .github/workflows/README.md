@@ -33,6 +33,7 @@ The workflow system is designed with modularity and reusability in mind:
 │ • ci-pr.yml           - Pull Request validation         │
 │ • ci-main.yml         - Main/Develop branch CI/CD       │
 │ • deploy.yml          - Kubernetes deployment           │
+│ • deployment-validation.yml - Helm and Terraform checks │
 └─────────────────────────────────────────────────────────┘
                             ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -85,7 +86,7 @@ Runs tests with coverage reporting. Supports different test types and coverage t
 **Inputs:**
 - `python-version` (string, default: "3.11") - Python version to use
 - `test-type` (string, required) - Type of tests: unit/integration/performance/all
-- `coverage-threshold` (number, default: 0) - Minimum coverage percentage
+- `coverage-threshold` (number, default: 90) - Minimum coverage percentage
 
 **Outputs:**
 - `coverage-percentage` - Test coverage percentage
@@ -98,7 +99,7 @@ jobs:
     with:
       python-version: "3.11"
       test-type: unit
-      coverage-threshold: 85
+      coverage-threshold: 90
 ```
 
 ### `_reusable-docker-build.yml`
@@ -139,13 +140,16 @@ jobs:
 
 **Jobs:**
 1. Code quality checks
-2. Unit tests
-3. Integration tests
-4. Performance tests
-5. Combined coverage check (≥85%)
-6. PR summary comment
+2. Full test suite and combined coverage check (≥90%)
+3. PR summary comment
 
 **Purpose:** Validate all changes before merging
+
+### `deployment-validation.yml` - Deployment Configuration Validation
+
+**Triggers:** Pull requests that change Helm charts, Terraform infrastructure, or this workflow
+
+**Checks:** Helm chart linting/rendering and Terraform formatting/validation.
 
 ### `ci-main.yml` - Main Branch CI/CD
 
@@ -155,12 +159,20 @@ jobs:
 
 **Jobs:**
 1. Code quality checks
-2. Full test suite with 85% coverage threshold
+2. Full test suite with 90% coverage threshold
 3. Multi-platform Docker image build
 4. Security scanning with Trivy
 5. Trigger deployment workflow
 
 **Purpose:** Build and prepare deployments for main branches
+
+### Security Scan Gate Status
+
+Security scans run on application, dependency, container, and workflow changes.
+Dependency findings are currently reported as warnings with downloadable
+artifacts because the existing runtime baseline contains advisories; scanner
+execution errors still fail the dependency scan. Enable blocking thresholds
+after the existing findings are triaged and remediated.
 
 ### `deploy.yml` - Kubernetes Deployment
 
@@ -300,7 +312,7 @@ mypy app/
 # Tests
 pytest tests/unit/ -v -m unit --cov=app
 pytest tests/integration/ -v -m integration --cov=app
-pytest tests/ -v --cov=app --cov-fail-under=85
+pytest tests/ -v --cov=app --cov-fail-under=90
 ```
 
 ### Triggering Deployment
@@ -443,15 +455,14 @@ act pull_request
 Pin action versions for security and stability:
 
 ```yaml
-# ✅ Good - pinned version
-- uses: actions/checkout@v4
+# ✅ Good - immutable commit SHA; Dependabot tracks the version comment
+- uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-# ⚠️ Acceptable - major version
-- uses: actions/checkout@v4
-
-# ❌ Bad - unpinned
+# ⚠️ Avoid mutable tags and branches in production workflows
 - uses: actions/checkout@master
 ```
+
+Dependabot updates pinned GitHub Actions and Python requirement manifests weekly.
 
 ### 9. **Use Matrix Builds**
 
