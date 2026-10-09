@@ -27,7 +27,7 @@ transformers==4.46.3
 onnxruntime==1.17.0
 
 # Secrets Management
-hvac>=1.2.0
+hvac>=2.4.0
 
 # Kubernetes Integration
 kubernetes>=27.0.0
